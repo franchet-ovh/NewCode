@@ -7,6 +7,7 @@ use std::{
 mod explorer;
 mod geometry;
 mod layout;
+mod mobile;
 mod persistence;
 
 fn test_app() -> EditorApp {
@@ -37,6 +38,7 @@ fn test_app() -> EditorApp {
         rename_text: String::new(),
         status: "Ready".into(),
         sidebar_mode: SidebarMode::Explorer,
+        mobile: Default::default(),
         git_ui: crate::git_ui::GitUi::default(),
         addons: crate::addons::Addons::default(),
         search_query: String::new(),

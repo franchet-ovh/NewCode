@@ -105,6 +105,58 @@ class DevTools:
         time.sleep(0.15)
 
 
+def mobile_panels(dev, source, screenshot, addons):
+    """Exercise actual touch input and the canvas at phone viewport sizes."""
+    def tap(x, y):
+        dev.send("Input.dispatchTouchEvent", {"type": "touchStart", "touchPoints": [{"x": x, "y": y}]})
+        time.sleep(0.08)
+        dev.send("Input.dispatchTouchEvent", {"type": "touchEnd", "touchPoints": []})
+        time.sleep(0.25)
+
+    def choose(index):
+        tap(40, 26)
+        tap(100, 94 + 48 * index)
+
+    dev.send("Emulation.setTouchEmulationEnabled", {"enabled": True})
+    for width, height in [(390, 844), (844, 390), (360, 640)]:
+        dev.send("Emulation.setDeviceMetricsOverride", {"width": width, "height": height, "deviceScaleFactor": 1, "mobile": True})
+        time.sleep(0.4)
+        dimensions = dev.evaluate("({canvas: document.querySelector('#editor').clientWidth, body: document.body.clientWidth, layout: innerWidth, visual: visualViewport.width, scale: visualViewport.scale})")
+        print(f"Mobile viewport {width} × {height}: {dimensions}", flush=True)
+        wait_until(lambda: dev.evaluate(f"Math.abs(document.querySelector('#editor').clientWidth - {width}) <= 1"))
+        # Visit all built-in panels. The long portrait viewport also fits addon rows.
+        for index in range(7 if height > 600 else 5):
+            choose(index)
+            assert dev.evaluate("document.activeElement.id !== 'input'"), "Navigation opened the software keyboard"
+            assert dev.evaluate("document.querySelector('#notice').hidden"), "Touch transport failed"
+        if addons and height > 800:
+            for index in range(7, 7 + len(addons)):
+                choose(index)
+                time.sleep(0.5)
+        if width == 390:
+            tap(40, 26)
+            drawer_screenshot = screenshot.with_name(f"{screenshot.stem}-mobile-drawer.png")
+            drawer_screenshot.write_bytes(base64.b64decode(dev.send("Page.captureScreenshot", {"format": "png"})["data"]))
+            tap(width - 10, 400)
+        choose(0)
+        if width == 390:
+            # Tap the document and explicitly request the mobile keyboard bridge.
+            tap(140, 115)
+            bounds = dev.evaluate("(() => { const r = document.querySelector('#keyboard').getBoundingClientRect(); return {x:r.x+r.width/2,y:r.y+r.height/2}; })()")
+            tap(bounds["x"], bounds["y"])
+            assert dev.evaluate("document.activeElement.id === 'input'"), "Keyboard button did not focus text input"
+            dev.text("mobile input")
+            tap(285, 26)  # Save in the compact header.
+            wait_until(lambda: "mobile input" in source.read_text())
+            dev.evaluate("document.querySelector('#input').blur()")
+        mobile_screenshot = screenshot.with_name(f"{screenshot.stem}-mobile-{width}.png")
+        mobile_screenshot.write_bytes(base64.b64decode(dev.send("Page.captureScreenshot", {"format": "png"})["data"]))
+    dev.send("Emulation.setTouchEmulationEnabled", {"enabled": False})
+    dev.send("Emulation.setDeviceMetricsOverride", {"width": 1000, "height": 720, "deviceScaleFactor": 2, "mobile": False})
+    wait_until(lambda: dev.evaluate("window.smokeFrame?.size[0] >= 900 && window.smokeFrame?.scale === 2"))
+    print("Mobile panel navigation, touch input, keyboard bridge, and resize passed", flush=True)
+
+
 def run(binary, browser, screenshot, addons):
     with tempfile.TemporaryDirectory(prefix="focus-browser-smoke-") as temporary:
         root = Path(temporary)
@@ -195,11 +247,15 @@ def run(binary, browser, screenshot, addons):
                 const originalFetch = window.fetch;
                 window.fetch = async (...args) => {
                     window.smokeHeaders = args[1]?.headers;
+                    if (String(args[0]).endsWith('/api/frame')) {
+                        const input = JSON.parse(args[1].body);
+                        if (input.events.length) window.smokeInput = input.events;
+                    }
                     const response = await originalFetch(...args);
                     if (String(args[0]).endsWith('/api/frame') && response.status === 200) {
                         response.clone().json().then(frame => { window.smokeFrame = {
                             dirty: frame.dirty, title: frame.title,
-                            meshes: frame.meshes.length, scale: frame.pixels_per_point
+                            meshes: frame.meshes.length, scale: frame.pixels_per_point, size: frame.size
                         }; });
                     }
                     return response;
@@ -285,6 +341,7 @@ def run(binary, browser, screenshot, addons):
             with Image.open(screenshot) as image:
                 assert len(image.convert("RGB").getcolors(image.width * image.height)) > 100, "Canvas did not render text and controls"
             print("Resize and high DPI rendering passed", flush=True)
+            mobile_panels(dev, source, screenshot, addon_ids)
 
             # Ensure shutdown confirmation covers unsaved edits too.
             dev.click(600, 102)
@@ -316,7 +373,7 @@ def run(binary, browser, screenshot, addons):
                     failure.parent.mkdir(parents=True, exist_ok=True)
                     failure.write_bytes(base64.b64decode(dev.send("Page.captureScreenshot", {"format": "png"})["data"]))
                     print("Browser failure screenshot:", failure)
-                    print("Browser state:", dev.evaluate("({frame: window.smokeFrame, focus: document.activeElement.id, status: document.querySelector('#message')?.textContent})"))
+                    print("Browser state:", dev.evaluate("({frame: window.smokeFrame, input: window.smokeInput, focus: document.activeElement.id, status: document.querySelector('#message')?.textContent})"))
                     print("Fixture document:", repr(source.read_text()))
                 except Exception:
                     pass

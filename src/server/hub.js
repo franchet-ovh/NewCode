@@ -9,6 +9,33 @@ const stopDialog = document.querySelector('#stop-dialog');
 const waiting = new Set(), stopping = new Set();
 let selected = location.hash.slice(1), records = [], workspaces = [], stopId = null;
 let editorSnapshot = '', workspaceSnapshot = '';
+const sidebar = document.querySelector('#hub-sidebar');
+const sidebarToggle = document.querySelector('#sidebar-toggle');
+const sidebarBackdrop = document.querySelector('#sidebar-backdrop');
+const compactHub = matchMedia('(max-width: 899px)');
+let sidebarOpen = !compactHub.matches || !selected;
+function showSidebar(open, restoreFocus = false) {
+  sidebarOpen = open;
+  document.body.classList.toggle('sidebar-collapsed', !open);
+  sidebar.inert = !open;
+  sidebarToggle.setAttribute('aria-expanded', String(open));
+  const label = open ? 'Collapse sidebar' : 'Open sidebar';
+  sidebarToggle.setAttribute('aria-label', label);
+  sidebarToggle.title = label;
+  sidebarBackdrop.hidden = !open || !compactHub.matches;
+  if (restoreFocus) sidebarToggle.focus();
+}
+sidebarToggle.addEventListener('click', () => showSidebar(!sidebarOpen));
+sidebarBackdrop.addEventListener('click', () => showSidebar(false, true));
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && compactHub.matches && sidebarOpen && !addDialog.open && !stopDialog.open) {
+    showSidebar(false, true);
+    event.preventDefault();
+  }
+});
+compactHub.addEventListener('change', () => showSidebar(sidebarOpen));
+showSidebar(sidebarOpen);
+
 
 function error(element, message = '') { element.textContent = message; element.hidden = !message; }
 async function api(path, method = 'GET', body) {
@@ -23,6 +50,7 @@ function select(id) {
   selected = id;
   history.replaceState(null, '', `#${id}`);
   frame.hidden = false; empty.hidden = true;
+  if (compactHub.matches) showSidebar(false, sidebar.contains(document.activeElement));
   for (const row of list.children) row.querySelector('.editor-select').setAttribute('aria-current', String(row.dataset.id === id));
 }
 async function start(workspace) {

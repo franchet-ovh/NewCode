@@ -47,8 +47,30 @@ pub(crate) struct GitUi {
     diff_target: Option<Selection>,
     diff_hidden: bool,
     review_status: review::ReviewStatus,
+    open_review_requested: bool,
 }
 impl GitUi {
+    pub(crate) fn take_open_review_request(&mut self) -> bool {
+        std::mem::take(&mut self.open_review_requested)
+    }
+
+    pub(crate) fn background_tick(
+        &mut self,
+        workspace: Option<&Path>,
+        runtime: Option<&Runtime>,
+        ctx: &egui::Context,
+    ) {
+        self.sync_workspace(workspace, runtime);
+        self.poll_reply();
+        // Do not start refreshing repositories until Source Control has been opened.
+        if self.snapshot.is_some()
+            || self.refresh.is_some()
+            || self.pending.is_some()
+            || self.review_request.is_some()
+        {
+            self.schedule_refresh(ctx, false);
+        }
+    }
     fn ticket(&self) -> Ticket {
         Ticket {
             repository: self.repository_generation,

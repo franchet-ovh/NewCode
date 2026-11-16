@@ -102,6 +102,7 @@ impl EditorApp {
         }
         let mut choice = None;
         eframe::egui::Modal::new(eframe::egui::Id::new("switch_workspace")).show(ctx, |ui| {
+            ui.set_max_width((ctx.viewport_rect().width() - 40.0).min(420.0));
             ui.heading("Unsaved changes");
             ui.label("Save changes before switching workspaces?");
             ui.horizontal(|ui| {

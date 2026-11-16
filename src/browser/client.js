@@ -1,6 +1,31 @@
 // Browser integration for the shared Rust/egui application. No remote assets or Node runtime.
 const canvas = document.querySelector("#editor");
 const input = document.querySelector("#input");
+const keyboardButton = document.querySelector("#keyboard");
+const touchUi = matchMedia("(pointer: coarse)");
+// Use the visible viewport, including when mobile browser chrome or the IME changes it.
+function resizeViewport() {
+  const viewport = window.visualViewport;
+  // Keep width tied to the layout viewport: fractional visual widths can otherwise
+  // feed back into mobile viewport scaling when rotating the device.
+  document.body.style.width = `${document.documentElement.clientWidth}px`;
+  document.body.style.height = `${Math.round(viewport?.height ?? innerHeight)}px`;
+  document.body.style.left = `${viewport?.offsetLeft ?? 0}px`;
+  document.body.style.top = `${viewport?.offsetTop ?? 0}px`;
+}
+window.visualViewport?.addEventListener("resize", resizeViewport);
+window.visualViewport?.addEventListener("scroll", resizeViewport);
+window.addEventListener("resize", resizeViewport);
+resizeViewport();
+keyboardButton.addEventListener("pointerdown", event => event.preventDefault());
+keyboardButton.addEventListener("click", () => {
+  if (!running || !control.owned) return;
+  if (document.activeElement === input) input.blur();
+  else input.focus({ preventScroll: true });
+});
+input.addEventListener("focus", () => keyboardButton.setAttribute("aria-pressed", "true"));
+input.addEventListener("blur", () => keyboardButton.setAttribute("aria-pressed", "false"));
+touchUi.addEventListener("change", event => { if (event.matches) input.blur(); });
 const notice = document.querySelector("#notice");
 const message = document.querySelector("#message");
 const reconnect = document.querySelector("#reconnect");
@@ -25,11 +50,13 @@ function setControl(next) {
   }
   control = next;
   controlBar.hidden = control.owned;
+  keyboardButton.disabled = !control.owned;
+  if (!control.owned) input.blur();
   ownerLabel.textContent = control.owner ? `${control.owner} has control.` : "Viewing this editor.";
 }
 const isMac = /Mac|iPhone|iPad/.test(navigator.platform);
 let events = [], running = false, dirty = false, composing = false, timer, inFlight;
-let lastComposition = null;
+let lastComposition = null, hadIme = false;
 
 
 function showNotice(text, retry = false) {
@@ -224,9 +251,12 @@ function platform(frame) {
   if (frame.paste) void pasteText();
   if (frame.output.ime) {
     const rect = frame.output.ime.cursor_rect;
-    input.style.left = `${view.x + rect.min.x * view.scale}px`;
-    input.style.top = `${view.y + rect.max.y * view.scale}px`;
+    const bounds = canvas.getBoundingClientRect();
+    input.style.left = `${Math.max(bounds.left, Math.min(bounds.right - 1, bounds.left + view.x + rect.min.x * view.scale))}px`;
+    input.style.top = `${Math.max(bounds.top, Math.min(bounds.bottom - 1, bounds.top + view.y + rect.max.y * view.scale))}px`;
   }
+  if (touchUi.matches && hadIme && !frame.output.ime) input.blur();
+  hadIme = Boolean(frame.output.ime);
 }
 
 function queue(event) {
@@ -337,6 +367,11 @@ input.addEventListener("beforeinput", event => {
     return;
   }
   if (event.inputType === "insertText" && event.data) { queue({ Text: event.data }); event.preventDefault(); }
+  const editKey = { deleteContentBackward: "Backspace", deleteContentForward: "Delete", insertLineBreak: "Enter", insertParagraph: "Enter" }[event.inputType];
+  if (editKey) {
+    for (const pressed of [true, false]) queue({ Key: { key: editKey, physical_key: null, pressed, repeat: false, modifiers: modifiers(event) } });
+    event.preventDefault();
+  }
 });
 input.addEventListener("input", () => { if (!composing) input.value = ""; });
 input.addEventListener("compositionstart", () => { composing = true; });
@@ -361,24 +396,38 @@ function position(event) {
   // Only the controller sends pointers, together with its own viewport dimensions.
   return { x: event.clientX - rect.left, y: event.clientY - rect.top };
 }
-canvas.addEventListener("pointermove", event => queue({ PointerMoved: position(event) }));
+function touch(event, phase) {
+  if (event.pointerType === "touch") queue({ Touch: { device_id: 0, id: event.pointerId, phase, pos: position(event), force: event.pressure || null } });
+}
+canvas.addEventListener("pointermove", event => {
+  touch(event, "Move");
+  if (event.isPrimary) queue({ PointerMoved: position(event) });
+});
 canvas.addEventListener("pointerdown", event => {
   if (!running || !control.owned) return;
-  input.focus({ preventScroll: true });
+  // Opening a drawer or scrolling must not summon the phone keyboard.
+  if (event.pointerType !== "touch") input.focus({ preventScroll: true });
+  else if (document.activeElement !== input) canvas.focus({ preventScroll: true });
   canvas.setPointerCapture(event.pointerId);
+  touch(event, "Start");
+  if (!event.isPrimary) return;
   queue({ PointerMoved: position(event) });
   const button = ["Primary", "Middle", "Secondary", "Extra1", "Extra2"][event.button];
   if (button) queue({ PointerButton: { pos: position(event), button, pressed: true, modifiers: modifiers(event) } });
   event.preventDefault();
 });
 canvas.addEventListener("pointerup", event => {
+  touch(event, "End");
   const button = ["Primary", "Middle", "Secondary", "Extra1", "Extra2"][event.button];
-  if (button) queue({ PointerButton: { pos: position(event), button, pressed: false, modifiers: modifiers(event) } });
+  if (button && event.isPrimary) queue({ PointerButton: { pos: position(event), button, pressed: false, modifiers: modifiers(event) } });
   if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
+  if (event.pointerType === "touch" && event.isPrimary) queue("PointerGone");
 });
 canvas.addEventListener("pointerleave", () => queue("PointerGone"));
 canvas.addEventListener("pointercancel", event => {
-  queue({ PointerButton: { pos: position(event), button: "Primary", pressed: false, modifiers: modifiers(event) } });
+  touch(event, "Cancel");
+  if (event.isPrimary) queue({ PointerButton: { pos: position(event), button: "Primary", pressed: false, modifiers: modifiers(event) } });
+  if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
   queue("PointerGone");
 });
 canvas.addEventListener("contextmenu", event => event.preventDefault());

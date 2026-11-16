@@ -132,6 +132,7 @@ impl GitUi {
             return;
         }
         if let Action::Diff(selection) = action {
+            self.open_review_requested = true;
             self.load_review(selection, ctx);
             return;
         }

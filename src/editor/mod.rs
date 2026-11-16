@@ -22,6 +22,7 @@ mod documents;
 mod explorer;
 mod layout;
 mod logs;
+mod mobile;
 mod persistence;
 mod search;
 mod shell;
@@ -65,6 +66,7 @@ pub(crate) struct EditorApp {
     rename_text: String,
     status: String,
     sidebar_mode: SidebarMode,
+    mobile: mobile::MobileState,
     git_ui: crate::git_ui::GitUi,
     addons: crate::addons::Addons,
     search_query: String,
@@ -144,6 +146,7 @@ impl EditorApp {
             rename_text: String::new(),
             status: "Ready".into(),
             sidebar_mode: SidebarMode::Explorer,
+            mobile: Default::default(),
             git_ui: crate::git_ui::GitUi::default(),
             addons,
             search_query: String::new(),
@@ -227,21 +230,34 @@ impl EditorApp {
         }
         let opened_find = self.editor_shortcuts(ctx);
         self.update_addons(ctx);
-        self.toolbar(root);
         self.update_window_title(ctx);
-        self.status_bar(root);
-        let cwd = self.settings.workspace.clone();
-        let runtime = self.dev_container.runtime().cloned();
-        self.activity_bar(root);
+        // Hidden panels still own live processes and asynchronous work.
+        if let Some(terminal) = self.top.as_mut() {
+            terminal.poll();
+        }
+        self.git_ui
+            .background_tick(self.settings.workspace.as_deref(), runtime.as_ref(), ctx);
         self.cancel_creation_for_workspace_change();
-        self.sidebar(root);
-        self.addons.right_panel(
-            root,
-            &mut self.settings.right_width,
-            &mut self.settings.selected_right_addon,
-        );
-        self.shell_panel(root, cwd.as_deref(), runtime.as_ref());
-        self.document_panel(root, opened_find);
+        if mobile::is_compact(ctx.viewport_rect().width()) {
+            self.mobile_layout(root, opened_find);
+        } else {
+            self.mobile.drawer_open = false;
+            self.toolbar(root);
+            self.status_bar(root);
+            let cwd = self.settings.workspace.clone();
+            let runtime = self.dev_container.runtime().cloned();
+            self.activity_bar(root);
+            self.sidebar(root);
+            self.addons.right_panel(
+                root,
+                &mut self.settings.right_width,
+                &mut self.settings.selected_right_addon,
+            );
+            self.shell_panel(root, cwd.as_deref(), runtime.as_ref());
+            self.document_panel(root, opened_find);
+        }
+        self.mobile.was_compact = mobile::is_compact(ctx.viewport_rect().width());
+        self.prepare_panel_input(ctx, self.mobile.was_compact);
         self.rename_dialog(ctx);
         self.close_dialog(ctx);
         self.workspace_switch_dialog(ctx);
@@ -253,6 +269,12 @@ impl EditorApp {
 }
 impl eframe::App for EditorApp {
     fn raw_input_hook(&mut self, ctx: &egui::Context, raw: &mut egui::RawInput) {
+        let compact = mobile::is_compact(
+            raw.screen_rect
+                .unwrap_or_else(|| ctx.viewport_rect())
+                .width(),
+        );
+        self.prepare_panel_input(ctx, compact);
         self.addons.route_input(ctx, raw);
         self.route_terminal_input(ctx, raw);
     }

@@ -28,3 +28,13 @@ dialog h2 { margin-top:0; } dialog label { display:block; margin-bottom:8px; }
 dialog input { width:100%; padding:8px; font:inherit; border:1px solid #b8c5d6; border-radius:3px; background:white; color:inherit; }
 .dialog-actions { display:flex; justify-content:flex-end; flex-wrap:wrap; gap:8px; margin-top:20px; }
 .dialog-actions button { border-color:#b8c5d6; }
+
+#sidebar-rail { width:48px; flex-shrink:0; background:#e5e9f0; border-right:1px solid #d8dee9; z-index:3; }
+#sidebar-toggle { width:44px; height:44px; margin:2px; text-align:center; }
+#sidebar-backdrop { position:fixed; inset:0; border:0; border-radius:0; padding:0; background:#2e344077; z-index:1; }
+body.sidebar-collapsed aside { display:none; }
+@media(max-width:899px) {
+  body { height:100dvh; }
+  #hub-sidebar { position:fixed; left:48px; top:0; bottom:0; width:min(280px,calc(100vw - 48px)); padding:16px 12px; z-index:2; box-shadow:6px 0 18px #2e344033; }
+  #hub-sidebar button { min-height:44px; }
+}

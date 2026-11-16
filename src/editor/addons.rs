@@ -3,6 +3,8 @@ use eframe::egui;
 
 impl EditorApp {
     pub(super) fn update_addons(&mut self, ctx: &egui::Context) {
+        self.addons
+            .apply_settings(&self.settings.addon_enabled, &self.settings.addon_state);
         self.addons.manager_tick(ctx, &self.settings.addon_enabled);
         self.addons.sync(
             self.settings.workspace.as_deref(),
@@ -11,7 +13,13 @@ impl EditorApp {
         if self.addons.tick(
             ctx,
             self.dirty || !self.unsaved_files.is_empty(),
-            self.sidebar_mode == super::SidebarMode::Addon,
+            self.sidebar_mode == super::SidebarMode::Addon
+                && (!super::mobile::is_compact(ctx.viewport_rect().width())
+                    || (!self.mobile.drawer_open
+                        && matches!(
+                            self.mobile.panel,
+                            Some(super::mobile::MobilePanel::LeftAddon(_))
+                        ))),
         ) {
             self.git_ui.external_change();
             // Checkout changes disk contents. Retain every unsaved editor buffer.

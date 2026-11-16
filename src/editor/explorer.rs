@@ -369,8 +369,12 @@ impl EditorApp {
         if let Some(path) = self.rename_target.clone() {
             egui::Window::new("Rename")
                 .collapsible(false)
+                .default_width((ctx.viewport_rect().width() - 40.0).min(300.0))
                 .show(ctx, |ui| {
-                    ui.text_edit_singleline(&mut self.rename_text);
+                    ui.add(
+                        egui::TextEdit::singleline(&mut self.rename_text)
+                            .desired_width(ui.available_width()),
+                    );
                     ui.horizontal(|ui| {
                         if ui.button("Rename").clicked() {
                             let dest = path.with_file_name(&self.rename_text);

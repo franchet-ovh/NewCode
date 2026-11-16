@@ -116,7 +116,7 @@ impl EditorApp {
             });
     }
 
-    fn toolbar_actions(&mut self, ui: &mut egui::Ui) {
+    pub(super) fn toolbar_actions(&mut self, ui: &mut egui::Ui) {
         let context = ui.ctx().clone();
         let ctx = &context;
         if ui
@@ -211,10 +211,11 @@ impl EditorApp {
         ui.menu_button("Addons", |ui| {
             self.addons.menu(ui, &mut self.settings.addon_enabled)
         });
-        self.addons
-            .apply_settings(&self.settings.addon_enabled, &self.settings.addon_state);
         if self.addons.take_manager_request() {
             self.sidebar_mode = SidebarMode::AddonManager;
+            if super::mobile::is_compact(ctx.viewport_rect().width()) {
+                self.select_mobile_panel(super::mobile::MobilePanel::Manager, ctx);
+            }
         }
         if self.sidebar_mode == SidebarMode::Addon && self.addons.active.is_none() {
             self.sidebar_mode = SidebarMode::Explorer;
@@ -226,6 +227,9 @@ impl EditorApp {
         {
             self.bottom_tab = super::logs::Tab::Logs;
             self.logs.source = Some(crate::logging::session::Source::DevContainer);
+            if super::mobile::is_compact(ctx.viewport_rect().width()) {
+                self.select_mobile_panel(super::mobile::MobilePanel::Logs, ctx);
+            }
         }
     }
     pub(super) fn status_bar(&mut self, root: &mut egui::Ui) {
@@ -325,50 +329,60 @@ impl EditorApp {
             });
     }
     pub(super) fn document_panel(&mut self, root: &mut egui::Ui, opened_find: bool) {
-        let context = root.ctx().clone();
-        let ctx = &context;
         let colors = theme::colors(root);
         egui::CentralPanel::default()
             .frame(egui::Frame::new().fill(colors.editor).inner_margin(0))
             .show(root, |ui| {
-                ui.spacing_mut().item_spacing.y = 0.0;
-                self.document_tabs(ui, ctx);
-                if self.sidebar_mode == SidebarMode::AddonManager
-                    && self
-                        .addons
-                        .manager_central(ui, &mut self.settings.addon_enabled)
-                {
-                    return;
-                }
-                if self.sidebar_mode == SidebarMode::Addon && self.addons.central(ui) {
-                    return;
-                }
-                if self.sidebar_mode == SidebarMode::Git && self.git_ui.show_diff(ui) {
-                    return;
-                }
-                if self.active_file.is_some() {
-                    self.find_bar(ui, ctx, opened_find);
-                    ui.add_enabled_ui(!self.addons.worktree_busy(), |ui| self.text_view(ui, ctx));
-                } else {
-                    ui.vertical_centered(|ui| {
-                        ui.add_space((ui.available_height() * 0.23).max(12.0));
-                        theme::empty_art(ui, Icon::File, theme::colors(ui).accent);
-                        ui.label(
-                            egui::RichText::new("Make room for your next idea")
-                                .size(20.0)
-                                .strong()
-                                .color(theme::colors(ui).text),
-                        );
-                        ui.label(
-                            egui::RichText::new(
-                                "Click a file to preview it; double-click to keep it open.",
-                            )
-                            .color(theme::colors(ui).muted),
-                        );
-                        ui.add_space(12.0);
-                        ui.small("Ctrl+S  Save     Ctrl+F  Find     Ctrl+W  Close tab");
-                    });
-                }
+                self.document_content(ui, opened_find, true);
             });
+    }
+
+    pub(super) fn document_content(
+        &mut self,
+        ui: &mut egui::Ui,
+        opened_find: bool,
+        show_details: bool,
+    ) {
+        let context = ui.ctx().clone();
+        let ctx = &context;
+        ui.spacing_mut().item_spacing.y = 0.0;
+        self.document_tabs(ui, ctx);
+        if show_details
+            && self.sidebar_mode == SidebarMode::AddonManager
+            && self
+                .addons
+                .manager_central(ui, &mut self.settings.addon_enabled)
+        {
+            return;
+        }
+        if show_details && self.sidebar_mode == SidebarMode::Addon && self.addons.central(ui) {
+            return;
+        }
+        if show_details && self.sidebar_mode == SidebarMode::Git && self.git_ui.show_diff(ui) {
+            return;
+        }
+        if self.active_file.is_some() {
+            self.find_bar(ui, ctx, opened_find);
+            ui.add_enabled_ui(!self.addons.worktree_busy(), |ui| self.text_view(ui, ctx));
+        } else {
+            ui.vertical_centered(|ui| {
+                ui.add_space((ui.available_height() * 0.23).max(12.0));
+                theme::empty_art(ui, Icon::File, theme::colors(ui).accent);
+                ui.label(
+                    egui::RichText::new("Make room for your next idea")
+                        .size(20.0)
+                        .strong()
+                        .color(theme::colors(ui).text),
+                );
+                ui.label(
+                    egui::RichText::new(
+                        "Click a file to preview it; double-click to keep it open.",
+                    )
+                    .color(theme::colors(ui).muted),
+                );
+                ui.add_space(12.0);
+                ui.small("Ctrl+S  Save     Ctrl+F  Find     Ctrl+W  Close tab");
+            });
+        }
     }
 }

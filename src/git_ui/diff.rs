@@ -78,10 +78,12 @@ impl GitUi {
         if let Some(notice) = &view.notice {
             ui.label(notice);
         }
-        ui.columns(2, |columns| {
-            columns[0].strong("Before");
-            columns[1].strong("After");
-        });
+        if ui.available_width() >= 600.0 {
+            ui.columns(2, |columns| {
+                columns[0].strong("Before");
+                columns[1].strong("After");
+            });
+        }
         let scroll_id = ui
             .make_persistent_id((
                 "git_review_content",
