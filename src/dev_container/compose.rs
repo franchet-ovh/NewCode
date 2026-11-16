@@ -45,10 +45,12 @@ where
     )?;
     let resolved: Value = serde_json::from_slice(&bytes)
         .map_err(|_| "Could not parse resolved Docker Compose configuration")?;
-    let mut override_config = build_override(configuration, &resolved)?
-        .unwrap_or_else(|| json!({"services": {}}));
+    let mut override_config =
+        build_override(configuration, &resolved)?.unwrap_or_else(|| json!({"services": {}}));
     let service = &mut override_config["services"][&configuration.service];
-    if service.is_null() { *service = json!({}); }
+    if service.is_null() {
+        *service = json!({});
+    }
     service["volumes"] = json!([{"type":"bind",
         "source": configuration.workspace.join(".devcontainer/mounted_files"),
         "target": persistence_target(), "bind": {"create_host_path": false}}]);
@@ -174,4 +176,6 @@ where
     }
 }
 
-fn persistence_target() -> &'static str { "/focus-editor-assistant-data" }
+fn persistence_target() -> &'static str {
+    "/focus-editor-assistant-data"
+}
