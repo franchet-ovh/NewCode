@@ -270,7 +270,7 @@ impl EditorApp {
             let mut query_changed = false;
             let mut navigate = None;
             let mut close_find = false;
-            ui.horizontal(|ui| {
+            ui.horizontal_wrapped(|ui| {
                 ui.label(egui::RichText::new("Find").strong());
                 let query = ui.add(
                     egui::TextEdit::singleline(&mut self.find_query)

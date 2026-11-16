@@ -3,6 +3,19 @@ use crate::ui_theme as theme;
 use std::fs;
 
 impl Addons {
+    pub fn panel_entries(&self) -> Vec<(String, String, focus_addon_sdk::Panel)> {
+        self.entries
+            .iter()
+            .filter(|addon| addon.enabled)
+            .map(|addon| {
+                (
+                    addon.manifest.id.clone(),
+                    addon.manifest.name.clone(),
+                    addon.manifest.panel,
+                )
+            })
+            .collect()
+    }
     pub fn menu(&mut self, ui: &mut egui::Ui, _enabled: &mut BTreeMap<String, bool>) {
         if ui.button("Manage addons…").clicked() {
             self.open_manager();
@@ -53,6 +66,10 @@ impl Addons {
         }
     }
     pub fn central(&mut self, ui: &mut egui::Ui) -> bool {
+        self.central_content(ui, true)
+    }
+
+    pub fn central_content(&mut self, ui: &mut egui::Ui, show_header: bool) -> bool {
         if !self.detail {
             return false;
         }
@@ -62,12 +79,14 @@ impl Addons {
         let Some(addon) = self.entries.iter_mut().find(|a| a.manifest.id == id) else {
             return false;
         };
-        ui.horizontal(|ui| {
-            ui.heading(&addon.view.title);
-            if ui.button("Back to editor").clicked() {
-                self.detail = false;
-            }
-        });
+        if show_header {
+            ui.horizontal(|ui| {
+                ui.heading(&addon.view.title);
+                if ui.button("Back to editor").clicked() {
+                    self.detail = false;
+                }
+            });
+        }
         let mut action = None;
         egui::ScrollArea::vertical()
             .id_salt(("addon-detail", &id))

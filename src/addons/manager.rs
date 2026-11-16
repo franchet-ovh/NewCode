@@ -50,6 +50,10 @@ impl Default for Manager {
     }
 }
 impl Addons {
+    pub fn manager_has_detail(&self) -> bool {
+        self.manager.detail_visible && self.manager.selected.is_some()
+    }
+
     pub fn manager_busy(&self) -> bool {
         self.manager.pending.is_some()
     }

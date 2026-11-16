@@ -79,11 +79,6 @@ impl EditorApp {
         cwd: Option<&Path>,
         runtime: Option<&crate::dev_container::Runtime>,
     ) {
-        let context = root.ctx().clone();
-        let ctx = &context;
-        if let Some(terminal) = self.top.as_mut() {
-            terminal.poll();
-        }
         let top_height = self.settings.top_height;
         let top_response = egui::Panel::bottom("top_terminal")
             .frame(
@@ -96,42 +91,47 @@ impl EditorApp {
             .default_size(top_height)
             .min_size(80.0)
             .show(root, |ui| {
-                ui.horizontal(|ui| {
-                    ui.selectable_value(
-                        &mut self.bottom_tab,
-                        super::logs::Tab::Terminal,
-                        "Terminal",
-                    );
-                    ui.selectable_value(&mut self.bottom_tab, super::logs::Tab::Logs, "Logs");
-                    if self.bottom_tab == super::logs::Tab::Terminal {
-                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            if theme::button(ui, Icon::Refresh, "", theme::colors(ui).accent, false)
-                                .on_hover_text("Restart terminal")
-                                .clicked()
-                            {
-                                self.restart_terminal(ctx, cwd, runtime);
-                            }
-                        });
-                    }
-                });
-                ui.separator();
-                if self.bottom_tab == super::logs::Tab::Terminal {
-                    Self::terminal_ui(ui, &mut self.top, self.terminal_error.as_deref());
-                } else {
-                    let widget_id = ctx.data(|data| {
-                        data.get_temp::<egui::Id>(
-                            super::terminal_input::terminal_id().with("widget"),
-                        )
-                    });
-                    if let Some(id) = widget_id {
-                        ctx.memory_mut(|memory| memory.surrender_focus(id));
-                    }
-                    ctx.data_mut(|data| {
-                        data.remove::<egui::Rect>(super::terminal_input::terminal_id().with("rect"))
-                    });
-                    self.logs.ui(ui);
-                }
+                self.shell_content(ui, cwd, runtime);
             });
         self.settings.top_height = top_response.response.rect.height().max(80.0);
+    }
+
+    pub(super) fn shell_content(
+        &mut self,
+        ui: &mut egui::Ui,
+        cwd: Option<&Path>,
+        runtime: Option<&crate::dev_container::Runtime>,
+    ) {
+        let context = ui.ctx().clone();
+        let ctx = &context;
+        ui.horizontal(|ui| {
+            ui.selectable_value(&mut self.bottom_tab, super::logs::Tab::Terminal, "Terminal");
+            ui.selectable_value(&mut self.bottom_tab, super::logs::Tab::Logs, "Logs");
+            if self.bottom_tab == super::logs::Tab::Terminal {
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if theme::button(ui, Icon::Refresh, "", theme::colors(ui).accent, false)
+                        .on_hover_text("Restart terminal")
+                        .clicked()
+                    {
+                        self.restart_terminal(ctx, cwd, runtime);
+                    }
+                });
+            }
+        });
+        ui.separator();
+        if self.bottom_tab == super::logs::Tab::Terminal {
+            Self::terminal_ui(ui, &mut self.top, self.terminal_error.as_deref());
+        } else {
+            let widget_id = ctx.data(|data| {
+                data.get_temp::<egui::Id>(super::terminal_input::terminal_id().with("widget"))
+            });
+            if let Some(id) = widget_id {
+                ctx.memory_mut(|memory| memory.surrender_focus(id));
+            }
+            ctx.data_mut(|data| {
+                data.remove::<egui::Rect>(super::terminal_input::terminal_id().with("rect"))
+            });
+            self.logs.ui(ui);
+        }
     }
 }

@@ -58,6 +58,7 @@ impl EditorApp {
             }
             self.git_ui.dismiss_diff();
             self.reveal_active_tab = true;
+            self.mobile_document_opened();
             return true;
         }
         // Read before changing tabs or taking the outgoing buffer: failed opens
@@ -122,6 +123,7 @@ impl EditorApp {
         self.reveal_active_tab = true;
         self.git_ui.dismiss_diff();
         self.status = "File opened".into();
+        self.mobile_document_opened();
         true
     }
 

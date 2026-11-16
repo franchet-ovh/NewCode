@@ -143,6 +143,52 @@ mod tests {
                 .any(|e| matches!(e, Event::Text(_)))
         );
     }
+
+    #[test]
+    fn fullscreen_addons_fit_phone_width_and_hidden_surfaces_release_input() {
+        let mut host = Addons::default();
+        host.entries = vec![addon("first-tool"), addon("second-tool")];
+        host.entries[0]
+            .values
+            .insert("draft".into(), "keep this".into());
+        let ctx = egui::Context::default();
+        crate::ui_theme::apply(&ctx);
+        for width in [320.0, 390.0] {
+            let _ = crate::test_frame(
+                &ctx,
+                egui::RawInput {
+                    screen_rect: Some(Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(width, 600.0),
+                    )),
+                    ..Default::default()
+                },
+                |root| {
+                    egui::CentralPanel::default()
+                        .show(root, |ui| host.right_content(ui, "first-tool"));
+                    assert!(ctx.globally_used_rect().right() <= width + 1.0);
+                },
+            );
+        }
+        host.entries[0].surface.rect = Some(Rect::EVERYTHING);
+        host.entries[0].surface.focused = true;
+        host.entries[1].surface.rect = Some(Rect::EVERYTHING);
+        host.hide_surfaces_except(Some("second-tool"));
+        assert!(host.entries[0].surface.rect.is_none());
+        assert!(!host.entries[0].surface.focused);
+        assert!(host.entries[1].surface.rect.is_some());
+        let mut raw = egui::RawInput {
+            events: vec![Event::Text("must reach editor".into())],
+            ..Default::default()
+        };
+        host.route_input(&ctx, &mut raw);
+        assert_eq!(raw.events.len(), 1);
+        assert!(host.entries[0].surface.events.is_empty());
+        assert_eq!(host.entries[0].values["draft"], "keep this");
+        host.entries[0].enabled = false;
+        assert_eq!(host.panel_entries().len(), 1);
+        assert_eq!(host.panel_entries()[0].0, "second-tool");
+    }
     #[test]
     fn workspace_changes_retain_textures_but_clear_old_content() {
         let ctx = egui::Context::default();
@@ -320,6 +366,22 @@ impl Surface {
 }
 
 impl Addons {
+    pub fn hide_surfaces_except(&mut self, visible: Option<&str>) {
+        for addon in &mut self.entries {
+            if visible != Some(addon.manifest.id.as_str()) {
+                if addon.surface.focused {
+                    addon.surface.focused = false;
+                    addon.surface.events.push(Event::WindowFocused(false));
+                    if let Some(process) = &addon.process {
+                        addon.surface.flush_input(process, self.context.generation);
+                    }
+                }
+                addon.surface.rect = None;
+                addon.surface.events.clear();
+            }
+        }
+    }
+
     pub fn route_input(&mut self, _ctx: &egui::Context, raw: &mut egui::RawInput) {
         for addon in &mut self.entries {
             if !addon.enabled || addon.manifest.panel != focus_addon_sdk::Panel::Right {
@@ -355,6 +417,7 @@ impl Addons {
                     event,
                     Event::PointerMoved(_)
                         | Event::PointerButton { .. }
+                        | Event::Touch { .. }
                         | Event::PointerGone
                         | Event::MouseWheel { .. }
                 );
@@ -427,46 +490,49 @@ impl Addons {
                     ui.separator();
                 }
                 let id = selected.as_ref().unwrap().clone();
-                let addon = self
-                    .entries
-                    .iter_mut()
-                    .find(|a| a.manifest.id == id)
-                    .unwrap();
-                if let Some(error) = &addon.error {
-                    ui.colored_label(theme::colors(ui).error, error);
-                    if ui.button("Restart").clicked() {
-                        addon.error = None;
-                        addon.process = None;
-                    }
-                    return;
-                }
-                if addon.manifest.ui == focus_addon_sdk::Presentation::Surface {
-                    if let Some(process) = &addon.process {
-                        if let Err(error) = addon.surface.draw(ui, process, self.context.generation)
-                        {
-                            addon.error = Some(error);
-                            addon.process = None;
-                        }
-                    }
-                } else {
-                    let mut action = None;
-                    egui::ScrollArea::vertical()
-                        .id_salt(("addon-right", &id))
-                        .show(ui, |ui| {
-                            widgets::render(
-                                ui,
-                                &addon.view.sidebar,
-                                &mut addon.values,
-                                &mut self.cache,
-                                &mut action,
-                                addon.working,
-                            )
-                        });
-                    if let Some(action) = action {
-                        self.action(&id, action);
-                    }
-                }
+                self.right_content(ui, &id);
             });
         *width = response.response.rect.width().max(260.0);
+    }
+
+    pub fn right_content(&mut self, ui: &mut egui::Ui, id: &str) {
+        let addon = self
+            .entries
+            .iter_mut()
+            .find(|a| a.manifest.id == id && a.enabled);
+        let Some(addon) = addon else { return };
+        if let Some(error) = &addon.error {
+            ui.colored_label(theme::colors(ui).error, error);
+            if ui.button("Restart").clicked() {
+                addon.error = None;
+                addon.process = None;
+            }
+            return;
+        }
+        if addon.manifest.ui == focus_addon_sdk::Presentation::Surface {
+            if let Some(process) = &addon.process {
+                if let Err(error) = addon.surface.draw(ui, process, self.context.generation) {
+                    addon.error = Some(error);
+                    addon.process = None;
+                }
+            }
+        } else {
+            let mut action = None;
+            egui::ScrollArea::vertical()
+                .id_salt(("addon-right", &id))
+                .show(ui, |ui| {
+                    widgets::render(
+                        ui,
+                        &addon.view.sidebar,
+                        &mut addon.values,
+                        &mut self.cache,
+                        &mut action,
+                        addon.working,
+                    )
+                });
+            if let Some(action) = action {
+                self.action(id, action);
+            }
+        }
     }
 }

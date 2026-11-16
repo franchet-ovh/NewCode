@@ -143,7 +143,7 @@ pub(crate) fn show(ctx: &egui::Context) {
         };
         entries.sort_by_key(|path| (!path.is_dir(), path.file_name().map(|name| name.to_owned())));
         egui::ScrollArea::vertical()
-            .max_height(320.0)
+            .max_height((ctx.viewport_rect().height() - 220.0).clamp(44.0, 320.0))
             .show(ui, |ui| {
                 for path in entries {
                     let directory = path.is_dir();

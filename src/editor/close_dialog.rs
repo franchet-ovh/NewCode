@@ -76,6 +76,7 @@ impl EditorApp {
         };
         let mut choice = None;
         egui::Modal::new(egui::Id::new("close_unsaved_file")).show(ctx, |ui| {
+            ui.set_max_width((ctx.viewport_rect().width() - 40.0).min(420.0));
             ui.heading("Unsaved changes");
             ui.label(format!(
                 "Save changes to {} before closing?",
