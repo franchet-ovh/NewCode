@@ -9,6 +9,7 @@ import shutil
 import subprocess
 import tarfile
 import tempfile
+from prepare_version import validate_versions
 from addon_release import TARGETS, RELEASE_TARGETS, safe_tag, manifests, assets as addon_files, package_addons
 
 
@@ -23,7 +24,7 @@ def run(*args, **kwargs):
     return subprocess.check_output(args, text=True, **kwargs).strip()
 
 
-def verify_binary(binary, target, name="focus-editor"):
+def verify_binary(binary, target, name="focus-editor", expected_version=None):
     description = run("file", "-b", str(binary))
     print(description)
     architecture = {
@@ -51,7 +52,7 @@ def verify_binary(binary, target, name="focus-editor"):
             if not dependency.startswith(("/usr/lib/", "/System/Library/")):
                 raise RuntimeError(f"Unbundled macOS dependency: {dependency}")
     version = run(str(binary), "--version")
-    if not version.startswith(name + " "):
+    if not version.startswith(name + " ") or (expected_version is not None and version != f"{name} {expected_version}"):
         raise RuntimeError("Executable version smoke test failed")
     print(version)
 
@@ -152,11 +153,12 @@ def main():
     parser.add_argument("tag")
     args = parser.parse_args()
     binary = Path("target", args.target, "release/focus-editor").resolve(strict=True)
-    verify_binary(binary, args.target)
-    verify_binary(binary.with_name("focus-editor-server"), args.target, "focus-editor-server")
+    version = validate_versions(args.tag)
+    verify_binary(binary, args.target, expected_version=version)
+    verify_binary(binary.with_name("focus-editor-server"), args.target, "focus-editor-server", version)
     for name in ADDON_EXECUTABLES:
         executable = binary.parent / name
-        verify_binary(executable, args.target, executable.name)
+        verify_binary(executable, args.target, executable.name, version)
     destination = Path("dist").resolve()
     destination.mkdir(exist_ok=True)
     output = destination / asset_name(args.tag, args.target)
