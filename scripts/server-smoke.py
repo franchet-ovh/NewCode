@@ -195,6 +195,22 @@ def run(binary, browser):
                 dev.click(x + offset[0], y + offset[1])
             choose(app_id)
             wait_until(lambda: view("w.smokeFrame?.dirty"))
+            # Sidebar toggles must resize the existing browsing context, preserving drafts.
+            view("w.sidebarSmokeIdentity = 'preserved'")
+            expanded = dev.evaluate("document.querySelector('#view').clientWidth")
+            dev.evaluate("document.querySelector('#sidebar-toggle').click()")
+            assert dev.evaluate("document.querySelector('#view').clientWidth") > expanded
+            assert view("w.sidebarSmokeIdentity") == 'preserved'
+            dev.send("Emulation.setDeviceMetricsOverride", {"width":390,"height":844,"deviceScaleFactor":1,"mobile":True})
+            dev.evaluate("document.querySelector('#sidebar-toggle').click()")
+            assert dev.evaluate("document.querySelector('#view').clientWidth") >= 340
+            assert dev.evaluate("!document.querySelector('#sidebar-backdrop').hidden")
+            dev.evaluate("document.querySelector('#sidebar-backdrop').click()")
+            assert dev.evaluate("document.querySelector('#sidebar-toggle').getAttribute('aria-expanded')") == 'false'
+            assert view("w.sidebarSmokeIdentity") == 'preserved'
+            dev.send("Emulation.setDeviceMetricsOverride", {"width":1440,"height":1000,"deviceScaleFactor":1,"mobile":False})
+            dev.evaluate("document.querySelector('#sidebar-toggle').click()")
+            wait_until(lambda: view("w.smokeFrame?.size[0] >= 900"))
             assert view("w.smokeFrame.control.owned") is False
             view("w.document.querySelector('#claim').click()")
             wait_until(lambda: view("w.smokeFrame?.control.owned"))
