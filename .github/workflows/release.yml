@@ -36,6 +36,8 @@ jobs:
         with:
           ref: ${{ github.event.release.tag_name }}
           persist-credentials: false
+      - name: Set release versions
+        run: python3 scripts/release/prepare_version.py "$RELEASE_TAG"
       - name: Run shared Linux checks
         uses: ./.github/actions/linux-checks
         with:
@@ -76,6 +78,8 @@ jobs:
           pattern: release-*
           path: dist
           merge-multiple: true
+      - name: Set release versions
+        run: python3 scripts/release/prepare_version.py "$RELEASE_TAG"
       - name: Validate downloads and generate checksums
         run: |
           python3 scripts/release/checksums.py dist "$RELEASE_TAG"
