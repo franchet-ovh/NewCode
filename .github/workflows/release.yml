@@ -8,7 +8,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: release-${{ github.event.release.id }}
+  group: release-main
   cancel-in-progress: false
 
 env:
@@ -17,7 +17,29 @@ env:
   FOCUS_RELEASE_TAG: ${{ github.event.release.tag_name }}
 
 jobs:
+  prepare:
+    name: Commit release versions to main
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    outputs:
+      sha: ${{ steps.version.outputs.sha }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          ref: main
+          persist-credentials: true
+      - name: Configure release commit identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+      - name: Commit and push release versions
+        id: version
+        run: python3 scripts/release/commit_version.py "$RELEASE_TAG"
+
   build:
+    needs: prepare
     name: Build ${{ matrix.platform }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
@@ -34,10 +56,10 @@ jobs:
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
-          ref: ${{ github.event.release.tag_name }}
+          ref: ${{ needs.prepare.outputs.sha }}
           persist-credentials: false
-      - name: Set release versions
-        run: python3 scripts/release/prepare_version.py "$RELEASE_TAG"
+      - name: Validate committed release versions
+        run: python3 scripts/release/prepare_version.py --check "$RELEASE_TAG"
       - name: Run shared Linux checks
         uses: ./.github/actions/linux-checks
         with:
@@ -63,7 +85,7 @@ jobs:
 
   publish:
     name: Attach verified downloads
-    needs: build
+    needs: [prepare, build]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -71,15 +93,15 @@ jobs:
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
-          ref: ${{ github.event.release.tag_name }}
+          ref: ${{ needs.prepare.outputs.sha }}
           persist-credentials: false
       - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
         with:
           pattern: release-*
           path: dist
           merge-multiple: true
-      - name: Set release versions
-        run: python3 scripts/release/prepare_version.py "$RELEASE_TAG"
+      - name: Validate committed release versions
+        run: python3 scripts/release/prepare_version.py --check "$RELEASE_TAG"
       - name: Validate downloads and generate checksums
         run: |
           python3 scripts/release/checksums.py dist "$RELEASE_TAG"

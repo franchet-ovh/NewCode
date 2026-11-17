@@ -246,8 +246,13 @@ impl Addons {
         self.manager.progress = label.into();
         self.manager.error = None;
         let ctx = ctx.clone();
+        let operation = label.to_owned();
+        log::info!("Addon manager started: {operation}");
         std::thread::spawn(move || {
-            let result = job(tx.clone()).unwrap_or_else(Event::Error);
+            let result = job(tx.clone()).unwrap_or_else(|error| {
+                log::warn!("Addon manager failed ({operation}): {error}");
+                Event::Error(error)
+            });
             let _ = tx.send(result);
             ctx.request_repaint();
         });

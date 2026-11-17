@@ -81,5 +81,7 @@ def prepare(tag, root=Path(".")):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("tag")
+    parser.add_argument("--check", action="store_true", help="Validate committed versions without editing files")
     args = parser.parse_args()
-    print(f"Prepared release version {prepare(args.tag)}")
+    version = validate_versions(args.tag) if args.check else prepare(args.tag)
+    print(f"Release version {version}")
