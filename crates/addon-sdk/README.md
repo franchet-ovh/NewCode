@@ -57,6 +57,27 @@ The host namespaces widget state per addon. `host.credentials` is a reserved
 button action that opens the native credential dialog without transmitting
 token text to the executable. Normal file tabs dismiss addon detail views.
 
+`Widget::Select.on_change` optionally names an action emitted when the selection
+changes. These reactive choices follow the values in subsequent views, allowing
+dependent option lists to update without clearing other form inputs.
+
+## Assistant handoff
+
+`Service::Assistants` returns JSON-encoded `InstalledAssistant` entries for Codex
+and OpenCode, including enabled state, errors, and live capabilities. The shared
+surface runner publishes generation-scoped `assistant.capabilities` notifications
+from `Panel::assistant_capabilities`; older addons without this support cannot
+receive a handoff. The host sends catalog changes to GitHub as `assistants.changed`.
+
+`Service::StartAssistant { addon, session }` validates the selected model, mode,
+and optional reasoning ID against that addon's current capabilities and forwards
+a correlated `assistant.start` request to its runner. `Panel::start_assistant`
+opens a fresh session and schedules its first prompt. Success acknowledges startup,
+not completion of the AI turn; backend failures appear in the assistant panel.
+Requests and replies are scoped to the workspace and addon process incarnation.
+The runner rejects stale generations, and the host rejects disabled, unavailable,
+or busy assistants. No provider credentials are sent to the requesting addon.
+
 ## Host services
 
 Use `Connection::call(generation, Service)` for background tool execution, HTTPS,

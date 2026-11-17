@@ -311,3 +311,157 @@ fn cleanup_waits_for_merge_and_preserves_remote_new_commits() {
     );
     let _ = fs::remove_dir_all(&app.context.storage);
 }
+
+fn assistant_ready(app: &mut App, id: &str) {
+    use focus_addon_sdk::{
+        AssistantCapabilities, AssistantChoice, AssistantModel, InstalledAssistant,
+    };
+    app.update_assistants(vec![InstalledAssistant {
+        id: id.into(),
+        name: id.into(),
+        enabled: true,
+        error: None,
+        capabilities: Some(AssistantCapabilities {
+            ready: true,
+            models: vec![AssistantModel {
+                id: "model".into(),
+                label: "Model".into(),
+                reasoning: vec!["low".into(), "high".into()],
+                default_reasoning: Some("low".into()),
+            }],
+            modes: vec![
+                AssistantChoice {
+                    id: "default".into(),
+                    label: "Default".into(),
+                },
+                AssistantChoice {
+                    id: "plan".into(),
+                    label: "Plan".into(),
+                },
+            ],
+            default_model: "model".into(),
+            ..Default::default()
+        }),
+    }]);
+    app.detail = Detail::Item {
+        pull: false,
+        value: json!({"number":42,"node_id":"issue-id",
+        "title":"Fix startup", "body":"The container fails", "html_url":"https://github.com/owner/project/issues/42"}),
+    };
+}
+fn assistant_action() -> Action {
+    action(
+        "issue_assistant",
+        json!({"branch":"issue-42","base":"main","reuse":true,
+        "assistant":"codex","assistant_model":"model","assistant_mode":"plan","assistant_reasoning":"high"}),
+    )
+}
+#[test]
+fn issue_session_uses_live_plan_high_choices_after_successful_checkout() {
+    let mut app = app();
+    assistant_ready(&mut app, "codex");
+    assert_eq!(app.assistant_selection.mode, "plan");
+    assert_eq!(app.assistant_selection.reasoning.as_deref(), Some("high"));
+    let mut host = Fake::from(vec![
+        text(""),
+        text(""),
+        ok(json!({"name":"issue-42"})),
+        text("fetched"),
+        text("switched"),
+        text("starting"),
+    ]);
+    app.issue_assistant(&mut host, &assistant_action()).unwrap();
+    assert!(matches!(
+        &host.requests[4],
+        Service::Git {
+            operation: GitOperation::Checkout { .. }
+        }
+    ));
+    let Service::StartAssistant { addon, session } = &host.requests[5] else {
+        panic!("No AI handoff")
+    };
+    assert_eq!(addon, "codex");
+    assert_eq!(session.selection.mode, "plan");
+    assert_eq!(session.selection.reasoning.as_deref(), Some("high"));
+    assert!(session.prompt.contains("owner/project"));
+    assert!(session.prompt.contains("Issue #42: Fix startup"));
+    assert!(session.prompt.contains("The container fails"));
+    assert!(
+        session
+            .prompt
+            .contains("https://github.com/owner/project/issues/42")
+    );
+    let _ = fs::remove_dir_all(&app.context.storage);
+}
+#[test]
+fn missing_disabled_or_stale_assistant_options_do_not_change_branches() {
+    let mut app = app();
+    let mut host = Fake::default();
+    assert!(app.issue_assistant(&mut host, &assistant_action()).is_err());
+    assistant_ready(&mut app, "codex");
+    app.assistants[0].enabled = false;
+    assert!(
+        app.issue_assistant(&mut host, &assistant_action())
+            .unwrap_err()
+            .contains("Enable")
+    );
+    app.assistants[0].enabled = true;
+    app.assistants[0].capabilities.as_mut().unwrap().models[0].reasoning = vec!["low".into()];
+    assert!(
+        app.issue_assistant(&mut host, &assistant_action())
+            .unwrap_err()
+            .contains("reasoning")
+    );
+    assert!(host.requests.is_empty());
+}
+#[test]
+fn cancelled_checkout_never_starts_an_assistant_session() {
+    let mut app = app();
+    assistant_ready(&mut app, "codex");
+    let mut host = Fake::from(vec![
+        text(""),
+        text(""),
+        ok(json!({"name":"issue-42"})),
+        text("fetched"),
+        ServiceReply::error("cancelled", "Checkout cancelled"),
+    ]);
+    assert!(
+        app.issue_assistant(&mut host, &assistant_action())
+            .unwrap_err()
+            .contains("cancelled")
+    );
+    assert!(
+        !host
+            .requests
+            .iter()
+            .any(|s| matches!(s, Service::StartAssistant { .. }))
+    );
+    let _ = fs::remove_dir_all(&app.context.storage);
+}
+#[test]
+fn switching_assistants_exposes_only_their_supported_options() {
+    let mut app = app();
+    assistant_ready(&mut app, "codex");
+    let mut other = app.assistants[0].clone();
+    other.id = "opencode".into();
+    other.name = "OpenCode".into();
+    let caps = other.capabilities.as_mut().unwrap();
+    caps.models[0].id = "other".into();
+    caps.models[0].reasoning.clear();
+    caps.models[0].default_reasoning = None;
+    caps.modes.retain(|m| m.id == "default");
+    app.assistants.push(other);
+    app.assistant_options(&action(
+        "assistant_options",
+        json!({"assistant":"opencode"}),
+    ));
+    assert_eq!(app.assistant_selection.model, "other");
+    assert_eq!(app.assistant_selection.mode, "default");
+    assert!(app.assistant_selection.reasoning.is_none());
+    assert!(
+        app.issue_assistant_widgets()
+            .iter()
+            .any(|w| matches!(w, Widget::Select{id,value,options,..}
+                if id == "assistant_reasoning" && value.is_empty() && options.len() == 1))
+    );
+}

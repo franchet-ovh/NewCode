@@ -1,4 +1,5 @@
 mod api;
+mod assistant;
 #[cfg(test)]
 mod tests;
 mod view;
@@ -95,6 +96,10 @@ enum Detail {
     None,
 }
 struct App {
+    assistants: Vec<focus_addon_sdk::InstalledAssistant>,
+    assistant: String,
+    assistant_selection: focus_addon_sdk::AssistantSelection,
+    assistant_notice: String,
     context: Context,
     api: Api,
     repos: Vec<Repo>,
@@ -131,6 +136,10 @@ impl Default for App {
             refreshed: None,
             cooldown: None,
             branch: String::new(),
+            assistants: vec![],
+            assistant: String::new(),
+            assistant_selection: Default::default(),
+            assistant_notice: String::new(),
         }
     }
 }
@@ -320,6 +329,9 @@ impl App {
             "new_pr" => self.prepare_pr(host)?,
             "create_pr" => self.create_pr(host, &action)?,
             "branch" => self.issue_branch(host, &action)?,
+            "issue_assistant" => self.issue_assistant(host, &action)?,
+            "assistant_options" => self.assistant_options(&action),
+            "assistant_refresh" => self.load_assistants(host),
             "merge" => self.merge(host, &action)?,
             "cleanup" => self.check_cleanup(host)?,
             id if id.starts_with("item:") => {
@@ -337,6 +349,9 @@ impl App {
                     value,
                     pull: self.pulls,
                 };
+                if !self.pulls {
+                    self.load_assistants(host);
+                }
             }
             _ => (),
         }
@@ -416,6 +431,14 @@ fn run() -> Result<(), String> {
                 }
             }
             Some("shutdown") => break,
+            Some("assistants.changed") => {
+                let params = message.params.unwrap_or_default();
+                if params["generation"].as_u64() == Some(app.context.generation) {
+                    if let Ok(entries) = serde_json::from_value(params["assistants"].clone()) {
+                        app.update_assistants(entries);
+                    }
+                }
+            }
             _ => (),
         }
         let mut view = app.view(false);

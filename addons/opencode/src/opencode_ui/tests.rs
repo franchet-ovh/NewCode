@@ -1,3 +1,4 @@
+mod issue;
 use super::*;
 use serde_json::json;
 use std::sync::mpsc;

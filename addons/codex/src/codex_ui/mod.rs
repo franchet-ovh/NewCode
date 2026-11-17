@@ -9,6 +9,7 @@ mod composer;
 mod conversation;
 mod events;
 mod header;
+mod issue;
 mod messages;
 mod plan;
 mod reasoning;
@@ -48,6 +49,7 @@ pub(crate) struct CodexUi {
     plan: plan::PlanState,
     markdown: crate::assistant_ui::content::CommonMarkCache,
     runtime: Option<Runtime>,
+    issue_launch: Option<issue::Launch>,
 }
 
 impl Default for CodexUi {
@@ -81,6 +83,7 @@ impl Default for CodexUi {
             plan: plan::PlanState::default(),
             markdown: Default::default(),
             runtime: None,
+            issue_launch: None,
         }
     }
 }
@@ -141,6 +144,7 @@ impl CodexUi {
     }
 
     pub(crate) fn stop(&mut self) {
+        self.issue_launch = None;
         log::info!("stop requested");
         if self.thread_id.is_some() {
             self.resume_thread = self.thread_id.clone();

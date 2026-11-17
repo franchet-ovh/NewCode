@@ -13,6 +13,7 @@ mod composer;
 mod conversation;
 mod events;
 mod header;
+mod issue;
 mod next_events;
 mod requests;
 mod responses;
@@ -91,6 +92,7 @@ pub(crate) struct OpenCodeUi {
     last_refresh: Option<Instant>,
     markdown: crate::assistant_ui::content::CommonMarkCache,
     runtime: Option<Runtime>,
+    issue_launch: Option<focus_addon_sdk::AssistantSession>,
 }
 impl Default for OpenCodeUi {
     fn default() -> Self {
@@ -127,6 +129,7 @@ impl Default for OpenCodeUi {
             last_refresh: None,
             markdown: Default::default(),
             runtime: None,
+            issue_launch: None,
         }
     }
 }
@@ -167,6 +170,7 @@ impl OpenCodeUi {
         }
     }
     pub(crate) fn stop(&mut self) {
+        self.issue_launch = None;
         log::info!("stop requested");
         self.server = None;
         self.online = false;
@@ -192,7 +196,8 @@ impl OpenCodeUi {
         }
     }
     fn locked(&self) -> bool {
-        self.busy
+        self.issue_launch.is_some()
+            || self.busy
             || !self.permissions.is_empty()
             || !self.questions.is_empty()
             || self.requests.values().any(|p| {
@@ -211,6 +216,7 @@ impl OpenCodeUi {
     }
     pub(crate) fn tick(&mut self, ctx: &egui::Context) {
         self.process_events();
+        self.progress_issue();
         if self.online {
             ctx.request_repaint_after(std::time::Duration::from_secs(1));
             if self.session.is_some()

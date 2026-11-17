@@ -437,6 +437,9 @@ impl Addons {
         width: &mut f32,
         selected: &mut Option<String>,
     ) {
+        if let Some(id) = self.assistants.reveal.take() {
+            *selected = Some(id);
+        }
         let available: Vec<_> = self
             .entries
             .iter()

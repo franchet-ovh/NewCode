@@ -19,6 +19,7 @@ impl App {
         }
         if let Ok(repo) = self.repo() {
             sidebar.push(W::Select {
+                on_change: None,
                 id: "remote".into(),
                 label: "Repository".into(),
                 value: repo.remote.clone(),
@@ -159,6 +160,7 @@ impl App {
                     });
                     view.detail
                         .push(W::button("branch", "Create issue branch & checkout"));
+                    view.detail.extend(self.issue_assistant_widgets());
                 }
             }
             Detail::CreatePr { head, title, body } => {

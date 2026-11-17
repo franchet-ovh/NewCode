@@ -7,6 +7,9 @@ use std::{
     path::PathBuf,
 };
 
+mod assistant;
+pub use assistant::*;
+
 pub const PROTOCOL_VERSION: u32 = 1;
 pub const MAX_MESSAGE: usize = 8 * 1024 * 1024;
 
@@ -183,6 +186,8 @@ pub enum Widget {
         label: String,
         value: String,
         options: Vec<(String, String)>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        on_change: Option<String>,
     },
     Link {
         label: String,
@@ -246,6 +251,13 @@ impl Action {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Service {
+    /// Installed assistant addons and the capabilities reported by their backends.
+    Assistants,
+    /// Start a fresh session in another addon using its advertised options.
+    StartAssistant {
+        addon: String,
+        session: AssistantSession,
+    },
     /// Argument arrays only; no implicit shell. Missing program has code `missing_tool`.
     Run {
         program: String,
