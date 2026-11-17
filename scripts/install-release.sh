@@ -30,7 +30,7 @@ for command in curl jq tar sha256sum install mktemp awk tr mv mkdir rm; do
     command -v "$command" >/dev/null 2>&1 || die "Required command not found: $command"
 done
 : "${HOME:?HOME must be set}"
-destination="$HOME/.local/share/focus-editor/bin"
+destination="$HOME/local/share/focus-editor/bin"
 repository='https://github.com/nfranchet/NewCode'
 work_dir=$(mktemp -d "${TMPDIR:-/tmp}/focus-editor-release.XXXXXX")
 install_stage=''
@@ -95,4 +95,4 @@ for binary in focus-editor focus-editor-server; do
 done
 
 printf 'Installed %s to %s\n' "$tag" "$destination"
-printf 'Add this directory to PATH if needed:\n  export PATH="$HOME/.local/share/focus-editor/bin:$PATH"\n'
+printf 'Add this directory to PATH if needed:\n  export PATH="$HOME/local/share/focus-editor/bin:$PATH"\n'
