@@ -184,3 +184,12 @@ release-package installation through the Rust manager. An optimized Linux amd64
 editor/addon build, verified archives/catalog, and isolated actual-addon install
 and reinstall passed. Native arm64 builds and release publication run in hosted
 CI; no release was published during implementation.
+
+
+## Dev Container failed-start recovery (#39)
+
+Rebuild and Rebuild without cache are available before connection, after failure, and while connected. Start/rebuild requests reload workspace configuration. Uncached rebuilding builds the service and its buildable dependencies first, then force-recreates the container only after the build succeeds, using the same resolved Compose overrides. Storage preparation skips legacy migration when the previous container already mounts the current workspace's assistant storage, even when its first startup failed before initialization.
+
+Regression coverage includes menu visibility and button dispatch, configuration repair, ordered commands and short-circuiting failures, persisted storage recovery, and protected legacy migration. The opt-in `cargo test --lib dev_container::recovery_tests:: -- --ignored` check uses a local `debian:trixie` image and isolated temporary Compose projects to recover from failed builds and unstartable containers with both rebuild actions, preserving a storage sentinel and cleaning its test containers/images. It never recreates the workspace's configured container. Desktop interaction remains a manual acceptance check.
+
+Validation: 163 library tests passed (five opt-in checks skipped by default), all three Compose configuration-only checks passed, and the isolated live recovery test passed for both rebuild modes. `cargo check`, `cargo fmt --check`, and whitespace checks passed. The full library suite required execution outside the sandbox for its existing local HTTP listener tests.
