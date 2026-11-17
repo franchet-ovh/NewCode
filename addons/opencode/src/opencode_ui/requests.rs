@@ -142,6 +142,14 @@ impl OpenCodeUi {
             return;
         }
         let previous_agent = go.then(|| std::mem::replace(&mut self.agent, "build".into()));
+        self.send_prompt(text, !go, previous_agent);
+    }
+    pub(super) fn send_prompt(
+        &mut self,
+        text: String,
+        draft: bool,
+        previous_agent: Option<String>,
+    ) -> bool {
         let (provider, model) = self.model.as_ref().unwrap();
         let mut body = json!({"parts":[{"type":"text","text":text}],"model":{"providerID":provider,"modelID":model},"agent":self.agent});
         if !self.variant.is_empty() {
@@ -154,7 +162,7 @@ impl OpenCodeUi {
         let admitted = self.request(
             Operation::Send {
                 text,
-                draft: !go,
+                draft,
                 previous_agent: previous_agent.clone(),
             },
             "POST",
@@ -167,6 +175,7 @@ impl OpenCodeUi {
                 self.agent = agent;
             }
         }
+        admitted
     }
     pub(super) fn go_ready(&self) -> bool {
         if self.turn_cancelled

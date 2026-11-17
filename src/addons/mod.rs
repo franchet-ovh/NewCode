@@ -1,4 +1,5 @@
 //! Installed executable addons. Native UI and credential handling stay in the host.
+mod assistant;
 mod catalog;
 mod credentials;
 mod installation;
@@ -84,6 +85,7 @@ pub(crate) struct Addons {
     pub notice: Option<String>,
     cache: crate::assistant_ui::content::CommonMarkCache,
     manager: manager::Manager,
+    assistants: assistant::Broker,
 }
 impl Default for Addons {
     fn default() -> Self {
@@ -111,6 +113,7 @@ impl Default for Addons {
             notice: None,
             cache: Default::default(),
             manager: Default::default(),
+            assistants: Default::default(),
         }
     }
 }
@@ -178,6 +181,7 @@ impl Addons {
         self.context.runtime = runtime.map(Into::into);
         self.runtime = runtime.cloned();
         self.context.generation = self.context.generation.wrapping_add(1);
+        self.cancel_assistant_requests();
         self.generation
             .store(self.context.generation, Ordering::SeqCst);
         self.detail = false;
@@ -268,6 +272,13 @@ impl Addons {
         if addon.process.is_none() || addon.incarnation != task.process_generation {
             return;
         }
+        if matches!(
+            &task.call.service,
+            Service::Assistants | Service::StartAssistant { .. }
+        ) {
+            self.assistant_service(task, ctx);
+            return;
+        }
         addon.working = true;
         let manifest = addon.manifest.clone();
         let workspace = self.context.workspace.clone();
@@ -327,6 +338,7 @@ impl Addons {
             self.respond(completion.task, completion.reply);
         }
         let mut tasks = Vec::new();
+        let mut assistant_events = Vec::new();
         for addon in &mut self.entries {
             let mut failure = None;
             if let Some(process) = &mut addon.process {
@@ -371,6 +383,13 @@ impl Addons {
                                 failure = Some("Addon protocol handshake failed".into());
                             }
                         }
+                        Some("assistant.capabilities") | None => {
+                            assistant_events.push((
+                                addon.manifest.id.clone(),
+                                addon.incarnation,
+                                message,
+                            ));
+                        }
                         Some("panel.status") => {
                             if let Some(params) = message.params {
                                 if params["generation"].as_u64() == Some(self.context.generation) {
@@ -413,6 +432,8 @@ impl Addons {
                                             self.detail = !view.detail.is_empty();
                                         }
                                     }
+                                    widgets::sync_selections(&view.sidebar, &mut addon.values);
+                                    widgets::sync_selections(&view.detail, &mut addon.values);
                                     addon.working = view.busy;
                                     addon.view = view;
                                 }
@@ -458,6 +479,9 @@ impl Addons {
                 addon.working = false;
             }
         }
+        for (addon, incarnation, message) in assistant_events {
+            self.assistant_event(addon, incarnation, message);
+        }
         for task in tasks {
             if task.call.generation != self.context.generation {
                 self.respond(task, ServiceReply::error("context", "Workspace changed"));
@@ -482,6 +506,7 @@ impl Addons {
         if self.entries.iter().any(|a| a.process.is_some()) {
             ctx.request_repaint_after(Duration::from_millis(100));
         }
+        self.poll_assistants();
         changed
     }
     pub fn checkout_waiting(&self) -> bool {

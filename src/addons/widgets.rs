@@ -4,6 +4,25 @@ use focus_addon_sdk::Widget;
 use serde_json::Value;
 use std::collections::BTreeMap;
 
+/// Reactive choices are owned by the addon so dependent defaults can change
+/// without clearing unrelated text fields in the same form.
+pub(super) fn sync_selections(widgets: &[Widget], values: &mut BTreeMap<String, Value>) {
+    for widget in widgets {
+        match widget {
+            Widget::Select {
+                id,
+                value,
+                on_change: Some(_),
+                ..
+            } => {
+                values.insert(id.clone(), Value::String(value.clone()));
+            }
+            Widget::Row { children } => sync_selections(children, values),
+            _ => (),
+        }
+    }
+}
+
 pub(super) fn render(
     ui: &mut egui::Ui,
     widgets: &[Widget],
@@ -68,13 +87,18 @@ pub(super) fn render(
             Widget::Select {
                 id,
                 label,
-                value,
+                value: value_default,
                 options,
+                on_change,
             } => {
                 let entry = values
                     .entry(id.clone())
-                    .or_insert_with(|| Value::String(value.clone()));
+                    .or_insert_with(|| Value::String(value_default.clone()));
                 let mut value = entry.as_str().unwrap_or_default().to_owned();
+                if !options.iter().any(|(key, _)| key == &value) {
+                    value = value_default.clone();
+                }
+                let previous = value.clone();
                 egui::ComboBox::from_id_salt(id)
                     .selected_text(
                         options
@@ -89,6 +113,11 @@ pub(super) fn render(
                         }
                     });
                 *entry = Value::String(value);
+                if entry.as_str() != Some(previous.as_str()) {
+                    if let Some(id) = on_change {
+                        *action = Some(id.clone());
+                    }
+                }
             }
             Widget::Link { label, url } => {
                 if reqwest::Url::parse(url).is_ok_and(|u| matches!(u.scheme(), "http" | "https")) {
@@ -99,5 +128,31 @@ pub(super) fn render(
                 ui.horizontal_wrapped(|ui| render(ui, children, values, cache, action, busy));
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn dependent_select_defaults_update_without_losing_branch_edits() {
+        let mut values = BTreeMap::from([
+            ("branch".into(), Value::String("my-edited-branch".into())),
+            ("reasoning".into(), Value::String(String::new())),
+        ]);
+        sync_selections(
+            &[Widget::Row {
+                children: vec![Widget::Select {
+                    id: "reasoning".into(),
+                    label: "Reasoning".into(),
+                    value: "high".into(),
+                    options: vec![("high".into(), "High".into())],
+                    on_change: Some("options".into()),
+                }],
+            }],
+            &mut values,
+        );
+        assert_eq!(values["reasoning"], "high");
+        assert_eq!(values["branch"], "my-edited-branch");
     }
 }

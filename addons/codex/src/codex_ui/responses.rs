@@ -32,6 +32,14 @@ impl CodexUi {
             self.status = "Finding previous session…".into();
         } else if let Some(method) = id.as_u64().and_then(|id| self.requests.remove(&id)) {
             if let Some(error) = error {
+                if self
+                    .issue_launch
+                    .as_ref()
+                    .is_some_and(|launch| Some(launch.request) == id.as_u64())
+                {
+                    self.issue_launch = None;
+                    self.busy = false;
+                }
                 log::warn!("Codex request failed; details available in panel");
                 self.reject_go(id);
                 if method == "account/rateLimits/read" {
@@ -123,6 +131,7 @@ impl CodexUi {
                         "Ready"
                     }
                     .into();
+                    self.submit_issue(id);
                 }
                 "model/list" => {
                     self.models.extend(

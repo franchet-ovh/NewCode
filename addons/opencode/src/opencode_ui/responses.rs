@@ -18,6 +18,9 @@ impl OpenCodeUi {
         let value = match result {
             Ok(value) => value,
             Err(error) => {
+                if matches!(pending.operation, Operation::Create) {
+                    self.issue_launch = None;
+                }
                 if matches!(
                     pending.operation,
                     Operation::PermissionsV2 | Operation::QuestionsV2

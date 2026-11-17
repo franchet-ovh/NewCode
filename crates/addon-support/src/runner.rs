@@ -1,7 +1,10 @@
 //! Reusable event loop for independently compiled addons contributing a UI surface.
 use crate::{surface, ui_theme};
 use egui;
-use focus_addon_sdk::{Context, Message, PROTOCOL_VERSION, read_message, write_message};
+use focus_addon_sdk::{
+    AssistantCapabilities, AssistantSession, Context, Message, PROTOCOL_VERSION, ServiceReply,
+    read_message, write_message,
+};
 use std::{io::BufReader, sync::mpsc, time::Duration};
 
 pub trait Panel {
@@ -9,6 +12,16 @@ pub trait Panel {
     fn tick(&mut self, ctx: &egui::Context);
     fn show(&mut self, ui: &mut egui::Ui, ctx: &egui::Context);
     fn state(&self) -> String;
+    fn assistant_capabilities(&self) -> Option<AssistantCapabilities> {
+        None
+    }
+    fn start_assistant(
+        &mut self,
+        _session: AssistantSession,
+        _ctx: &egui::Context,
+    ) -> Result<(), String> {
+        Err("This addon does not support starting assistant sessions".into())
+    }
 }
 pub fn run(mut panel: impl Panel) -> Result<(), String> {
     let level = std::env::var("FOCUS_ADDON_LOG_LEVEL").unwrap_or_else(|_| "info".into());
@@ -33,12 +46,19 @@ pub fn run(mut panel: impl Panel) -> Result<(), String> {
     let mut output = std::io::stdout();
     let mut generation = 0;
     let mut last_state = String::new();
+    let mut last_capabilities = None;
     loop {
         let message = match rx.recv_timeout(Duration::from_millis(50)) {
             Ok(m) => m,
             Err(mpsc::RecvTimeoutError::Timeout) => {
                 panel.tick(&ctx);
-                report(&panel, &mut last_state, generation, &mut output)?;
+                report(
+                    &panel,
+                    &mut last_state,
+                    &mut last_capabilities,
+                    generation,
+                    &mut output,
+                )?;
                 continue;
             }
             Err(_) => break,
@@ -57,11 +77,31 @@ pub fn run(mut panel: impl Panel) -> Result<(), String> {
             }
             Some("context.changed") => {
                 last_state.clear();
+                last_capabilities = None;
                 let context: Context = serde_json::from_value(message.params.unwrap_or_default())
                     .map_err(|e| e.to_string())?;
                 generation = context.generation;
                 ctx.memory_mut(|m| *m = Default::default());
                 panel.context(context, &ctx);
+            }
+            Some("assistant.start") => {
+                if let Some(id) = message.id {
+                    let params = message.params.unwrap_or_default();
+                    let result = if params["generation"].as_u64() != Some(generation) {
+                        Err("Workspace changed".into())
+                    } else {
+                        panel.tick(&ctx);
+                        serde_json::from_value::<AssistantSession>(params["session"].clone())
+                            .map_err(|e| e.to_string())
+                            .and_then(|session| panel.start_assistant(session, &ctx))
+                    };
+                    let reply = match result {
+                        Ok(()) => ServiceReply::success("New assistant session is starting"),
+                        Err(error) => ServiceReply::error("assistant", error),
+                    };
+                    write_message(&mut output, &Message::response(id, reply))
+                        .map_err(|e| e.to_string())?;
+                }
             }
             Some("surface.input") => {
                 let input: surface::Input =
@@ -78,7 +118,13 @@ pub fn run(mut panel: impl Panel) -> Result<(), String> {
             Some("shutdown") => break,
             _ => panel.tick(&ctx),
         }
-        report(&panel, &mut last_state, generation, &mut output)?;
+        report(
+            &panel,
+            &mut last_state,
+            &mut last_capabilities,
+            generation,
+            &mut output,
+        )?;
     }
     Ok(())
 }
@@ -86,9 +132,22 @@ pub fn run(mut panel: impl Panel) -> Result<(), String> {
 fn report(
     panel: &impl Panel,
     last: &mut String,
+    last_capabilities: &mut Option<AssistantCapabilities>,
     generation: u64,
     output: &mut impl std::io::Write,
 ) -> Result<(), String> {
+    let capabilities = panel.assistant_capabilities();
+    if &capabilities != last_capabilities {
+        write_message(
+            output,
+            &Message::notification(
+                "assistant.capabilities",
+                serde_json::json!({"generation":generation,"capabilities":capabilities}),
+            ),
+        )
+        .map_err(|e| e.to_string())?;
+        *last_capabilities = capabilities;
+    }
     let state = panel.state();
     if &state != last {
         write_message(

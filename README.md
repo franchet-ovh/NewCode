@@ -161,6 +161,7 @@ All addon installations share the directory beside logs. Omitted addons are not 
 The GitHub icon opens **Issues** and **Pull requests** for the active workspace's GitHub.com remotes, preferring `origin`. Select a repository, filter loaded items, load more results, or open Markdown details. The panel provides:
 
 - **Create issue branch & checkout** (`gcmr`): links an `issue-N` branch to its issue, with editable base/name and explicit existing-branch reuse.
+- **Create branch, checkout & start AI**: choose an installed Codex or OpenCode addon, its model, mode, and reasoning option. The choices come from the connected addon's live capabilities; Plan mode and High reasoning are preferred when available. After a successful branch checkout, the selected assistant opens a fresh session with the issue title, description, repository, and URL, and its right-hand tab is selected. Existing sessions and unsent drafts are preserved. Enable/connect the assistant first; failed or cancelled checkouts never send the issue to AI.
 - **Push & create PR** (`gpc`): previews editable title/body and the destination before pushing; associates known issue branches with `Closes #N` and recognizes existing PRs.
 - **Auto-merge (squash)** (`gpma`): respects checks/protections and merge queues. **Delete branches after merge** is unchecked by default. Selected cleanup waits for a confirmed merge, preserves new commits and occupied worktrees, and resumes when the addon runs again. GitHub's own repository deletion setting still applies.
 

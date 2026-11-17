@@ -28,7 +28,22 @@ struct App {
     sessions: BTreeMap<PathBuf, String>,
 }
 impl Panel for App {
+    fn assistant_capabilities(&self) -> Option<focus_addon_sdk::AssistantCapabilities> {
+        Some(self.current.assistant_capabilities())
+    }
+    fn start_assistant(
+        &mut self,
+        session: focus_addon_sdk::AssistantSession,
+        _ctx: &egui::Context,
+    ) -> Result<(), String> {
+        if self.context.workspace.is_none() {
+            return Err("Open a workspace first".into());
+        }
+        self.current
+            .start_issue(session, self.context.workspace.as_deref())
+    }
     fn context(&mut self, context: Context, ctx: &egui::Context) {
+        self.current.cancel_issue_start();
         self.tick(ctx);
         self.current.stop();
         if let Some(old) = self.context.workspace.take() {

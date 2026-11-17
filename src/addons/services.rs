@@ -33,6 +33,9 @@ pub(super) fn execute(
 ) -> ServiceReply {
     let started = Instant::now();
     let reply = match service {
+        Service::Assistants | Service::StartAssistant { .. } => {
+            ServiceReply::error("host", "Assistant requests must be routed by the editor")
+        }
         Service::Run {
             program,
             args,
