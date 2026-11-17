@@ -30,6 +30,14 @@ They are not static binaries. Use ldd focus-editor to identify missing shared
 libraries. Native mode needs an X11 or Wayland desktop and working OpenGL/EGL
 drivers. Both modes use local file dialogs through the desktop portal.
 
+HTTPS requests use the system CA store. Install your distribution's ca-certificates
+package and add any corporate proxy CA to that store, then restart the editor.
+To use an explicit PEM bundle:
+  SSL_CERT_FILE=/path/to/ca-bundle.pem focus-editor
+SSL_CERT_FILE and SSL_CERT_DIR override the system certificate locations; include
+all required roots in the selected bundle or directories, including the proxy CA.
+External tools such as Git, Codex, and OpenCode use their own TLS settings.
+
 Git, Docker, Codex, and OpenCode are separate optional installations.
 Configure provider authentication with each assistant's CLI before enabling it.
 The editor starts in the background; use --foreground to see diagnostics.
