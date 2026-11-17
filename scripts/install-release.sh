@@ -11,7 +11,7 @@ if [[ $# -gt 0 ]]; then
     if [[ $# -eq 1 && ( $1 == --help || $1 == -h ) ]]; then
         printf '%s\n' \
             'Install the latest stable Focus Editor release for this Linux architecture.' \
-            'Destination: $HOME/local/share/focus-editor/bin (no leading dot).' \
+            'Destination: $HOME/.local/share/focus-editor/bin (no leading dot).' \
             'Installs focus-editor and focus-editor-server only; addons are untouched.' \
             'Requires: bash, curl, jq, tar, sha256sum, and standard Linux utilities.'
         exit 0
@@ -30,7 +30,7 @@ for command in curl jq tar sha256sum install mktemp awk tr mv mkdir rm; do
     command -v "$command" >/dev/null 2>&1 || die "Required command not found: $command"
 done
 : "${HOME:?HOME must be set}"
-destination="$HOME/local/share/focus-editor/bin"
+destination="$HOME/.local/share/focus-editor/bin"
 repository='https://github.com/nfranchet/NewCode'
 work_dir=$(mktemp -d "${TMPDIR:-/tmp}/focus-editor-release.XXXXXX")
 install_stage=''
@@ -95,4 +95,4 @@ for binary in focus-editor focus-editor-server; do
 done
 
 printf 'Installed %s to %s\n' "$tag" "$destination"
-printf 'Add this directory to PATH if needed:\n  export PATH="$HOME/local/share/focus-editor/bin:$PATH"\n'
+printf 'Add this directory to PATH if needed:\n  export PATH="$HOME/.local/share/focus-editor/bin:$PATH"\n'
