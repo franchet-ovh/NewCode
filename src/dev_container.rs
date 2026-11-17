@@ -41,6 +41,18 @@ struct Configuration {
     remote_user: Option<String>,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum StartMode {
+    Normal,
+    Rebuild,
+    RebuildWithoutCache,
+}
+
+enum Action {
+    Start(StartMode),
+    Stop,
+}
+
 enum State {
     Unavailable,
     Available(Configuration),
@@ -149,7 +161,7 @@ impl DevContainer {
                     .button(format!("Open in {}", configuration.name))
                     .clicked()
                 {
-                    action = Some((configuration.clone(), false, false));
+                    action = Some((configuration.clone(), Action::Start(StartMode::Normal)));
                 }
             }
             State::Starting(configuration) => {
@@ -161,13 +173,10 @@ impl DevContainer {
             State::Ready(configuration, _) => {
                 ui.label(format!("Connected to {}", configuration.name));
                 if ui.button("Reconnect").clicked() {
-                    action = Some((configuration.clone(), false, false));
-                }
-                if ui.button("Rebuild").clicked() {
-                    action = Some((configuration.clone(), true, false));
+                    action = Some((configuration.clone(), Action::Start(StartMode::Normal)));
                 }
                 if ui.button("Stop").clicked() {
-                    action = Some((configuration.clone(), false, true));
+                    action = Some((configuration.clone(), Action::Stop));
                 }
             }
             State::Failed(configuration) => {
@@ -179,15 +188,27 @@ impl DevContainer {
                     .wrap(),
                 );
                 if ui.button(format!("Retry {}", configuration.name)).clicked() {
-                    action = Some((configuration.clone(), false, false));
+                    action = Some((configuration.clone(), Action::Start(StartMode::Normal)));
                 }
             }
         }
-        if let Some((configuration, rebuild, stop)) = action {
-            if stop {
-                self.stop(configuration, ctx.clone());
-            } else {
-                self.start(configuration, rebuild, ctx.clone());
+        if let State::Available(configuration)
+        | State::Ready(configuration, _)
+        | State::Failed(configuration) = &self.state
+        {
+            for (label, mode) in [
+                ("Rebuild", StartMode::Rebuild),
+                ("Rebuild without cache", StartMode::RebuildWithoutCache),
+            ] {
+                if ui.button(label).clicked() {
+                    action = Some((configuration.clone(), Action::Start(mode)));
+                }
+            }
+        }
+        if let Some((configuration, action)) = action {
+            match action {
+                Action::Stop => self.stop(configuration, ctx.clone()),
+                Action::Start(mode) => self.start(configuration, mode, ctx.clone()),
             }
             ui.close();
         }
@@ -200,20 +221,22 @@ impl DevContainer {
         }
     }
 
-    fn start(&mut self, configuration: Configuration, rebuild: bool, ctx: egui::Context) {
-        let operation = if rebuild {
-            "rebuild"
-        } else if matches!(&self.state, State::Ready(..)) {
-            "reconnect"
-        } else {
-            "start"
+    fn start(&mut self, configuration: Configuration, mode: StartMode, ctx: egui::Context) {
+        if matches!(self.state, State::Starting(_)) {
+            return;
+        }
+        let operation = match mode {
+            StartMode::Rebuild => "rebuild",
+            StartMode::RebuildWithoutCache => "rebuild without cache",
+            StartMode::Normal if matches!(self.state, State::Ready(..)) => "reconnect",
+            StartMode::Normal => "start",
         };
         log::info!("Dev Container {operation} requested");
         let (tx, events) = mpsc::channel();
         self.events = Some(events);
         self.state = State::Starting(configuration.clone());
         thread::spawn(move || {
-            let result = start(&configuration, rebuild);
+            let (configuration, result) = start_reloaded(configuration, mode, start);
             let _ = tx.send(Event::Started(configuration, result, operation));
             ctx.request_repaint();
         });
@@ -279,16 +302,28 @@ fn load_configuration(workspace: &Path) -> Result<Option<Configuration>, String>
     }))
 }
 
-fn start(configuration: &Configuration, rebuild: bool) -> Result<Runtime, String> {
-    let mut args = vec!["up", "-d"];
-    if rebuild {
-        args.extend(["--build", "--force-recreate"]);
-    } else {
-        args.push("--build");
+// Reload inside the lifecycle worker so edited configuration is used on every attempt.
+fn start_reloaded(
+    previous: Configuration,
+    mode: StartMode,
+    run: impl FnOnce(&Configuration, StartMode) -> Result<Runtime, String>,
+) -> (Configuration, Result<Runtime, String>) {
+    match load_configuration(&previous.workspace) {
+        Ok(Some(configuration)) => {
+            let result = run(&configuration, mode);
+            (configuration, result)
+        }
+        Ok(None) => (previous, Err("No Dev Container configuration found".into())),
+        Err(error) => (previous, Err(error)),
     }
-    args.push(&configuration.service);
+}
+
+fn start(configuration: &Configuration, mode: StartMode) -> Result<Runtime, String> {
     persistence::prepare(configuration)?;
-    compose::start(configuration, args)?;
+    let override_config = compose::start_override(configuration)?;
+    compose_start(&configuration.service, mode, |args| {
+        compose::execute(configuration, args, Some(&override_config)).map(|_| ())
+    })?;
     let container_id = compose(configuration, ["ps", "-q", configuration.service.as_str()])?;
     let container_id = String::from_utf8_lossy(&container_id).trim().to_owned();
     if container_id.is_empty() {
@@ -305,6 +340,22 @@ fn start(configuration: &Configuration, rebuild: bool) -> Result<Runtime, String
     };
     persistence::initialize(&runtime)?;
     Ok(runtime)
+}
+
+// Keep the two uncached phases ordered and stop immediately on build failure.
+fn compose_start(
+    service: &str,
+    mode: StartMode,
+    mut run: impl FnMut(&[&str]) -> Result<(), String>,
+) -> Result<(), String> {
+    match mode {
+        StartMode::Normal => run(&["up", "-d", "--build", service]),
+        StartMode::Rebuild => run(&["up", "-d", "--build", "--force-recreate", service]),
+        StartMode::RebuildWithoutCache => {
+            run(&["build", "--no-cache", "--with-dependencies", service])?;
+            run(&["up", "-d", "--no-build", "--force-recreate", service])
+        }
+    }
 }
 
 // devcontainer.json permits comments; serde_json deliberately does not.
@@ -354,3 +405,6 @@ mod tests;
 
 #[cfg(test)]
 mod path_tests;
+
+#[cfg(test)]
+mod recovery_tests;

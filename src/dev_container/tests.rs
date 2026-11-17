@@ -150,3 +150,213 @@ fn success_and_configuration_failures_use_their_expected_levels() {
     assert!(warnings[0].1.contains("missing field"));
     std::fs::remove_dir_all(root).unwrap();
 }
+
+fn test_runtime(configuration: &Configuration) -> Runtime {
+    Runtime {
+        host_workspace: configuration.workspace.clone(),
+        container_id: "test".into(),
+        workspace_folder: configuration.workspace_folder.clone(),
+        remote_user: configuration.remote_user.clone(),
+    }
+}
+
+#[test]
+fn rebuild_actions_are_available_before_connection_and_after_failure() {
+    let configuration = fallback_configuration(&None);
+    for (state, available) in [
+        (State::Unavailable, false),
+        (State::Available(configuration.clone()), true),
+        (State::Failed(configuration.clone()), true),
+        (
+            State::Ready(configuration.clone(), test_runtime(&configuration)),
+            true,
+        ),
+        (State::Starting(configuration.clone()), false),
+    ] {
+        let ctx = egui::Context::default();
+        let mut container = DevContainer {
+            state,
+            ..Default::default()
+        };
+        let output = crate::test_frame(&ctx, Default::default(), |root| {
+            egui::CentralPanel::default().show(root, |ui| container.menu(ui, &ctx));
+        });
+        for label in ["Rebuild", "Rebuild without cache"] {
+            let found = output.shapes.iter().any(|shape| {
+                matches!(
+                    &shape.shape, egui::Shape::Text(text) if text.galley.job.text == label
+                )
+            });
+            assert_eq!(found, available, "{label}");
+        }
+    }
+}
+
+#[test]
+fn rebuild_buttons_dispatch_the_selected_operation() {
+    for (label, operation) in [
+        ("Rebuild", "rebuild"),
+        ("Rebuild without cache", "rebuild without cache"),
+    ] {
+        let workspace = tempfile::tempdir().unwrap();
+        // Invalid configuration prevents any Docker calls during this UI test.
+        std::fs::write(workspace.path().join(".devcontainer.json"), "{}").unwrap();
+        let configuration = fallback_configuration(&Some(workspace.path().into()));
+        let mut container = DevContainer {
+            state: State::Failed(configuration),
+            ..Default::default()
+        };
+        let ctx = egui::Context::default();
+        let output = crate::test_frame(&ctx, Default::default(), |root| {
+            egui::CentralPanel::default().show(root, |ui| container.menu(ui, &ctx));
+        });
+        let position = output
+            .shapes
+            .iter()
+            .find_map(|shape| match &shape.shape {
+                egui::Shape::Text(text) if text.galley.job.text == label => {
+                    Some(text.visual_bounding_rect().center())
+                }
+                _ => None,
+            })
+            .unwrap();
+        crate::test_frame(
+            &ctx,
+            egui::RawInput {
+                events: vec![
+                    egui::Event::PointerMoved(position),
+                    egui::Event::PointerButton {
+                        pos: position,
+                        button: egui::PointerButton::Primary,
+                        pressed: true,
+                        modifiers: Default::default(),
+                    },
+                    egui::Event::PointerButton {
+                        pos: position,
+                        button: egui::PointerButton::Primary,
+                        pressed: false,
+                        modifiers: Default::default(),
+                    },
+                ],
+                ..Default::default()
+            },
+            |root| {
+                egui::CentralPanel::default().show(root, |ui| container.menu(ui, &ctx));
+            },
+        );
+        assert!(matches!(container.state, State::Starting(_)));
+        let event = container
+            .events
+            .as_ref()
+            .unwrap()
+            .recv_timeout(std::time::Duration::from_secs(5))
+            .unwrap();
+        assert!(matches!(event, Event::Started(_, Err(_), actual) if actual == operation));
+    }
+}
+
+#[test]
+fn start_modes_use_the_correct_commands_and_stop_on_failure() {
+    for (mode, expected) in [
+        (StartMode::Normal, vec![vec!["up", "-d", "--build", "dev"]]),
+        (
+            StartMode::Rebuild,
+            vec![vec!["up", "-d", "--build", "--force-recreate", "dev"]],
+        ),
+        (
+            StartMode::RebuildWithoutCache,
+            vec![
+                vec!["build", "--no-cache", "--with-dependencies", "dev"],
+                vec!["up", "-d", "--no-build", "--force-recreate", "dev"],
+            ],
+        ),
+    ] {
+        for fail_at in [None, Some(0), Some(expected.len() - 1)] {
+            let mut calls = Vec::new();
+            let result = compose_start("dev", mode, |args| {
+                calls.push(args.iter().map(|arg| arg.to_string()).collect::<Vec<_>>());
+                if fail_at == Some(calls.len() - 1) {
+                    Err("Compose failed".into())
+                } else {
+                    Ok(())
+                }
+            });
+            assert_eq!(result.is_err(), fail_at.is_some());
+            assert_eq!(
+                calls,
+                expected[..fail_at.map_or(expected.len(), |index| index + 1)]
+            );
+        }
+    }
+}
+
+#[test]
+fn retry_and_rebuild_reload_fixed_configuration_and_recover_from_failures() {
+    let workspace = tempfile::tempdir().unwrap();
+    let file = workspace.path().join(".devcontainer.json");
+    std::fs::write(workspace.path().join("compose.yml"), "services: {}").unwrap();
+    let mut previous = fallback_configuration(&Some(workspace.path().into()));
+    for mode in [
+        StartMode::Normal,
+        StartMode::Rebuild,
+        StartMode::RebuildWithoutCache,
+    ] {
+        std::fs::write(&file, "{}").unwrap();
+        let (configuration, result) = start_reloaded(previous, mode, |_, _| {
+            panic!("invalid config must not start")
+        });
+        assert!(result.err().unwrap().contains("missing field"));
+        std::fs::write(&file, r#"{"name":"Fixed","dockerComposeFile":"compose.yml","service":"fixed","workspaceFolder":"/fixed","remoteUser":"user"}"#).unwrap();
+        let (configuration, result) =
+            start_reloaded(configuration, mode, |configuration, actual_mode| {
+                assert_eq!(actual_mode, mode);
+                assert_eq!(configuration.service, "fixed");
+                assert_eq!(configuration.workspace_folder, Path::new("/fixed"));
+                assert_eq!(configuration.remote_user.as_deref(), Some("user"));
+                Err("simulated build/start failure".into())
+            });
+        let mut container = DevContainer::default();
+        deliver(
+            &mut container,
+            Event::Started(configuration.clone(), result, "start"),
+        );
+        assert!(matches!(container.state, State::Failed(_)));
+        let (configuration, result) = start_reloaded(configuration, mode, |configuration, _| {
+            Ok(test_runtime(configuration))
+        });
+        deliver(
+            &mut container,
+            Event::Started(configuration.clone(), result, "rebuild"),
+        );
+        assert!(container.runtime().is_some());
+        assert_eq!(container.label(), Some("Fixed"));
+        previous = configuration;
+    }
+    std::fs::remove_file(file).unwrap();
+    assert!(
+        start_reloaded(previous, StartMode::Rebuild, |_, _| panic!(
+            "missing config must not start"
+        ))
+        .1
+        .is_err()
+    );
+}
+
+#[test]
+fn an_in_flight_operation_cannot_be_replaced_by_another_start() {
+    let configuration = fallback_configuration(&None);
+    let (tx, rx) = mpsc::channel();
+    let mut container = DevContainer {
+        state: State::Starting(configuration.clone()),
+        events: Some(rx),
+        ..Default::default()
+    };
+    container.start(
+        configuration.clone(),
+        StartMode::RebuildWithoutCache,
+        egui::Context::default(),
+    );
+    tx.send(Event::Stopped(configuration, Ok(()))).unwrap();
+    assert!(container.tick());
+    assert!(matches!(container.state, State::Available(_)));
+}

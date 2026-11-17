@@ -17,11 +17,17 @@ where
 #[cfg(test)]
 mod tests;
 
+#[cfg(test)]
 pub(super) fn start<I, S>(configuration: &Configuration, args: I) -> Result<Vec<u8>, String>
 where
     I: IntoIterator<Item = S>,
     S: AsRef<str>,
 {
+    let override_config = start_override(configuration)?;
+    execute(configuration, args, Some(&override_config))
+}
+
+pub(super) fn start_override(configuration: &Configuration) -> Result<Value, String> {
     // Compose normally resolves build contexts from the first Compose file.
     // The runtime uses the host workspace as its project directory for stable
     // project identity and workspace bind mounts. Resolve builds separately so
@@ -75,7 +81,7 @@ where
         "CODEX_HOME": "/focus-editor-assistant-data/codex",
         "XDG_DATA_HOME": "/focus-editor-assistant-data/share"
     });
-    execute(configuration, args, Some(&override_config))
+    Ok(override_config)
 }
 
 fn workspace_mounts(
@@ -149,7 +155,7 @@ fn build_override(
     }
 }
 
-fn execute<I, S>(
+pub(super) fn execute<I, S>(
     configuration: &Configuration,
     args: I,
     override_config: Option<&Value>,
@@ -234,6 +240,6 @@ where
     }
 }
 
-fn persistence_target() -> &'static str {
+pub(super) fn persistence_target() -> &'static str {
     "/focus-editor-assistant-data"
 }
