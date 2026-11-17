@@ -1,4 +1,4 @@
-//! Build contexts must preserve COPY sources without rewriting user files/mounts.
+//! Builds use Compose-file paths; relative bind mounts use the host workspace.
 use super::*;
 use std::{
     fs,
@@ -21,7 +21,9 @@ impl Fixture {
         ));
         fs::create_dir_all(root.join(".devcontainer/vscode/files")).unwrap();
         let compose = root.join(".devcontainer/compose.yml");
-        fs::write(&compose, "services:\n  dev:\n    build:\n      context: .\n      dockerfile: ./vscode/Dockerfile\n      args:\n        PROJECT_NAME: ${COMPOSE_PROJECT_NAME}\n    volumes:\n      - .:/workspaces/test\n").unwrap();
+        fs::create_dir_all(root.join("repo")).unwrap();
+        fs::write(root.join("settings.json"), "workspace settings").unwrap();
+        fs::write(&compose, "services:\n  dev:\n    build:\n      context: .\n      dockerfile: ./vscode/Dockerfile\n      args:\n        PROJECT_NAME: ${COMPOSE_PROJECT_NAME}\n    volumes:\n      - .:/workspaces/test\n      - ./repo:/repo:ro\n      - ./settings.json:/etc/settings.json:ro\n      - cache:/cache\n  dependency:\n    image: scratch\n    volumes:\n      - type: bind\n        source: ./settings.json\n        target: /etc/settings.json\n        read_only: true\n        bind:\n          create_host_path: false\nvolumes:\n  cache:\n").unwrap();
         fs::write(
             root.join(".devcontainer/vscode/Dockerfile"),
             "FROM scratch\nCOPY ./vscode/files/toto.txt /tmp/toto.txt\n",
@@ -107,6 +109,39 @@ fn image_only_services_need_no_override_and_missing_services_are_errors() {
     );
 }
 
+#[test]
+fn relative_binds_use_workspace_and_preserve_mount_options_and_other_volumes() {
+    let fixture = Fixture::new();
+    let absolute = fixture.root.join("absolute");
+    let runtime = json!({"services": {
+        "dev": {"volumes": [
+            {"type":"bind", "source":"./repo", "target":"/repo", "read_only":true,
+                "bind":{"propagation":"rshared", "create_host_path":false}},
+            {"type":"bind", "source":absolute, "target":"/absolute"},
+            {"type":"volume", "source":"cache", "target":"/cache", "volume":{"nocopy":true}},
+            {"type":"volume", "target":"/anonymous"},
+            {"type":"tmpfs", "target":"/tmp", "tmpfs":{"size":1024}}
+        ]},
+        "dependency": {"volumes": [
+            {"type":"bind", "source":"./settings.json", "target":"/etc/settings.json", "read_only":true}
+        ]},
+        "database": {"volumes": [{"type":"volume", "source":"database", "target":"/data"}]}
+    }});
+    let before = runtime.clone();
+    let mut overlay = json!({"services":{"dev":{"build":{"context":"preserved"}}}});
+    workspace_mounts(&fixture.configuration, &runtime, &mut overlay).unwrap();
+    let mut expected = runtime["services"]["dev"]["volumes"].clone();
+    expected[0]["source"] = json!(fixture.root.join("repo"));
+    assert_eq!(overlay["services"]["dev"]["volumes"], expected);
+    assert_eq!(overlay["services"]["dev"]["build"]["context"], "preserved");
+    assert_eq!(
+        overlay["services"]["dependency"]["volumes"][0]["source"],
+        json!(fixture.root.join("settings.json"))
+    );
+    assert!(overlay["services"].get("database").is_none());
+    assert_eq!(runtime, before);
+}
+
 fn verify_resolved(configuration: &Configuration) -> Value {
     let original: Value =
         serde_json::from_slice(&compose(configuration, ["config", "--format", "json"]).unwrap())
@@ -115,10 +150,27 @@ fn verify_resolved(configuration: &Configuration) -> Value {
         serde_json::from_slice(&start(configuration, ["config", "--format", "json"]).unwrap())
             .unwrap();
     for (name, service) in merged["services"].as_object().unwrap() {
-        assert_eq!(service["volumes"], original["services"][name]["volumes"]);
+        let mounts: Vec<_> = service["volumes"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter(|mount| mount["target"] != persistence_target())
+            .cloned()
+            .collect();
+        assert_eq!(json!(mounts), original["services"][name]["volumes"]);
     }
     assert_eq!(merged["name"], original["name"]);
     let service = &merged["services"][&configuration.service];
+    let persistence = service["volumes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|mount| mount["target"] == persistence_target())
+        .unwrap();
+    assert_eq!(
+        persistence["source"],
+        json!(configuration.workspace.join(".devcontainer/mounted_files"))
+    );
     if service["build"]["args"].get("PROJECT_NAME").is_some() {
         assert_eq!(service["build"]["args"]["PROJECT_NAME"], merged["name"]);
     }
@@ -151,9 +203,51 @@ fn nested_copy_context_and_workspace_mount_resolve_independently() {
         service["volumes"][0]["source"],
         fixture.root.to_str().unwrap()
     );
+    for (target, source) in [("/repo", "repo"), ("/etc/settings.json", "settings.json")] {
+        let mount = service["volumes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|mount| mount["target"] == target)
+            .unwrap();
+        assert_eq!(mount["source"], json!(fixture.root.join(source)));
+        assert_eq!(mount["read_only"], true);
+    }
+    assert_eq!(
+        merged["services"]["dependency"]["volumes"][0]["source"],
+        json!(fixture.root.join("settings.json"))
+    );
     for (file, bytes) in fixture.files().iter().zip(before) {
         assert_eq!(fs::read(file).unwrap(), bytes);
     }
+}
+
+#[test]
+#[ignore = "requires Docker Compose plugin; resolves config only, never starts containers"]
+fn compose_override_file_bind_sources_stay_relative_to_workspace() {
+    let mut fixture = Fixture::new();
+    fs::create_dir_all(fixture.root.join("other-repo")).unwrap();
+    let override_file = fixture.root.join(".devcontainer/override.yml");
+    fs::write(
+        &override_file,
+        "services:\n  dev:\n    volumes:\n      - ./other-repo:/repo:ro\n",
+    )
+    .unwrap();
+    fixture
+        .configuration
+        .compose_files
+        .push(override_file.clone());
+    let before = fs::read(&override_file).unwrap();
+    let merged = verify_resolved(&fixture.configuration);
+    let mount = merged["services"]["dev"]["volumes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|mount| mount["target"] == "/repo")
+        .unwrap();
+    assert_eq!(mount["source"], json!(fixture.root.join("other-repo")));
+    assert_eq!(mount["read_only"], true);
+    assert_eq!(fs::read(override_file).unwrap(), before);
 }
 
 #[test]
