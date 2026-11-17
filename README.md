@@ -6,6 +6,20 @@ Licensed under the [Apache License 2.0](LICENSE).
 
 ## Release downloads
 
+To install only the editor and server from the latest stable GitHub release on
+Linux amd64 or arm64, run:
+
+```sh
+bash scripts/install-release.sh
+```
+
+The installer requires `curl`, `jq`, `tar`, and `sha256sum`. It verifies the release
+checksum and installs `focus-editor` and `focus-editor-server` into
+`$HOME/local/share/focus-editor/bin` (without a leading dot), leaving addons and
+their data untouched. Add this directory to `PATH` if needed. If the latest
+release's assets have not finished uploading, rerun the installer after its build
+completes.
+
 Publishing a GitHub release (including a prerelease) builds the tagged source and attaches:
 
 - `focus-editor-<tag>-linux-amd64.tar.gz`
