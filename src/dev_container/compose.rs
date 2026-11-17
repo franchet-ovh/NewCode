@@ -1,7 +1,10 @@
 //! Resolve build paths using Compose-file semantics while retaining workspace mounts.
 use super::{Configuration, diagnostics};
 use serde_json::{Value, json};
-use std::process::{Command, Stdio};
+use std::{
+    path::{Path, PathBuf},
+    process::{Command, Stdio},
+};
 
 pub(super) fn compose<I, S>(configuration: &Configuration, args: I) -> Result<Vec<u8>, String>
 where
@@ -33,7 +36,12 @@ where
     let mut build_configuration = configuration.clone();
     build_configuration.workspace = directory;
     // Keep COMPOSE_PROJECT_NAME interpolation stable even during path resolution.
-    let runtime_bytes = compose(configuration, ["config", "--format", "json"])?;
+    // Keep bind sources relative until we can anchor them to the host workspace,
+    // independently of the Compose-directory build configuration below.
+    let runtime_bytes = compose(
+        configuration,
+        ["config", "--no-path-resolution", "--format", "json"],
+    )?;
     let runtime: Value = serde_json::from_slice(&runtime_bytes)
         .map_err(|_| "Could not parse runtime Docker Compose configuration")?;
     let project_name = runtime["name"]
@@ -47,18 +55,68 @@ where
         .map_err(|_| "Could not parse resolved Docker Compose configuration")?;
     let mut override_config =
         build_override(configuration, &resolved)?.unwrap_or_else(|| json!({"services": {}}));
+    workspace_mounts(configuration, &runtime, &mut override_config)?;
     let service = &mut override_config["services"][&configuration.service];
     if service.is_null() {
         *service = json!({});
     }
-    service["volumes"] = json!([{"type":"bind",
+    let volumes = service
+        .as_object_mut()
+        .ok_or("Invalid Dev Container service override")?
+        .entry("volumes")
+        .or_insert_with(|| json!([]))
+        .as_array_mut()
+        .ok_or("Invalid Dev Container volume override")?;
+    volumes.retain(|volume| volume["target"] != persistence_target());
+    volumes.push(json!({"type":"bind",
         "source": configuration.workspace.join(".devcontainer/mounted_files"),
-        "target": persistence_target(), "bind": {"create_host_path": false}}]);
+        "target": persistence_target(), "bind": {"create_host_path": false}}));
     service["environment"] = json!({
         "CODEX_HOME": "/focus-editor-assistant-data/codex",
         "XDG_DATA_HOME": "/focus-editor-assistant-data/share"
     });
     execute(configuration, args, Some(&override_config))
+}
+
+fn workspace_mounts(
+    configuration: &Configuration,
+    runtime: &Value,
+    override_config: &mut Value,
+) -> Result<(), String> {
+    let services = runtime["services"]
+        .as_object()
+        .ok_or("Docker Compose did not resolve runtime services")?;
+    for (name, service) in services {
+        let Some(volumes) = service["volumes"].as_array() else {
+            continue;
+        };
+        let mut mounts = volumes.clone();
+        let mut changed = false;
+        for mount in &mut mounts {
+            if mount["type"] != "bind" {
+                continue;
+            }
+            let source = mount["source"]
+                .as_str()
+                .ok_or("Docker Compose bind mount has no source")?;
+            if Path::new(source).is_relative() {
+                // Remove redundant `.` components without requiring the mount
+                // source to exist or dereferencing host symlinks.
+                let source: PathBuf = configuration.workspace.join(source).components().collect();
+                mount["source"] = json!(source);
+                changed = true;
+            }
+        }
+        if changed {
+            let service = &mut override_config["services"][name];
+            if service.is_null() {
+                *service = json!({});
+            }
+            service["volumes"] = json!(mounts);
+            log::debug!("Resolved Dev Container bind mounts from workspace for service {name}");
+        }
+    }
+    Ok(())
 }
 
 fn build_override(
