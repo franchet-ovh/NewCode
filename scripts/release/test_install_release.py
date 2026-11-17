@@ -26,7 +26,7 @@ class InstallReleaseTests(unittest.TestCase):
         self.bin.mkdir()
         self.fixtures = self.root / 'fixtures'
         self.fixtures.mkdir()
-        self.destination = self.home / 'local/share/focus-editor/bin'
+        self.destination = self.home / '.local/share/focus-editor/bin'
         self.env = dict(os.environ, HOME=str(self.home), PATH=f'{self.bin}:{os.environ["PATH"]}',
                         INSTALL_TEST_FIXTURES=str(self.fixtures), INSTALL_TEST_ARCH='x86_64',
                         INSTALL_TEST_OS='Linux', INSTALL_TEST_REQUESTS=str(self.root / 'requests.jsonl'))
@@ -85,7 +85,7 @@ shutil.copyfile(pathlib.Path(os.environ['INSTALL_TEST_FIXTURES']) / name, args[a
         for binary in ('focus-editor', 'focus-editor-server'):
             (self.destination / binary).write_text('previous version')
         (self.destination / 'keep.txt').write_text('keep this file')
-        addons = self.home / 'local/share/focus-editor/addons'
+        addons = self.home / '.local/share/focus-editor/addons'
         addons.mkdir()
         (addons / 'existing-addon').write_text('existing data')
 
