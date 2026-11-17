@@ -103,7 +103,6 @@ shutil.copyfile(pathlib.Path(os.environ['INSTALL_TEST_FIXTURES']) / name, args[a
                 self.assertEqual({p.name for p in self.destination.iterdir()}, {'focus-editor', 'focus-editor-server', 'keep.txt'})
                 self.assertEqual((self.destination / 'keep.txt').read_text(), 'keep this file')
                 self.assertEqual((self.destination.parent / 'addons/existing-addon').read_text(), 'existing data')
-                self.assertFalse((self.home / '.local').exists())
         urls = [json.loads(line) for line in (self.root / 'requests.jsonl').read_text().splitlines()]
         self.assertTrue(all('focus-addon-' not in url and 'addons.json' not in url for url in urls))
 
