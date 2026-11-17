@@ -38,3 +38,4 @@ jobs:
         uses: ./.github/actions/linux-checks
         with:
           target: ${{ matrix.target }}
+          build-release: ${{ github.ref == 'refs/heads/main' }}
