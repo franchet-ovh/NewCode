@@ -106,6 +106,9 @@ impl Addons {
         true
     }
     pub(super) fn action(&mut self, id: &str, action: String) {
+        if self.installation_pending(id) {
+            return;
+        }
         if action == "host.credentials" {
             self.credentials = Some(Credentials {
                 addon: id.to_owned(),

@@ -81,6 +81,7 @@ pub(crate) struct Addons {
     rx: mpsc::Receiver<Completion>,
     confirm: Option<Task>,
     worktree_jobs: usize,
+    host_tasks: BTreeMap<String, usize>,
     credentials: Option<Credentials>,
     pub notice: Option<String>,
     cache: crate::assistant_ui::content::CommonMarkCache,
@@ -109,6 +110,7 @@ impl Default for Addons {
             rx,
             confirm: None,
             worktree_jobs: 0,
+            host_tasks: BTreeMap::new(),
             credentials: None,
             notice: None,
             cache: Default::default(),
@@ -202,6 +204,9 @@ impl Addons {
         }
     }
     pub fn activate(&mut self, id: String, ctx: &egui::Context) {
+        if self.installation_pending(&id) {
+            return;
+        }
         if self
             .entries
             .iter()
@@ -280,6 +285,7 @@ impl Addons {
             return;
         }
         addon.working = true;
+        *self.host_tasks.entry(task.addon.clone()).or_default() += 1;
         let manifest = addon.manifest.clone();
         let workspace = self.context.workspace.clone();
         let runtime = self.runtime.clone();
@@ -329,6 +335,9 @@ impl Addons {
         }
         let mut changed = false;
         while let Ok(completion) = self.rx.try_recv() {
+            if let Some(count) = self.host_tasks.get_mut(&completion.task.addon) {
+                *count = count.saturating_sub(1);
+            }
             if matches!(&completion.task.call.service, Service::Git { operation } if operation.changes_worktree())
             {
                 self.worktree_jobs = self.worktree_jobs.saturating_sub(1);

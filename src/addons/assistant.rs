@@ -19,6 +19,13 @@ struct Pending {
     started: Instant,
 }
 impl Addons {
+    pub(super) fn assistant_pending(&self, id: &str) -> bool {
+        self.assistants
+            .pending
+            .values()
+            .any(|p| p.target == id || p.source.addon == id)
+    }
+
     fn installed_assistants(&self) -> Vec<InstalledAssistant> {
         self.entries
             .iter()
@@ -49,6 +56,9 @@ impl Addons {
             }
             Service::StartAssistant { addon, session } => {
                 let result = (|| {
+                    if self.installation_pending(&addon) {
+                        return Err("The assistant is waiting for an addon update".to_owned());
+                    }
                     if self.context.workspace.is_none() || self.worktree_jobs > 0 {
                         return Err("Wait for workspace checkout to finish".to_owned());
                     }

@@ -29,6 +29,8 @@ pub(super) struct Manager {
     error: Option<String>,
     uninstall: Option<String>,
     restart: Option<String>,
+    queued: Option<Prepared>,
+    changing: Option<String>,
 }
 impl Default for Manager {
     fn default() -> Self {
@@ -46,6 +48,8 @@ impl Default for Manager {
             error: None,
             uninstall: None,
             restart: None,
+            queued: None,
+            changing: None,
         }
     }
 }
@@ -55,7 +59,38 @@ impl Addons {
     }
 
     pub fn manager_busy(&self) -> bool {
-        self.manager.pending.is_some()
+        self.manager.pending.is_some() || self.manager.queued.is_some()
+    }
+
+    pub(super) fn installation_pending(&self, id: &str) -> bool {
+        self.manager.changing.as_deref() == Some(id)
+            || self
+                .manager
+                .queued
+                .as_ref()
+                .is_some_and(|p| p.manifest.id == id)
+    }
+
+    fn ready_upgrade(&mut self) -> Option<Prepared> {
+        if self
+            .manager
+            .queued
+            .as_ref()
+            .is_some_and(|p| !self.upgrade_busy(&p.manifest.id))
+        {
+            self.manager.queued.take()
+        } else {
+            None
+        }
+    }
+
+    fn upgrade_busy(&self, id: &str) -> bool {
+        self.entries
+            .iter()
+            .any(|a| a.manifest.id == id && a.working)
+            || self.host_tasks.get(id).copied().unwrap_or(0) > 0
+            || self.confirm.as_ref().is_some_and(|task| task.addon == id)
+            || self.assistant_pending(id)
     }
 }
 enum Action {
@@ -86,6 +121,94 @@ mod tests {
             sha256: "0".repeat(64),
         }
     }
+    fn running_fixture(root: &std::path::Path) -> Addons {
+        use std::os::unix::fs::PermissionsExt;
+        let directory = root.join("addons/fixture");
+        std::fs::create_dir_all(&directory).unwrap();
+        std::fs::write(directory.join("addon.toml"), "id='fixture'\nname='Fixture'\nversion='1'\nprotocol=1\nexecutable='program'\nicon='icon.png'\npanel='right'\n").unwrap();
+        std::fs::write(directory.join("program"), "#!/bin/sh\nwhile IFS= read -r line; do\ncase \"$line\" in *shutdown*) exit 0;; esac\ndone\n").unwrap();
+        std::fs::set_permissions(
+            directory.join("program"),
+            std::fs::Permissions::from_mode(0o755),
+        )
+        .unwrap();
+        std::fs::write(directory.join("icon.png"), b"fixture").unwrap();
+        let manifest = load_manifest(&directory.join("addon.toml")).unwrap();
+        let mut host = Addons::default();
+        host.entries.push(Addon {
+            manifest,
+            directory,
+            storage: root.join("data"),
+            enabled: true,
+            process: None,
+            error: None,
+            view: View::default(),
+            values: BTreeMap::new(),
+            icon: None,
+            working: false,
+            incarnation: 0,
+            surface: Default::default(),
+            seed: Default::default(),
+            status: String::new(),
+        });
+        host.activate("fixture".into(), &egui::Context::default());
+        assert!(host.entries[0].process.is_some());
+        host
+    }
+
+    #[test]
+    fn update_keeps_process_stopped_until_commit_then_restarts() {
+        let root = tempfile::tempdir().unwrap();
+        let mut host = running_fixture(root.path());
+        let ctx = egui::Context::default();
+        let prepared =
+            packages::prepare_local(root.path(), &host.entries[0].directory.join("addon.toml"))
+                .unwrap();
+        host.stop_managed("fixture").unwrap();
+        host.manager.changing = Some("fixture".into());
+        host.activate("fixture".into(), &ctx);
+        host.tick(&ctx, false, true);
+        assert!(host.entries[0].process.is_none());
+        packages::commit(root.path(), prepared).unwrap();
+        // Both installation failure and success must release the startup guard.
+        let (tx, rx) = mpsc::channel();
+        host.manager.pending = Some(rx);
+        tx.send(Event::Error("simulated failure".into())).unwrap();
+        host.manager_tick(&ctx, &BTreeMap::new());
+        assert!(!host.installation_pending("fixture"));
+        assert!(host.entries[0].process.is_some());
+        assert_eq!(host.manager.error.as_deref(), Some("simulated failure"));
+    }
+
+    #[test]
+    fn busy_update_is_queued_without_stopping_current_tasks() {
+        let root = tempfile::tempdir().unwrap();
+        let mut host = running_fixture(root.path());
+        let ctx = egui::Context::default();
+        let prepared =
+            packages::prepare_local(root.path(), &host.entries[0].directory.join("addon.toml"))
+                .unwrap();
+        host.entries[0].working = true;
+        let (tx, rx) = mpsc::channel();
+        host.manager.pending = Some(rx);
+        tx.send(Event::Prepared(prepared)).unwrap();
+        host.manager_tick(&ctx, &BTreeMap::new());
+        assert!(host.manager_busy());
+        assert!(host.manager.queued.is_some());
+        assert!(host.entries[0].process.is_some());
+        host.manager_tick(&ctx, &BTreeMap::new());
+        assert!(host.manager.queued.is_some());
+        host.entries[0].working = false;
+        host.host_tasks.insert("fixture".into(), 1);
+        assert!(host.upgrade_busy("fixture"));
+        assert!(host.ready_upgrade().is_none());
+        host.action("fixture", "new-task".into());
+        assert!(!host.entries[0].working);
+        host.host_tasks.clear();
+        assert!(host.ready_upgrade().is_some());
+        assert!(!host.manager_busy());
+    }
+
     #[test]
     fn incompatible_packages_cannot_be_selected_for_installation() {
         let mut p = package();
@@ -263,7 +386,7 @@ impl Addons {
         ctx: &egui::Context,
         enabled_settings: &mut BTreeMap<String, bool>,
     ) {
-        if self.manager.pending.is_some() {
+        if self.manager_busy() {
             return;
         }
         match action {
@@ -349,7 +472,7 @@ impl Addons {
         Ok(())
     }
     pub(crate) fn install_local(&mut self, ctx: &egui::Context, source: std::path::PathBuf) {
-        if self.manager.pending.is_some() {
+        if self.manager_busy() {
             return;
         }
         let root = match crate::app_paths::data_root() {
@@ -393,6 +516,9 @@ impl Addons {
                 }
             }
         }
+        if let Some(prepared) = self.ready_upgrade() {
+            events.push(Event::Prepared(prepared));
+        }
         for event in events {
             match event {
                 Event::Progress(text) => self.manager.progress = text,
@@ -403,9 +529,10 @@ impl Addons {
                 }
                 Event::Prepared(prepared) => {
                     let id = prepared.manifest.id.clone();
-                    if let Err(error) = self.stop_managed(&id) {
+                    if self.upgrade_busy(&id) {
                         self.manager.pending = None;
-                        self.manager.error = Some(error);
+                        self.manager.progress = "Waiting for addon tasks to finish…".into();
+                        self.manager.queued = Some(prepared);
                         continue;
                     }
                     let root = match crate::app_paths::data_root() {
@@ -416,11 +543,18 @@ impl Addons {
                             continue;
                         }
                     };
+                    if let Err(error) = self.stop_managed(&id) {
+                        self.manager.pending = None;
+                        self.manager.error = Some(error);
+                        continue;
+                    }
+                    self.manager.changing = Some(id);
                     self.worker(ctx, "Installing addon…", move |_| {
                         packages::commit(&root, prepared).map(|(m, r)| Event::Installed(m, r))
                     });
                 }
                 Event::Installed(manifest, receipt) => {
+                    self.manager.changing = None;
                     self.manager.pending = None;
                     let id = manifest.id.clone();
                     if let Ok(root) = crate::app_paths::data_root() {
@@ -483,6 +617,7 @@ impl Addons {
                     self.manager.progress = "Addon uninstalled".into();
                 }
                 Event::Error(error) => {
+                    self.manager.changing = None;
                     self.manager.pending = None;
                     self.manager.error = Some(error);
                     if let Some(id) = self.manager.restart.take() {
@@ -491,7 +626,7 @@ impl Addons {
                 }
             }
         }
-        if self.manager.pending.is_some() {
+        if self.manager_busy() {
             ctx.request_repaint_after(Duration::from_millis(100));
         }
     }
@@ -511,7 +646,7 @@ impl Addons {
                 .hint_text("Search addons")
                 .desired_width(f32::INFINITY),
         );
-        ui.add_enabled_ui(self.manager.pending.is_none(), |ui| {
+        ui.add_enabled_ui(!self.manager_busy(), |ui| {
             if ui.button("Rescan installed").clicked() {
                 action = Some(Action::Rescan);
             }
@@ -526,7 +661,7 @@ impl Addons {
                 action = Some(Action::Fetch);
             }
         });
-        if self.manager.pending.is_some() {
+        if self.manager_busy() {
             ui.spinner();
         }
         if !self.manager.progress.is_empty() {
@@ -646,7 +781,7 @@ impl Addons {
                     if let Some(error) = &addon.error {
                         ui.colored_label(theme::colors(ui).error, error);
                     }
-                    ui.add_enabled_ui(self.manager.pending.is_none(), |ui| {
+                    ui.add_enabled_ui(!self.manager_busy(), |ui| {
                         ui.horizontal_wrapped(|ui| {
                             let mut enabled = addon.enabled;
                             if ui.checkbox(&mut enabled, "Enabled").changed() {
@@ -676,8 +811,7 @@ impl Addons {
                     if let Some(reason) = &reason {
                         ui.colored_label(theme::colors(ui).warning, reason);
                     }
-                    let can_install = reason.is_none() && self.manager.pending.is_none()
-                        && !installed.is_some_and(|a| a.working);
+                    let can_install = reason.is_none() && !self.manager_busy();
                     let label = if installed.is_some() { "Update / install selected release" } else { "Install" };
                     if ui.add_enabled(can_install, egui::Button::new(label)).clicked() {
                         action = Some(Action::Install(package, catalog.release.clone()));
