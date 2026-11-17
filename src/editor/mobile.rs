@@ -192,7 +192,12 @@ impl EditorApp {
                     .inner_margin(egui::Margin::symmetric(8, 2)),
             )
             .show(root, |ui| {
-                ui.add(egui::Label::new(&self.status).truncate());
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    ui.label(
+                        egui::RichText::new(format!("v{}", env!("CARGO_PKG_VERSION"))).small(),
+                    );
+                    ui.add(egui::Label::new(&self.status).truncate());
+                });
             });
         // Header actions can change the selected panel, so use the current value.
         let panel = self.mobile.panel.clone().unwrap();

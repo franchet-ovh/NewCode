@@ -243,7 +243,37 @@ impl EditorApp {
             )
             .show(root, |ui| {
                 ui.horizontal(|ui| {
-                    ui.add(
+                    let version = format!("v{}", env!("CARGO_PKG_VERSION"));
+                    let version_width = ui
+                        .painter()
+                        .layout_no_wrap(
+                            version.clone(),
+                            egui::TextStyle::Small.resolve(ui.style()),
+                            colors.on_accent,
+                        )
+                        .size()
+                        .x;
+                    let metadata = format!(
+                        "{} open files{}",
+                        self.open_files.len(),
+                        if self.dirty { "  Unsaved changes" } else { "" }
+                    );
+                    let metadata_width = ui
+                        .painter()
+                        .layout_no_wrap(
+                            metadata,
+                            egui::TextStyle::Small.resolve(ui.style()),
+                            colors.on_accent,
+                        )
+                        .size()
+                        .x;
+                    let status_width = (ui.available_width()
+                        - version_width
+                        - metadata_width
+                        - 4.0 * ui.spacing().item_spacing.x)
+                        .max(0.0);
+                    ui.add_sized(
+                        [status_width, ui.available_height()],
                         egui::Label::new(
                             egui::RichText::new(&self.status)
                                 .small()
@@ -252,6 +282,7 @@ impl EditorApp {
                         .truncate(),
                     );
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        ui.label(egui::RichText::new(version).small().color(colors.on_accent));
                         ui.label(
                             egui::RichText::new(format!("{} open files", self.open_files.len()))
                                 .small()
