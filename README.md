@@ -18,6 +18,8 @@ Linux binaries are built on Ubuntu 24.04 and require glibc 2.39 or newer. The de
 
 Open **Addons** in the activity bar to install individual addons from the release catalog. The editor archives also include addon executables: run `python3 install-addons.py` from the extracted archive to install all of them, or add `--addon github` to select one (Python 3.11 or newer). Use **Rescan installed** in the manager afterward. The installer preserves addon data and installs executables beside logs.
 
+HTTPS requests from the editor and bundled Rust addons trust the system certificate store. On Linux, install your distribution's `ca-certificates` package and add any corporate proxy CA to that store. Restart the editor after updating certificates. To select a PEM CA bundle explicitly, launch with `SSL_CERT_FILE=/path/to/ca-bundle.pem focus-editor`. `SSL_CERT_FILE` and `SSL_CERT_DIR` override the native certificate locations, so the selected bundle or directories must include all the roots you need, including the proxy CA. External tools such as Git, Codex, and OpenCode manage their own TLS settings.
+
 Automatic releases currently publish Linux binaries only. macOS arm64 builds and DMGs are skipped. macOS remains available to build from source; its app packaging script remains available for manual use.
 
 Finder launches retain the inherited PATH and add `~/.local/bin`, `~/.opencode/bin`, `/opt/homebrew/bin`, and `/usr/local/bin` for external tools. Git, Docker, Codex, and OpenCode are separate installations; authenticate assistants with their CLI first. Run `focus-editor --version` (or the app's executable path with `--version`) to check the version without opening a window.
