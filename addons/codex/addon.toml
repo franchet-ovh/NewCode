@@ -1,6 +1,6 @@
 id = "codex"
 name = "Codex"
-version = "0.4.2-2"
+version = "0.4.2-3"
 protocol = 1
 executable = "focus-addon-codex"
 icon = "icon.png"
