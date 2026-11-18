@@ -28,11 +28,20 @@ jobs:
     outputs:
       sha: ${{ steps.version.outputs.sha }}
     steps:
+      - name: Create release App token
+        id: release-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
+          permission-contents: write
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           ref: main
           # Only this job receives the environment-scoped PR-bypass identity.
-          ssh-key: ${{ secrets.RELEASE_VERSION_DEPLOY_KEY }}
+          token: ${{ steps.release-token.outputs.token }}
           persist-credentials: true
       - name: Configure release commit identity
         run: |
