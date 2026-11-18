@@ -20,7 +20,13 @@ jobs:
   prepare:
     name: Commit release versions to main
     if: github.event_name == 'release' && github.event.action == 'published'
-    runs-on: ubuntu-24.04
+    runs-on:
+      group: NewCode-group
+      labels: arc-franchet-ovh
+    container: ubuntu:24.04
+    defaults:
+      run:
+        shell: bash
     timeout-minutes: 10
     environment: release-version
     permissions:
@@ -28,6 +34,10 @@ jobs:
     outputs:
       sha: ${{ steps.version.outputs.sha }}
     steps:
+      - name: Install job prerequisites
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends ca-certificates curl git python3 sudo file gh xz-utils unzip
       - name: Create release App token
         id: release-token
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
@@ -54,19 +64,27 @@ jobs:
   build:
     needs: prepare
     name: Build ${{ matrix.platform }}
-    runs-on: ${{ matrix.runner }}
+    runs-on: ${{ fromJSON(matrix.runner) }}
+    container: ubuntu:24.04
+    defaults:
+      run:
+        shell: bash
     timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
         include:
           - platform: linux-amd64
-            runner: ubuntu-24.04
+            runner: '{"group":"NewCode-group","labels":"arc-franchet-ovh"}'
             target: x86_64-unknown-linux-gnu
           - platform: linux-arm64
-            runner: ubuntu-24.04-arm
+            runner: '"ubuntu-24.04-arm"'
             target: aarch64-unknown-linux-gnu
     steps:
+      - name: Install job prerequisites
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends ca-certificates curl git python3 sudo file gh xz-utils unzip
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           ref: ${{ needs.prepare.outputs.sha }}
@@ -94,11 +112,21 @@ jobs:
   publish:
     name: Attach verified downloads
     needs: [prepare, build]
-    runs-on: ubuntu-24.04
+    runs-on:
+      group: NewCode-group
+      labels: arc-franchet-ovh
+    container: ubuntu:24.04
+    defaults:
+      run:
+        shell: bash
     timeout-minutes: 10
     permissions:
       contents: write
     steps:
+      - name: Install job prerequisites
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends ca-certificates curl git python3 sudo file gh xz-utils unzip
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           ref: ${{ needs.prepare.outputs.sha }}
