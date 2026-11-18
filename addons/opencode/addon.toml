@@ -1,6 +1,6 @@
 id = "opencode"
 name = "OpenCode"
-version = "0.4.4"
+version = "0.4.5-1"
 protocol = 1
 executable = "focus-addon-opencode"
 icon = "icon.png"
