@@ -19,18 +19,26 @@ jobs:
   test:
     name: Test ${{ matrix.platform }}
     runs-on: ${{ matrix.runner }}
+    container: ubuntu:24.04
+    defaults:
+      run:
+        shell: bash
     timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
         include:
           - platform: linux-amd64
-            runner: ubuntu-24.04
+            runner: arc-franchet-ovh
             target: x86_64-unknown-linux-gnu
           - platform: linux-arm64
             runner: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
     steps:
+      - name: Install job prerequisites
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends ca-certificates curl git python3 sudo file gh xz-utils unzip
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           persist-credentials: false

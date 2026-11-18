@@ -22,8 +22,19 @@ runs:
         TARGET: ${{ inputs.target }}
       shell: bash
       run: |
+        if ! command -v rustup >/dev/null 2>&1; then
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs -o "$RUNNER_TEMP/rustup-init.sh"
+          sh "$RUNNER_TEMP/rustup-init.sh" -y --profile minimal --default-toolchain none
+        fi
+        export PATH="$HOME/.cargo/bin:$PATH"
+        echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
         rustup toolchain install stable --profile minimal --component rustfmt
         rustup default stable
+        host=$(rustc -vV | sed -n 's/^host: //p')
+        if [ "$host" != "$TARGET" ]; then
+          echo "Native tests require $TARGET, but this runner provides $host" >&2
+          exit 1
+        fi
         rustup target add "$TARGET"
     - name: Install pinned Zig toolchain for Ghostty
       shell: bash
