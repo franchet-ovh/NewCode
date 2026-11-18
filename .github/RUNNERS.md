@@ -1,8 +1,11 @@
 # Workflow runners
 
 Release preparation, publication, and AMD64 builds and branch tests use the
-organization's `arc-franchet-ovh` runner scale set. This is the scale-set name,
-not a GitHub-hosted image label. The runner group must allow this repository.
+organization's `arc-franchet-ovh` runner scale set in `NewCode-group`. Workflows
+select both the group and scale-set label explicitly. The group allows public
+repositories and grants access only to `franchet-ovh/NewCode`. ARC's
+`runnerGroup` setting must also be `NewCode-group`; a workflow group selector
+alone does not move the scale set out of `Default`.
 
 The scale set uses ARC Kubernetes container mode. Each job supplies an Ubuntu
 24.04 container and installs its prerequisites before checkout. The shared Linux
