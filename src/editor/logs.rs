@@ -24,6 +24,13 @@ impl Default for Logs {
     }
 }
 impl Logs {
+    pub(super) fn show_diagnostics(&mut self) {
+        self.source = None;
+        self.query.clear();
+        self.level = log::Level::Warn;
+        self.follow = true;
+    }
+
     fn matches(&self, entry: &session::Entry, query: &str) -> bool {
         self.source.is_none_or(|s| s == entry.source)
             && entry.level <= self.level
@@ -104,6 +111,27 @@ impl Logs {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn diagnostics_navigation_resets_filters_to_all_warnings_and_errors() {
+        let mut logs = Logs {
+            source: Some(Source::Git),
+            query: "hidden".into(),
+            level: log::Level::Error,
+            follow: false,
+        };
+        logs.show_diagnostics();
+        for level in [log::Level::Error, log::Level::Warn, log::Level::Info] {
+            let entry = session::Entry {
+                timestamp: String::new(),
+                level,
+                source: Source::Editor,
+                text: "visible".into(),
+            };
+            assert_eq!(logs.matches(&entry, &logs.query), level <= log::Level::Warn);
+        }
+        assert!(logs.follow);
+    }
+
     #[test]
     fn source_severity_and_search_filters_combine() {
         let mut view = Logs::default();

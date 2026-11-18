@@ -11,6 +11,7 @@ use std::sync::Arc;
 #[derive(Default)]
 pub(super) struct EditorLayoutCache {
     text: String,
+    indentation: String,
     extension: String,
     query: String,
     active_match: Option<usize>,
@@ -18,6 +19,16 @@ pub(super) struct EditorLayoutCache {
     colors: Option<theme::Colors>,
     font: Option<FontId>,
     line_height: f32,
+}
+
+impl EditorLayoutCache {
+    pub(super) fn indentation(&self, text: &str) -> String {
+        if self.text == text && !self.indentation.is_empty() {
+            self.indentation.clone()
+        } else {
+            super::status::indentation(text)
+        }
+    }
 }
 
 impl EditorApp {
@@ -63,6 +74,9 @@ impl EditorApp {
             }
             let galley = ui.fonts_mut(|fonts| fonts.layout_job(job));
             let mut cached = layout_cache.lock().unwrap();
+            if cached.text != source || cached.indentation.is_empty() {
+                cached.indentation = super::status::indentation(source);
+            }
             cached.text = source.to_owned();
             cached.extension = extension.clone();
             cached.query = find_query.clone();
@@ -186,6 +200,16 @@ impl EditorApp {
                             target.max.y -= metrics.editor_line_height * 4.0;
                             ui.scroll_to_rect(target, Some(egui::Align::TOP));
                         }
+                        let cursor_id = editor_id.with("status_cursor");
+                        let cursor = edit.cursor_range.map(|range| range.primary.index.0);
+                        let changed = ui.ctx().data_mut(|data| {
+                            let changed = data.get_temp::<Option<usize>>(cursor_id) != Some(cursor);
+                            data.insert_temp(cursor_id, cursor);
+                            changed
+                        });
+                        if changed {
+                            ui.ctx().request_repaint();
+                        }
                         edit.response
                     })
                     .inner;
@@ -197,6 +221,7 @@ impl EditorApp {
             .data_mut(|data| data.insert_temp(editor_id.with("scroll_state_id"), response.id));
         let response = response.inner;
         if response.changed() {
+            ui.ctx().request_repaint();
             self.mark_modified();
         }
         if response.has_focus() && ui.input(|i| i.modifiers.ctrl && i.key_pressed(egui::Key::S)) {

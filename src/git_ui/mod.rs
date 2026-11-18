@@ -41,6 +41,7 @@ pub(crate) struct GitUi {
     refresh_requested: bool,
     refreshed: Option<Instant>,
     notice: Option<Notice>,
+    refresh_error: Option<String>,
     commit: String,
     diff: Option<review::DiffView>,
     review_generation: u64,
@@ -50,6 +51,71 @@ pub(crate) struct GitUi {
     open_review_requested: bool,
 }
 impl GitUi {
+    /// Cached state only: rendering the status bar never invokes Git.
+    pub(crate) fn status_summary(&self) -> (String, String) {
+        if self.workspace.is_none() {
+            return (
+                "No workspace".into(),
+                "Open a workspace to view Git state".into(),
+            );
+        }
+        let Some(snapshot) = &self.snapshot else {
+            return if let Some(error) = &self.refresh_error {
+                ("Git unavailable".into(), error.clone())
+            } else {
+                ("Git loading…".into(), "Reading repository state".into())
+            };
+        };
+        let tracking = &snapshot.tracking;
+        let mut label = format!(
+            "⑂ {}{}",
+            snapshot.branch,
+            if snapshot.files.is_empty() { "" } else { "*" }
+        );
+        if tracking.upstream.is_some() && tracking.counts_known {
+            label.push_str(&format!(" ↑{} ↓{}", tracking.ahead, tracking.behind));
+        } else if tracking.upstream.is_some() {
+            label.push_str(" · Upstream unavailable");
+        } else {
+            label.push_str(" · No upstream");
+        }
+        if self.busy() {
+            label.push_str(" · Working…");
+        } else if self.refresh_error.is_some() {
+            label.push_str(" · Stale");
+        } else if self.refresh.is_some() {
+            label.push_str(" · Refreshing…");
+        }
+        let mut details = format!(
+            "{}\n{}\n{} saved working-tree changes",
+            snapshot.root.display(),
+            snapshot.branch,
+            snapshot.files.len()
+        );
+        if tracking.unborn {
+            details.push_str("\nNo commits yet");
+        }
+        if let Some(upstream) = &tracking.upstream {
+            details.push_str(&format!("\nUpstream: {upstream}"));
+            if tracking.counts_known {
+                details.push_str(&format!(
+                    "\nAhead {}, behind {} (locally known refs; no fetch)",
+                    tracking.ahead, tracking.behind
+                ));
+            } else {
+                details.push_str("\nAhead/behind unavailable: upstream ref is missing");
+            }
+        } else {
+            details.push_str("\nNo upstream");
+        }
+        if let Some(error) = &self.refresh_error {
+            details.push_str(&format!(
+                "\nRefresh failed; showing previous state: {error}"
+            ));
+        }
+        (label, details)
+    }
+
     pub(crate) fn take_open_review_request(&mut self) -> bool {
         std::mem::take(&mut self.open_review_requested)
     }
@@ -62,12 +128,7 @@ impl GitUi {
     ) {
         self.sync_workspace(workspace, runtime);
         self.poll_reply();
-        // Do not start refreshing repositories until Source Control has been opened.
-        if self.snapshot.is_some()
-            || self.refresh.is_some()
-            || self.pending.is_some()
-            || self.review_request.is_some()
-        {
+        if self.workspace.is_some() {
             self.schedule_refresh(ctx, false);
         }
     }

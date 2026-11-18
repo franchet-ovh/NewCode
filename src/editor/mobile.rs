@@ -184,21 +184,7 @@ impl EditorApp {
                     });
                 });
             });
-        egui::Panel::bottom("mobile_status")
-            .exact_size(22.0)
-            .frame(
-                egui::Frame::new()
-                    .fill(theme::colors(root).chrome)
-                    .inner_margin(egui::Margin::symmetric(8, 2)),
-            )
-            .show(root, |ui| {
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    ui.label(
-                        egui::RichText::new(format!("v{}", env!("CARGO_PKG_VERSION"))).small(),
-                    );
-                    ui.add(egui::Label::new(&self.status).truncate());
-                });
-            });
+        self.status_bar(root);
         // Header actions can change the selected panel, so use the current value.
         let panel = self.mobile.panel.clone().unwrap();
         egui::CentralPanel::default()
