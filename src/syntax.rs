@@ -1,21 +1,30 @@
 use crate::ui_theme::Colors;
 use eframe::egui::{FontId, TextFormat, text::LayoutJob};
 
+/// Display name and existing highlighter family share one extension mapping.
+pub(crate) fn language(ext: &str) -> (&'static str, &'static str) {
+    match ext {
+        "rs" => ("Rust", "rust"),
+        "py" => ("Python", "python"),
+        "js" => ("JavaScript", "js"),
+        "jsx" => ("JavaScript JSX", "js"),
+        "ts" => ("TypeScript", "js"),
+        "tsx" => ("TypeScript TSX", "js"),
+        "json" => ("JSON", "json"),
+        "toml" => ("TOML", "toml"),
+        "html" | "htm" => ("HTML", "html"),
+        "css" => ("CSS", "css"),
+        "scss" => ("SCSS", "css"),
+        "sh" | "bash" => ("Shell", "sh"),
+        "sql" => ("SQL", "sql"),
+        "md" => ("Markdown", "md"),
+        _ => ("Plain Text", "plain"),
+    }
+}
+
 pub(crate) fn colored_job(text: &str, ext: &str, colors: Colors, font: FontId) -> LayoutJob {
     let mut job = LayoutJob::default();
-    let lang = match ext {
-        "rs" => "rust",
-        "py" => "python",
-        "js" | "jsx" | "ts" | "tsx" => "js",
-        "json" => "json",
-        "toml" => "toml",
-        "html" | "htm" => "html",
-        "css" | "scss" => "css",
-        "sh" | "bash" => "sh",
-        "sql" => "sql",
-        "md" => "md",
-        _ => "plain",
-    };
+    let lang = language(ext).1;
     let keywords = match lang {
         "rust" => {
             "fn let mut pub use mod struct enum impl trait async await return if else match for while loop in as const static type Self self crate"
@@ -119,4 +128,23 @@ fn append_word(
             ..fmt.clone()
         },
     );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::language;
+    #[test]
+    fn language_labels_distinguish_shared_highlighter_families() {
+        for (ext, expected) in [
+            ("js", "JavaScript"),
+            ("jsx", "JavaScript JSX"),
+            ("ts", "TypeScript"),
+            ("tsx", "TypeScript TSX"),
+        ] {
+            assert_eq!(language(ext), (expected, "js"));
+        }
+        assert_eq!(language("rs"), ("Rust", "rust"));
+        assert_eq!(language("unknown"), ("Plain Text", "plain"));
+        assert_eq!(language(""), ("Plain Text", "plain"));
+    }
 }

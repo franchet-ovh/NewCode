@@ -16,7 +16,8 @@ fn panel() -> GitUi {
         workspace: Some(root.clone()),
         snapshot: Some(Snapshot {
             root,
-            branch: "main...origin/main".into(),
+            branch: "main".into(),
+            tracking: Default::default(),
             files: vec![Change {
                 path: "nested/a_very_long_filename_with_changes.rs".into(),
                 old: None,

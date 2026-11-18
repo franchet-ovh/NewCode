@@ -61,15 +61,21 @@ pub(crate) struct Entry {
 struct Store {
     entries: VecDeque<std::sync::Arc<Entry>>,
     bytes: usize,
+    errors: usize,
+    warnings: usize,
     context: Option<eframe::egui::Context>,
 }
 impl Store {
     fn push(&mut self, entry: Entry) {
         self.bytes += entry.text.len();
+        self.errors += usize::from(entry.level == log::Level::Error);
+        self.warnings += usize::from(entry.level == log::Level::Warn);
         self.entries.push_back(std::sync::Arc::new(entry));
         while self.entries.len() > 10_000 || self.bytes > 8 * 1024 * 1024 {
             if let Some(entry) = self.entries.pop_front() {
                 self.bytes -= entry.text.len();
+                self.errors -= usize::from(entry.level == log::Level::Error);
+                self.warnings -= usize::from(entry.level == log::Level::Warn);
             }
         }
     }
@@ -77,6 +83,16 @@ impl Store {
         self.entries
             .retain(|entry| source.is_some_and(|s| entry.source != s));
         self.bytes = self.entries.iter().map(|entry| entry.text.len()).sum();
+        self.errors = self
+            .entries
+            .iter()
+            .filter(|entry| entry.level == log::Level::Error)
+            .count();
+        self.warnings = self
+            .entries
+            .iter()
+            .filter(|entry| entry.level == log::Level::Warn)
+            .count();
     }
 }
 static STORE: LazyLock<Mutex<Store>> = LazyLock::new(|| Mutex::new(Store::default()));
@@ -92,6 +108,11 @@ pub(crate) fn push(entry: Entry, repaint: bool) {
     if let Some(context) = context {
         context.request_repaint();
     }
+}
+/// Counts of retained application records, independent of viewer filters.
+pub(crate) fn diagnostic_counts() -> (usize, usize) {
+    let store = STORE.lock().unwrap_or_else(|e| e.into_inner());
+    (store.errors, store.warnings)
 }
 pub(crate) fn snapshot() -> Vec<std::sync::Arc<Entry>> {
     STORE
@@ -180,6 +201,44 @@ mod tests {
         });
         assert!(store.entries.is_empty());
     }
+    #[test]
+    fn diagnostic_counts_follow_retention_and_source_clear() {
+        let mut store = Store::default();
+        for (level, source) in [
+            (log::Level::Error, Source::Git),
+            (log::Level::Warn, Source::Editor),
+            (log::Level::Info, Source::Editor),
+        ] {
+            store.push(Entry {
+                timestamp: String::new(),
+                level,
+                source,
+                text: "record".into(),
+            });
+        }
+        assert_eq!((store.errors, store.warnings), (1, 1));
+        for _ in 0..9_998 {
+            store.push(Entry {
+                timestamp: String::new(),
+                level: log::Level::Info,
+                source: Source::Editor,
+                text: String::new(),
+            });
+        }
+        assert_eq!((store.errors, store.warnings), (0, 1));
+        store.clear(Some(Source::Git));
+        assert_eq!((store.errors, store.warnings), (0, 1));
+        store.clear(Some(Source::Editor));
+        assert_eq!((store.errors, store.warnings), (0, 0));
+        store.push(Entry {
+            timestamp: String::new(),
+            level: log::Level::Error,
+            source: Source::Git,
+            text: "x".repeat(8 * 1024 * 1024 + 1),
+        });
+        assert_eq!((store.errors, store.warnings), (0, 0));
+    }
+
     #[test]
     fn new_launch_replaces_file_without_interleaving_older_instance() {
         use std::io::Write;

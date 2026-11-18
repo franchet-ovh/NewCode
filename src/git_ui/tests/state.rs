@@ -262,3 +262,67 @@ fn selecting_a_new_file_cancels_the_old_diff_load() {
             .contains("untracked")
     );
 }
+
+#[test]
+fn status_loads_without_opening_source_control_and_handles_failure_and_switch() {
+    let repo = Repo::new();
+    let ctx = egui::Context::default();
+    let mut state = GitUi::default();
+    state.background_tick(Some(&repo.0), None, &ctx);
+    assert!(state.refresh.is_some());
+    wait(&mut state);
+    assert!(state.snapshot.is_some());
+    let (label, details) = state.status_summary();
+    assert!(label.starts_with("⑂ "));
+    assert!(details.contains("No commits yet"));
+
+    let (tx, request) = pending(state.ticket());
+    state.refresh = Some(request);
+    tx.send(RefreshReply {
+        snapshot: Err("test refresh failed".into()),
+        invalidation: None,
+    })
+    .unwrap();
+    state.poll_reply();
+    let (label, details) = state.status_summary();
+    assert!(label.contains("Stale"));
+    assert!(details.contains("test refresh failed"));
+
+    // A valid old result must not populate the new workspace's status.
+    let (tx, request) = pending(state.ticket());
+    state.refresh = Some(request);
+    tx.send(RefreshReply {
+        snapshot: Ok(snapshot(&repo.0).unwrap()),
+        invalidation: None,
+    })
+    .unwrap();
+    let next = Repo::new();
+    state.sync_workspace(Some(&next.0), None);
+    state.poll_reply();
+    assert!(state.snapshot.is_none());
+    assert!(state.refresh_error.is_none());
+    assert_eq!(state.status_summary().0, "Git loading…");
+    state.background_tick(Some(&next.0), None, &ctx);
+    wait(&mut state);
+    assert_eq!(state.snapshot.as_ref().unwrap().root, next.0);
+}
+
+#[test]
+fn unavailable_status_exposes_worker_error_without_inventing_a_branch() {
+    let mut state = GitUi {
+        workspace: Some("/test/non-repository".into()),
+        ..Default::default()
+    };
+    let (tx, request) = pending(state.ticket());
+    state.refresh = Some(request);
+    tx.send(RefreshReply {
+        snapshot: Err("not a repository".into()),
+        invalidation: None,
+    })
+    .unwrap();
+    state.poll_reply();
+    assert_eq!(
+        state.status_summary(),
+        ("Git unavailable".into(), "not a repository".into())
+    );
+}

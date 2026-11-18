@@ -15,6 +15,7 @@ fn commit_focus_survives_refresh_and_failure() {
     let make_snapshot = || Snapshot {
         root: workspace.clone(),
         branch: "main".into(),
+        tracking: Default::default(),
         files: Vec::new(),
         counts: [HashMap::new(), HashMap::new()],
     };

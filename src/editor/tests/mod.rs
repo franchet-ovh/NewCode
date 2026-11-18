@@ -10,7 +10,7 @@ mod layout;
 mod mobile;
 mod persistence;
 
-fn test_app() -> EditorApp {
+pub(super) fn test_app() -> EditorApp {
     EditorApp {
         settings: Settings::default(),
         pending_workspace: None,

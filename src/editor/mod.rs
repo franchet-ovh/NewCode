@@ -27,6 +27,7 @@ mod persistence;
 mod search;
 mod shell;
 mod sidebar;
+mod status;
 mod tabs;
 mod terminal_input;
 mod text_view;

@@ -74,10 +74,52 @@ pub(super) fn changes(bytes: &[u8]) -> Vec<Change> {
     result
 }
 
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub(super) struct Tracking {
+    pub upstream: Option<String>,
+    pub ahead: u64,
+    pub behind: u64,
+    pub counts_known: bool,
+    pub detached: bool,
+    pub unborn: bool,
+}
+
+fn branch_status(bytes: &[u8]) -> (String, Tracking) {
+    let text = String::from_utf8_lossy(bytes);
+    let mut branch = String::new();
+    let mut oid = String::new();
+    let mut tracking = Tracking::default();
+    for field in text.split('\0') {
+        if let Some(value) = field.strip_prefix("# branch.head ") {
+            tracking.detached = value == "(detached)";
+            branch = value.to_owned();
+        } else if let Some(value) = field.strip_prefix("# branch.oid ") {
+            tracking.unborn = value == "(initial)";
+            oid = value.to_owned();
+        } else if let Some(value) = field.strip_prefix("# branch.upstream ") {
+            tracking.upstream = Some(value.to_owned());
+        } else if let Some(value) = field.strip_prefix("# branch.ab ") {
+            tracking.counts_known = true;
+            for count in value.split_whitespace() {
+                if let Some(value) = count.strip_prefix('+') {
+                    tracking.ahead = value.parse().unwrap_or(0);
+                } else if let Some(value) = count.strip_prefix('-') {
+                    tracking.behind = value.parse().unwrap_or(0);
+                }
+            }
+        }
+    }
+    if tracking.detached {
+        branch = format!("Detached HEAD ({})", &oid[..oid.len().min(8)]);
+    }
+    (branch, tracking)
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) struct Snapshot {
     pub(super) root: PathBuf,
     pub(super) branch: String,
+    pub(super) tracking: Tracking,
     pub(super) files: Vec<Change>,
     pub(super) counts: [HashMap<String, LineStats>; 2],
 }
@@ -94,16 +136,17 @@ pub(super) fn snapshot_with(
     let root = git_with(workspace, &["rev-parse", "--show-toplevel"], runtime)?;
     let root = PathBuf::from(String::from_utf8_lossy(&root).trim_end());
     let root = runtime.map_or(Ok(root.clone()), |runtime| runtime.host_path(&root))?;
-    let branch = String::from_utf8_lossy(&git_with(
+    let (branch, tracking) = branch_status(&git_with(
         &root,
-        &["status", "--short", "--branch"],
+        &[
+            "status",
+            "--porcelain=v2",
+            "--branch",
+            "-z",
+            "--untracked-files=no",
+        ],
         runtime,
-    )?)
-    .lines()
-    .next()
-    .unwrap_or("")
-    .trim_start_matches("## ")
-    .to_owned();
+    )?);
     let files = changes(&git_with(
         &root,
         &["status", "--porcelain=v1", "-z", "--untracked-files=all"],
@@ -129,6 +172,7 @@ pub(super) fn snapshot_with(
         counts,
         root,
         branch,
+        tracking,
         files,
     })
 }
@@ -138,4 +182,66 @@ pub(super) fn conflict(c: &Change) -> bool {
         || c.work == 'U'
         || (c.index == 'A' && c.work == 'A')
         || (c.index == 'D' && c.work == 'D')
+}
+
+#[cfg(test)]
+mod status_tests {
+    use super::*;
+
+    #[test]
+    fn parses_branch_tracking_without_human_readable_status() {
+        for (ahead, behind) in [(0, 0), (3, 0), (0, 2), (3, 2)] {
+            let (branch, state) = branch_status(format!("# branch.oid abcdef123456\0# branch.head feature/topic\0# branch.upstream origin/feature/topic\0# branch.ab +{ahead} -{behind}\0").as_bytes());
+            assert_eq!(branch, "feature/topic");
+            assert_eq!(state.upstream.as_deref(), Some("origin/feature/topic"));
+            assert_eq!((state.ahead, state.behind), (ahead, behind));
+            assert!(state.counts_known);
+            assert!(!state.detached && !state.unborn);
+        }
+        let (_, missing_upstream) =
+            branch_status(b"# branch.head main\0# branch.upstream origin/main\0");
+        assert!(!missing_upstream.counts_known);
+        let (branch, _) =
+            branch_status(b"# branch.head main\0# branch.ab +0 -0\x001 file\n# branch.head fake\0");
+        assert_eq!(branch, "main");
+        let (branch, state) = branch_status(b"# branch.oid (initial)\0# branch.head main\0");
+        assert_eq!(branch, "main");
+        assert!(state.unborn);
+        assert!(state.upstream.is_none());
+        let (branch, state) =
+            branch_status(b"# branch.oid abcdef123456\0# branch.head (detached)\0");
+        assert_eq!(branch, "Detached HEAD (abcdef12)");
+        assert!(state.detached);
+    }
+
+    #[test]
+    fn real_repository_reports_unborn_upstream_and_detached_head() {
+        let root = tempfile::tempdir().unwrap();
+        let run = |args: &[&str]| git(root.path(), args).unwrap();
+        run(&["init", "-q", "-b", "main"]);
+        let initial = snapshot(root.path()).unwrap();
+        assert_eq!(initial.branch, "main");
+        assert!(initial.tracking.unborn);
+        run(&[
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.invalid",
+            "-c",
+            "commit.gpgsign=false",
+            "-c",
+            "core.hooksPath=/dev/null",
+            "commit",
+            "--allow-empty",
+            "-qm",
+            "initial",
+        ]);
+        run(&["branch", "base"]);
+        run(&["branch", "--set-upstream-to=base", "main"]);
+        let tracked = snapshot(root.path()).unwrap();
+        assert_eq!(tracked.tracking.upstream.as_deref(), Some("base"));
+        assert_eq!((tracked.tracking.ahead, tracked.tracking.behind), (0, 0));
+        run(&["checkout", "--detach", "-q"]);
+        assert!(snapshot(root.path()).unwrap().tracking.detached);
+    }
 }

@@ -270,6 +270,7 @@ impl GitUi {
         self.refreshed = Some(Instant::now());
         match result {
             Ok(snapshot) => {
+                self.refresh_error = None;
                 if self.snapshot.as_ref() != Some(&snapshot) {
                     self.snapshot = Some(snapshot);
                 }
@@ -300,7 +301,10 @@ impl GitUi {
                     self.notice = None;
                 }
             }
-            Err(error) => self.notice = Some(Notice::error("Could not refresh repository", error)),
+            Err(error) => {
+                self.refresh_error = Some(error.clone());
+                self.notice = Some(Notice::error("Could not refresh repository", error));
+            }
         }
     }
     pub(super) fn poll_reply(&mut self) {
