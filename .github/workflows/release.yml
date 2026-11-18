@@ -53,10 +53,12 @@ jobs:
           # Only this job receives the environment-scoped PR-bypass identity.
           token: ${{ steps.release-token.outputs.token }}
           persist-credentials: true
+      - name: Configure workspace Git
+        uses: ./.github/actions/git-workspace
       - name: Configure release commit identity
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C "$GITHUB_WORKSPACE" config --local user.name "github-actions[bot]"
+          git -C "$GITHUB_WORKSPACE" config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
       - name: Commit and push release versions
         id: version
         run: python3 scripts/release/commit_version.py "$RELEASE_TAG"
@@ -89,6 +91,8 @@ jobs:
         with:
           ref: ${{ needs.prepare.outputs.sha }}
           persist-credentials: false
+      - name: Configure workspace Git
+        uses: ./.github/actions/git-workspace
       - name: Validate committed release versions
         run: python3 scripts/release/prepare_version.py --check "$RELEASE_TAG"
       - name: Run shared Linux checks
@@ -131,6 +135,8 @@ jobs:
         with:
           ref: ${{ needs.prepare.outputs.sha }}
           persist-credentials: false
+      - name: Configure workspace Git
+        uses: ./.github/actions/git-workspace
       - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
         with:
           pattern: release-*

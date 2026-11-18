@@ -12,6 +12,14 @@ The scale set uses ARC Kubernetes container mode. Each job supplies an Ubuntu
 checks bootstrap Rust because the container does not include GitHub-hosted
 runner toolchains. AMD64 jobs require x86-64 runner nodes.
 
+After each checkout, the `git-workspace` composite action adds the exact
+`GITHUB_WORKSPACE` path to the shell container's global Git `safe.directory`
+configuration and verifies repository discovery. ARC action and shell containers
+can use different users and home directories, so checkout's temporary Git trust
+configuration may not cover later shell steps. An ownership mismatch can make
+`git config user.name ...` report `fatal: not in a git directory` even when `.git`
+exists. Trust is limited to the current checkout, rather than all repositories.
+
 ARM64 builds and tests temporarily retain the native `ubuntu-24.04-arm` runner.
 The tests and packaging execute the compiled binaries, so assigning both targets
 to an AMD64 scale set alone would not work. Moving ARM64 requires either a native

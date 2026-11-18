@@ -1,0 +1,12 @@
+name: Configure workspace Git
+description: Trust the mounted checkout for subsequent job-container shell steps
+runs:
+  using: composite
+  steps:
+    - name: Trust and verify the workspace checkout
+      shell: bash
+      run: |
+        # ARC action and shell containers can use different users and HOME paths.
+        # Configure the shell environment as well as checkout's temporary config.
+        git config --global --add safe.directory "$GITHUB_WORKSPACE"
+        git -C "$GITHUB_WORKSPACE" rev-parse --show-toplevel
