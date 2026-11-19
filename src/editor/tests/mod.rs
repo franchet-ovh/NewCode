@@ -12,6 +12,8 @@ mod persistence;
 
 pub(super) fn test_app() -> EditorApp {
     EditorApp {
+        explorer_cache: Default::default(),
+        disk_changes: Default::default(),
         settings: Settings::default(),
         pending_workspace: None,
         settings_path: PathBuf::from("/tmp/focus-layout-test-unused.toml"),

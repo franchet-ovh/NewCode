@@ -241,6 +241,14 @@ Records contain a timestamp, level, process ID, and component. Foreground launch
 
 For component filters, use `RUST_LOG`, for example `RUST_LOG=warn,focus_editor::git_ui=debug focus-editor .`. An explicit `--log-level` takes precedence over `RUST_LOG`. With neither set, application Info and dependency Warn are enabled. Only the current launch is retained; the next launch replaces the file without creating history or rotated backups.
 
+## Filesystem refresh and external edits
+
+Explorer caches directory listings. Use **Reload Explorer** in its header to discover external additions or removals; collapsing and expanding a folder also reloads it. File operations inside the editor refresh the listing automatically.
+
+Open files are checked through metadata about once per second, with a new 800–1,200 ms interval each cycle. When a local file changes on disk, **Overwrite** saves the editor contents over the disk version, **Reload** discards unsaved edits and reads the disk version, and **Cancel** keeps editing unchanged. Saving after Cancel asks again if the disk version still differs. Merge conflicting edits manually.
+
+Git's periodic checks cover known modified/staged paths and repository metadata. Newly changed paths are discovered when Source Control opens, through **Refresh repository status**, or after editor saves and file operations. Unchanged checks do not run Git or read file contents; they do not rescan the whole workspace.
+
 ## Layout and appearance
 
 - The left activity bar switches between **Explorer**, **Search**, and **Source Control**.

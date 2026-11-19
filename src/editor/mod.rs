@@ -17,6 +17,7 @@ mod clipboard;
 mod close_dialog;
 mod creation;
 mod deletion;
+mod disk_changes;
 mod document_paths;
 mod documents;
 mod explorer;
@@ -45,6 +46,8 @@ enum SidebarMode {
 }
 
 pub(crate) struct EditorApp {
+    explorer_cache: HashMap<PathBuf, Vec<explorer::TreeEntry>>,
+    disk_changes: disk_changes::DiskChanges,
     settings: Settings,
     settings_path: PathBuf,
     pending_workspace: Option<PathBuf>,
@@ -124,7 +127,9 @@ impl EditorApp {
         addons.discover(&settings.addon_enabled);
         addons.suppressed = arguments.disabled_addons.clone();
         addons.apply_settings(&settings.addon_enabled, &settings.addon_state);
-        Self {
+        let mut app = Self {
+            explorer_cache: Default::default(),
+            disk_changes: Default::default(),
             settings,
             settings_path,
             pending_workspace: None,
@@ -162,7 +167,9 @@ impl EditorApp {
             open_file_filter: String::new(),
             reveal_active_tab: true,
             editor_layout_cache: Arc::new(Mutex::new(EditorLayoutCache::default())),
-        }
+        };
+        app.initialize_disk_changes();
+        app
     }
 
     pub(crate) fn has_unsaved_changes(&self) -> bool {
@@ -259,13 +266,19 @@ impl EditorApp {
         }
         self.mobile.was_compact = mobile::is_compact(ctx.viewport_rect().width());
         self.prepare_panel_input(ctx, self.mobile.was_compact);
-        self.rename_dialog(ctx);
-        self.close_dialog(ctx);
-        self.workspace_switch_dialog(ctx);
-        self.addon_dialogs(ctx);
-        self.deletion_dialog(ctx);
+        self.poll_disk_changes(ctx);
+        if !self.disk_changes.has_conflict() {
+            self.rename_dialog(ctx);
+            self.close_dialog(ctx);
+            if !self.disk_changes.has_conflict() {
+                self.workspace_switch_dialog(ctx);
+            }
+            self.addon_dialogs(ctx);
+            self.deletion_dialog(ctx);
+            crate::file_picker::show(ctx);
+        }
+        self.disk_change_dialog(ctx);
         self.cancel_unfocused_creation(ctx);
-        crate::file_picker::show(ctx);
     }
 }
 impl eframe::App for EditorApp {

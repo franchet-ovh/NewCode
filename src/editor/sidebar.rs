@@ -48,7 +48,7 @@ impl EditorApp {
             );
             if self.sidebar_mode == SidebarMode::Explorer {
                 let actions = egui::Rect::from_min_max(
-                    egui::pos2(rect.right() - 58.0, rect.top()),
+                    egui::pos2(rect.right() - 86.0, rect.top()),
                     rect.max - egui::vec2(8.0, 0.0),
                 );
                 ui.scope_builder(
@@ -56,6 +56,12 @@ impl EditorApp {
                         .max_rect(actions)
                         .layout(egui::Layout::right_to_left(egui::Align::Center)),
                     |ui| {
+                        if theme::button(ui, Icon::Refresh, "", colors.accent, false)
+                            .on_hover_text("Reload Explorer")
+                            .clicked()
+                        {
+                            self.explorer_cache.clear();
+                        }
                         if theme::button(ui, Icon::NewFolder, "", colors.accent, false)
                             .on_hover_text("New folder")
                             .clicked()

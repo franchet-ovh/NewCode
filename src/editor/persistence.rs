@@ -177,6 +177,8 @@ impl EditorApp {
         self.terminal_error = None;
         self.dev_container = Default::default();
         self.git_ui = Default::default();
+        self.explorer_cache.clear();
+        self.disk_changes = Default::default();
         self.settings = settings;
         self.settings_path = settings_path;
         let (files, active, buffer) = restore_open_files(&self.settings);
@@ -193,6 +195,7 @@ impl EditorApp {
                 eframe::egui::Id::new(("document_editor", self.next_document_id)),
             );
         }
+        self.initialize_disk_changes();
         self.preview_file = None;
         self.creation = None;
         self.deletion = None;

@@ -1,3 +1,4 @@
+mod filesystem;
 use focus_addon_support::assistant_ui;
 mod addons;
 mod app_paths;

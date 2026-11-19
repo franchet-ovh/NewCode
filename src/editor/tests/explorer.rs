@@ -321,3 +321,44 @@ fn inline_creation_submits_cancels_and_never_overwrites() {
     assert!(app.creation.is_none());
     fs::remove_dir_all(root).unwrap();
 }
+
+/// Also used under strace to measure filesystem calls during repeated repaints.
+#[test]
+fn idle_explorer_repaints() {
+    let directory = tempfile::Builder::new()
+        .prefix("focus-explorer-io-")
+        .tempdir()
+        .unwrap();
+    for index in 0..32 {
+        fs::write(directory.path().join(format!("file-{index}.txt")), "text").unwrap();
+    }
+    let ctx = egui::Context::default();
+    let mut app = test_app();
+    app.open_files.clear();
+    app.active_file = None;
+    for _ in 0..120 {
+        let _ = crate::test_frame(&ctx, egui::RawInput::default(), |ui| {
+            app.tree(ui, directory.path());
+        });
+    }
+}
+
+#[test]
+fn explorer_keeps_cached_listing_until_reload() {
+    let directory = tempfile::tempdir().unwrap();
+    fs::write(directory.path().join("initial.txt"), "text").unwrap();
+    let ctx = egui::Context::default();
+    let mut app = test_app();
+    let draw = |app: &mut EditorApp| {
+        let _ = crate::test_frame(&ctx, egui::RawInput::default(), |ui| {
+            app.tree(ui, directory.path())
+        });
+    };
+    draw(&mut app);
+    fs::write(directory.path().join("external.txt"), "text").unwrap();
+    draw(&mut app);
+    assert_eq!(app.explorer_cache[directory.path()].len(), 1);
+    app.explorer_cache.clear();
+    draw(&mut app);
+    assert_eq!(app.explorer_cache[directory.path()].len(), 2);
+}

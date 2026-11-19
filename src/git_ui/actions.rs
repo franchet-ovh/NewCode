@@ -9,12 +9,8 @@ use super::{
     review::{DiffView, ReviewStatus, ReviewUpdate},
 };
 use eframe::egui;
-use std::{
-    sync::mpsc,
-    time::{Duration, Instant},
-};
+use std::{sync::mpsc, time::Instant};
 
-const REFRESH_INTERVAL: Duration = Duration::from_secs(3);
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) struct Ticket {
     pub repository: u64,
@@ -27,7 +23,7 @@ pub(super) struct Pending<T> {
     pub(super) foreground: bool,
 }
 impl<T: Send + 'static> Pending<T> {
-    fn spawn(
+    pub(super) fn spawn(
         ticket: Ticket,
         foreground: bool,
         ctx: &egui::Context,
@@ -47,7 +43,7 @@ impl<T: Send + 'static> Pending<T> {
         }
     }
 }
-fn receive<T>(slot: &mut Option<Pending<T>>) -> Option<(Ticket, Result<T, String>)> {
+pub(super) fn receive<T>(slot: &mut Option<Pending<T>>) -> Option<(Ticket, Result<T, String>)> {
     let request = slot.as_ref()?;
     let result = match request.rx.try_recv() {
         Ok(value) => Ok(value),
@@ -86,7 +82,6 @@ impl GitUi {
             return;
         }
         self.refresh_requested |= manual;
-        ctx.request_repaint_after(REFRESH_INTERVAL);
         if self.refresh.is_some()
             || self.busy()
             || self.review_request.is_some()
@@ -94,13 +89,14 @@ impl GitUi {
         {
             return;
         }
-        if !self.refresh_requested
-            && self
-                .refreshed
-                .is_some_and(|time| time.elapsed() < REFRESH_INTERVAL)
-        {
+        if !self.refresh_requested && self.refreshed.is_some() {
+            if self.snapshot.is_some() {
+                self.schedule_poll(ctx);
+            }
+            // Failed discovery needs an explicit retry, rather than repeated parent-directory probes.
             return;
         }
+        self.polling.reset();
         let foreground = std::mem::take(&mut self.refresh_requested) || self.snapshot.is_none();
         let workspace = self.workspace.clone().unwrap();
         let root = self
@@ -142,6 +138,7 @@ impl GitUi {
         // Older status reads and diff loads cannot overwrite a mutation's resulting state.
         self.data_generation = self.data_generation.wrapping_add(1);
         self.refresh = None;
+        self.polling.reset();
         if self.review_request.take().is_some() {
             self.review_status =
                 ReviewStatus::Failed("Index changing. Reload diff to continue.".into());
@@ -266,7 +263,7 @@ impl GitUi {
             )
         }));
     }
-    fn apply_snapshot(&mut self, result: Result<Snapshot, String>) {
+    pub(super) fn apply_snapshot(&mut self, result: Result<Snapshot, String>) {
         self.refreshed = Some(Instant::now());
         match result {
             Ok(snapshot) => {
@@ -308,6 +305,7 @@ impl GitUi {
         }
     }
     pub(super) fn poll_reply(&mut self) {
+        self.poll_metadata_reply();
         if let Some((ticket, result)) = receive(&mut self.refresh) {
             if ticket == self.ticket() {
                 match result {

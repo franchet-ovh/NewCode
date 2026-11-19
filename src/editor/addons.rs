@@ -22,6 +22,7 @@ impl EditorApp {
                         ))),
         ) {
             self.git_ui.external_change();
+            self.explorer_cache.clear();
             // Checkout changes disk contents. Retain every unsaved editor buffer.
             let removed: Vec<_> = self
                 .open_files
@@ -35,7 +36,14 @@ impl EditorApp {
             if !self.dirty {
                 if let Some(path) = &self.active_file {
                     match std::fs::read_to_string(path) {
-                        Ok(text) => self.buffer = text,
+                        Ok(text) => {
+                            self.disk_changes.remember(
+                                path,
+                                text.clone(),
+                                crate::filesystem::DiskVersion::read(path),
+                            );
+                            self.buffer = text;
+                        }
                         Err(error) => {
                             self.status =
                                 format!("Could not reload file after Git operation: {error}")

@@ -10,12 +10,14 @@ use std::{
     path::{Path, PathBuf},
 };
 
-struct TreeEntry {
+#[derive(Clone)]
+pub(super) struct TreeEntry {
     path: PathBuf,
     name: OsString,
     is_dir: bool,
 }
 
+#[cfg(test)]
 impl TreeEntry {
     fn snapshot(path: PathBuf) -> Self {
         Self {
@@ -85,14 +87,36 @@ impl EditorApp {
                 ui.vertical(|ui| self.creation_row(ui));
             });
         }
-        let Ok(entries) = fs::read_dir(dir) else {
-            return;
-        };
-        let mut entries: Vec<_> = entries
-            .flatten()
-            .map(|entry| TreeEntry::snapshot(entry.path()))
-            .collect();
-        sort_entries(&mut entries);
+        let entries = self
+            .explorer_cache
+            .entry(dir.to_path_buf())
+            .or_insert_with(|| {
+                let mut entries: Vec<_> = fs::read_dir(dir)
+                    .into_iter()
+                    .flatten()
+                    .flatten()
+                    .map(|entry| {
+                        let is_dir = entry
+                            .file_type()
+                            .map(|kind| {
+                                if kind.is_symlink() {
+                                    entry.path().is_dir()
+                                } else {
+                                    kind.is_dir()
+                                }
+                            })
+                            .unwrap_or(false);
+                        TreeEntry {
+                            path: entry.path(),
+                            name: entry.file_name(),
+                            is_dir,
+                        }
+                    })
+                    .collect();
+                sort_entries(&mut entries);
+                entries
+            })
+            .clone();
         for entry in entries {
             let path = entry.path;
             let name = entry.name.to_string_lossy();
@@ -119,6 +143,9 @@ impl EditorApp {
                 response.context_menu(|ui| self.file_menu(ui, &path));
                 if open {
                     self.tree_at_depth(ui, &path, depth + 1);
+                } else {
+                    self.explorer_cache
+                        .retain(|cached, _| !cached.starts_with(&path));
                 }
             } else {
                 let response = self.explorer_row(ui, &path, &name, depth, None);
@@ -269,11 +296,7 @@ impl EditorApp {
     }
 
     pub(super) fn explorer_panel(&mut self, ui: &mut egui::Ui) {
-        let workspace = self
-            .settings
-            .workspace
-            .as_ref()
-            .map(|root| fs::canonicalize(root).unwrap_or(root.clone()));
+        let workspace = self.settings.workspace.as_ref().cloned();
         let outside = self
             .creation
             .as_ref()

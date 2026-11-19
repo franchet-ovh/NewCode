@@ -21,6 +21,7 @@ mod model;
 mod panel;
 mod patch;
 mod patch_model;
+mod polling;
 mod presentation;
 mod repository;
 mod review;
@@ -30,6 +31,7 @@ mod tests;
 
 #[derive(Default)]
 pub(crate) struct GitUi {
+    polling: polling::Polling,
     workspace: Option<PathBuf>,
     runtime: Option<Runtime>,
     snapshot: Option<Snapshot>,
@@ -148,6 +150,7 @@ impl GitUi {
     pub(crate) fn external_change(&mut self) {
         self.data_generation = self.data_generation.wrapping_add(1);
         self.refresh = None;
+        self.polling.reset();
         self.review_request = None;
         self.diff = None;
         self.refresh_requested = true;
@@ -171,6 +174,7 @@ impl GitUi {
         configure_input_style(ui);
         self.sync_workspace(workspace, runtime);
         self.poll_reply();
+        self.panel_opened(ui.ctx());
         let manual_refresh = self.panel_header(ui);
         if workspace.is_none() {
             ui.vertical_centered(|ui| {
