@@ -30,6 +30,7 @@ pub(super) fn git_with(
     };
     let output = command
         .env("GIT_LITERAL_PATHSPECS", "1")
+        .env("GIT_OPTIONAL_LOCKS", "0")
         .args(args)
         .output()
         .map_err(|e| e.to_string())?;
@@ -136,28 +137,54 @@ pub(super) fn snapshot_with(
     let root = git_with(workspace, &["rev-parse", "--show-toplevel"], runtime)?;
     let root = PathBuf::from(String::from_utf8_lossy(&root).trim_end());
     let root = runtime.map_or(Ok(root.clone()), |runtime| runtime.host_path(&root))?;
-    let (branch, tracking) = branch_status(&git_with(
-        &root,
-        &[
-            "status",
-            "--porcelain=v2",
-            "--branch",
-            "-z",
-            "--untracked-files=no",
-        ],
-        runtime,
-    )?);
-    let files = changes(&git_with(
-        &root,
-        &["status", "--porcelain=v1", "-z", "--untracked-files=all"],
-        runtime,
-    )?);
+    snapshot_at(root, runtime, None)
+}
+
+/// Restrict working-tree access to known changes; an empty scope matches no paths.
+pub(super) fn snapshot_at(
+    root: PathBuf,
+    runtime: Option<&Runtime>,
+    paths: Option<&[String]>,
+) -> Result<Snapshot, String> {
+    let scope = |mut args: Vec<&str>| -> Vec<String> {
+        args.push("--");
+        let mut args: Vec<String> = args.into_iter().map(str::to_owned).collect();
+        if let Some(paths) = paths {
+            if paths.is_empty() {
+                // Literal pathspec, guaranteed absent because Git cannot track .git.
+                args.push(".git/focus-empty-scope".into());
+            } else {
+                args.extend(paths.iter().cloned());
+            }
+        }
+        args
+    };
+    let run = |args: Vec<String>| {
+        git_with(
+            &root,
+            &args.iter().map(String::as_str).collect::<Vec<_>>(),
+            runtime,
+        )
+    };
+    let (branch, tracking) = branch_status(&run(scope(vec![
+        "status",
+        "--porcelain=v2",
+        "--branch",
+        "-z",
+        "--untracked-files=no",
+    ]))?);
+    let files = changes(&run(scope(vec![
+        "status",
+        "--porcelain=v1",
+        "-z",
+        "--untracked-files=all",
+    ]))?);
     let counts = |cached: bool| -> Result<HashMap<String, LineStats>, String> {
         let mut args = vec!["diff", "--numstat", "-z", "--find-renames"];
         if cached {
             args.push("--cached");
         }
-        Ok(stats::numstat(&git_with(&root, &args, runtime)?))
+        Ok(stats::numstat(&run(scope(args))?))
     };
     let mut counts = [counts(true)?, counts(false)?];
     for change in &files {

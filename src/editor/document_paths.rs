@@ -9,6 +9,9 @@ impl EditorApp {
             from.display(),
             to.display()
         );
+        self.disk_changes.remap(from, to);
+        self.explorer_cache.clear();
+        self.git_ui.external_change();
         let remap = |path: &Path| match path.strip_prefix(from) {
             Ok(suffix) => to.join(suffix),
             Err(_) => path.to_path_buf(),

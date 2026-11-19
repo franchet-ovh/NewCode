@@ -52,6 +52,7 @@ impl NewEntry {
 
 impl EditorApp {
     pub(super) fn create_entry(&mut self, is_dir: bool) {
+        self.explorer_cache.clear();
         log::debug!("Begin inline creation directory={is_dir}");
         let parent = self
             .active_file
@@ -123,6 +124,8 @@ impl EditorApp {
         {
             match entry.create() {
                 Ok(path) => {
+                    self.explorer_cache.clear();
+                    self.git_ui.external_change();
                     self.status = format!("Created {}", path.display());
                     ui.memory_mut(|m| m.surrender_focus(id));
                     return;

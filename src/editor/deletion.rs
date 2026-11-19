@@ -58,6 +58,8 @@ impl EditorApp {
         {
             self.creation = None;
         }
+        self.explorer_cache.clear();
+        self.git_ui.external_change();
         self.status = format!("Deleted {}", path.display());
         log::info!("Deleted entry path={}", path.display());
         Ok(())

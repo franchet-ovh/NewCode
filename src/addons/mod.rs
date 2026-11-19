@@ -170,7 +170,7 @@ impl Addons {
     }
 
     pub fn sync(&mut self, workspace: Option<&Path>, runtime: Option<&Runtime>) {
-        let workspace = workspace.map(|p| p.canonicalize().unwrap_or_else(|_| p.to_path_buf()));
+        let workspace = workspace.map(Path::to_path_buf);
         if self.context.workspace == workspace && self.runtime.as_ref() == runtime {
             return;
         }

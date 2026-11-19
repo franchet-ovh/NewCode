@@ -64,10 +64,12 @@ impl EditorApp {
         // Read before changing tabs or taking the outgoing buffer: failed opens
         // must leave the current file, preview slot, and unsaved edits intact.
         let dirty = self.unsaved_files.contains_key(&path);
+        let disk_version = crate::filesystem::DiskVersion::read(&path);
         let content = match self
             .unsaved_files
             .get(&path)
             .cloned()
+            .or_else(|| self.disk_changes.cached_text(&path))
             .map(Ok)
             .unwrap_or_else(|| fs::read_to_string(&path))
         {
@@ -92,6 +94,7 @@ impl EditorApp {
                     return None;
                 }
                 self.document_ids.remove(&preview);
+                self.disk_changes.forget(&preview);
                 self.open_files.iter().position(|open| open == &preview)
             });
             if let Some(index) = replacement {
@@ -114,6 +117,10 @@ impl EditorApp {
             );
         }
         self.unsaved_files.remove(&path);
+        if !existing {
+            self.disk_changes
+                .remember(&path, content.clone(), disk_version);
+        }
         self.active_file = Some(path);
         self.buffer = content;
         self.dirty = dirty;
@@ -146,12 +153,22 @@ impl EditorApp {
         } else {
             return true;
         };
-        match fs::write(path, content) {
+        let content = content.clone();
+        if self.disk_save_conflict(path) {
+            return false;
+        }
+        match fs::write(path, &content) {
             Ok(()) => {
                 if active {
                     self.dirty = false;
                 }
                 self.unsaved_files.remove(path);
+                self.disk_changes.remember(
+                    path,
+                    content,
+                    crate::filesystem::DiskVersion::read(path),
+                );
+                self.git_ui.external_change();
                 self.status = format!("Saved {}", path.display());
                 true
             }
@@ -177,6 +194,7 @@ impl EditorApp {
         };
         let was_active = self.active_file.as_ref() == Some(&path);
         self.open_files.remove(index);
+        self.disk_changes.forget(&path);
         self.document_ids.remove(&path);
         self.unsaved_files.remove(&path);
         self.keep_preview(&path);

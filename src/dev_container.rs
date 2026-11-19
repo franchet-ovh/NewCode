@@ -84,8 +84,7 @@ impl Default for DevContainer {
 
 impl DevContainer {
     pub(crate) fn sync_workspace(&mut self, workspace: Option<&Path>) {
-        let workspace =
-            workspace.map(|path| path.canonicalize().unwrap_or_else(|_| path.to_path_buf()));
+        let workspace = workspace.map(Path::to_path_buf);
         if self.workspace == workspace {
             return;
         }
