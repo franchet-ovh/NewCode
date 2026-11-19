@@ -78,7 +78,7 @@ jobs:
         include:
           - platform: linux-amd64
             #runner: '{"group":"NewCode-group","labels":"arc-franchet-ovh"}'
-			# in house runner is too slow. Need more CPUs
+            # in house runner is too slow. Need more CPUs
             runner: '"ubuntu-24.04"'
             target: x86_64-unknown-linux-gnu
           - platform: linux-arm64
@@ -160,4 +160,4 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-		run: gh release edit "$RELEASE_TAG" --draft=false
+        run: gh release edit "$RELEASE_TAG" --draft=false
