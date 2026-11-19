@@ -1,6 +1,6 @@
 [package]
 name = "focus-addon-opencode"
-version = "0.4.5-1"
+version = "0.4.5-2"
 edition = "2024"
 rust-version = "1.95"
 license = "Apache-2.0"
