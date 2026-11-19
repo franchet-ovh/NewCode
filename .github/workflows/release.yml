@@ -19,7 +19,7 @@ env:
 jobs:
   prepare:
     name: Commit release versions to main
-    if: github.event_name == 'release' && github.event.action == 'draft'
+    if: github.event_name == 'release' && github.event.action == 'published'
     runs-on:
       group: NewCode-group
       labels: arc-franchet-ovh
