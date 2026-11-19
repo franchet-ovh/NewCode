@@ -29,8 +29,10 @@ jobs:
       matrix:
         include:
           - platform: linux-amd64
-            runner: '{"group":"NewCode-group","labels":"arc-franchet-ovh"}'
-            target: x86_64-unknown-linux-gnu
+            #runner: '{"group":"NewCode-group","labels":"arc-franchet-ovh"}'
+			# in house runner is too slow. Need more CPUs
+            runner: '"ubuntu-24.04"'
+			target: x86_64-unknown-linux-gnu
           - platform: linux-arm64
             runner: '"ubuntu-24.04-arm"'
             target: aarch64-unknown-linux-gnu
