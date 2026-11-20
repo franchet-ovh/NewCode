@@ -1,6 +1,37 @@
 //! Host-filesystem dialogs rendered inside the shared UI for remote controllers.
 use eframe::egui;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
+
+/// Native viewers run the editor on a worker, but OS dialogs belong on the GUI thread.
+pub(crate) type NativeDialogHandler = Arc<dyn Fn(Purpose, PathBuf) + Send + Sync>;
+#[derive(Clone)]
+struct NativeDialogs(NativeDialogHandler);
+const NATIVE_DIALOGS: &str = "native_file_dialogs";
+
+pub(crate) fn delegate_native(ctx: &egui::Context, handler: NativeDialogHandler) {
+    ctx.data_mut(|data| data.insert_temp(egui::Id::new(NATIVE_DIALOGS), NativeDialogs(handler)));
+}
+
+pub(crate) fn pick_native(purpose: &Purpose, directory: &Path) -> Option<PathBuf> {
+    let dialog = rfd::FileDialog::new().set_directory(directory);
+    match purpose {
+        Purpose::Workspace => dialog.pick_folder(),
+        Purpose::Move(source) => dialog
+            .set_file_name(source.file_name().unwrap_or_default().to_string_lossy())
+            .save_file(),
+        Purpose::Addon => dialog
+            .add_filter("Addon manifest or package", &["toml", "gz"])
+            .pick_file(),
+    }
+}
+
+pub(crate) fn finish_native(ctx: &egui::Context, purpose: Purpose, path: Option<PathBuf>) {
+    if let Some(path) = path {
+        ctx.data_mut(|data| data.insert_temp(egui::Id::new(RESULT), (purpose, path)));
+        ctx.request_repaint();
+    }
+}
 
 #[derive(Clone)]
 pub(crate) enum Purpose {
@@ -27,18 +58,14 @@ pub(crate) fn request(ctx: &egui::Context, purpose: Purpose, directory: Option<&
             .unwrap_or(false)
     });
     if !remote {
-        let dialog = rfd::FileDialog::new().set_directory(directory.unwrap_or(Path::new(".")));
-        let path = match &purpose {
-            Purpose::Workspace => dialog.pick_folder(),
-            Purpose::Move(source) => dialog
-                .set_file_name(source.file_name().unwrap_or_default().to_string_lossy())
-                .save_file(),
-            Purpose::Addon => dialog
-                .add_filter("Addon manifest or package", &["toml", "gz"])
-                .pick_file(),
-        };
-        if let Some(path) = path {
-            ctx.data_mut(|data| data.insert_temp(egui::Id::new(RESULT), (purpose, path)));
+        let directory = directory.unwrap_or(Path::new("."));
+        let handler =
+            ctx.data(|data| data.get_temp::<NativeDialogs>(egui::Id::new(NATIVE_DIALOGS)));
+        if let Some(handler) = handler {
+            handler.0(purpose, directory.to_path_buf());
+        } else {
+            let path = pick_native(&purpose, directory);
+            finish_native(ctx, purpose, path);
         }
         return;
     }
@@ -233,6 +260,32 @@ pub(crate) fn show(ctx: &egui::Context) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn delegated_native_dialogs_return_asynchronously_and_remote_pickers_stay_in_app() {
+        let ctx = egui::Context::default();
+        let (sender, incoming) = std::sync::mpsc::channel();
+        delegate_native(
+            &ctx,
+            Arc::new(move |purpose, directory| {
+                sender.send((purpose, directory)).unwrap();
+            }),
+        );
+        request(&ctx, Purpose::Workspace, Some(Path::new("/tmp")));
+        let (purpose, directory) = incoming.try_recv().unwrap();
+        assert_eq!(directory, Path::new("/tmp"));
+        assert!(take(&ctx).is_none());
+        finish_native(&ctx, purpose, Some(directory.clone()));
+        assert_eq!(take(&ctx).unwrap().1, directory);
+        finish_native(&ctx, Purpose::Workspace, None);
+        assert!(take(&ctx).is_none());
+        ctx.data_mut(|data| data.insert_temp(egui::Id::new("remote_controller"), true));
+        request(&ctx, Purpose::Workspace, Some(Path::new("/tmp")));
+        assert!(incoming.try_recv().is_err());
+        assert!(
+            ctx.data(|data| data.get_temp::<Picker>(egui::Id::new(STATE)))
+                .is_some()
+        );
+    }
     #[test]
     fn destination_is_a_single_file_name() {
         for name in ["", "..", ".", "/tmp/x", "../x", "a/b"] {

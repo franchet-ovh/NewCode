@@ -4,7 +4,7 @@ use eframe::egui::{self, ColorImage, TextureId, TextureOptions, epaint::ImageDel
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, PartialEq)]
 pub(super) struct Input {
     pub size: [f32; 2],
     pub pixels_per_point: f32,

@@ -74,9 +74,18 @@ impl Renderer {
     pub fn title(&self) -> String {
         self.app.window_title()
     }
-    pub fn set_waker(&self, viewer: egui::Context) {
-        self.ctx
-            .set_request_repaint_callback(move |info| viewer.request_repaint_after(info.delay));
+    pub fn set_waker(&self, wake: impl Fn(egui::RequestRepaintInfo) + Send + Sync + 'static) {
+        self.ctx.set_request_repaint_callback(wake);
+    }
+    pub fn delegate_dialogs(&self, handler: crate::file_picker::NativeDialogHandler) {
+        crate::file_picker::delegate_native(&self.ctx, handler);
+    }
+    pub fn finish_dialog(
+        &self,
+        purpose: crate::file_picker::Purpose,
+        path: Option<std::path::PathBuf>,
+    ) {
+        crate::file_picker::finish_native(&self.ctx, purpose, path);
     }
     pub fn save_documents(&mut self) -> bool {
         self.app.save_documents()

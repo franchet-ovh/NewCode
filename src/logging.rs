@@ -4,7 +4,7 @@ pub(crate) mod process;
 pub(crate) mod redaction;
 pub(crate) mod session;
 
-#[derive(Default, Debug)]
+#[derive(Clone, Default, Debug)]
 pub(crate) struct Arguments {
     pub(crate) version: bool,
     pub(crate) ui: bool,
