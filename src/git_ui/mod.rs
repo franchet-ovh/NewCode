@@ -47,6 +47,8 @@ pub(crate) struct GitUi {
     commit: String,
     diff: Option<review::DiffView>,
     review_generation: u64,
+    review_reload: bool,
+    review_retry_after: Option<Instant>,
     diff_target: Option<Selection>,
     diff_hidden: bool,
     review_status: review::ReviewStatus,
@@ -130,6 +132,7 @@ impl GitUi {
     ) {
         self.sync_workspace(workspace, runtime);
         self.poll_reply();
+        self.reload_review(ctx);
         if self.workspace.is_some() {
             self.schedule_refresh(ctx, false);
         }
@@ -152,7 +155,7 @@ impl GitUi {
         self.refresh = None;
         self.polling.reset();
         self.review_request = None;
-        self.diff = None;
+        self.review_reload = self.diff_target.is_some();
         self.refresh_requested = true;
     }
     fn sync_workspace(&mut self, workspace: Option<&Path>, runtime: Option<&Runtime>) {

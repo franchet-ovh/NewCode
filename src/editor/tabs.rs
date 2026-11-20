@@ -4,11 +4,28 @@ use super::close_dialog::CloseTabs;
 use crate::ui_theme as theme;
 use eframe::egui::{self, FontId};
 impl EditorApp {
+    pub(super) fn handle_review_request(&mut self) {
+        if self.git_ui.take_open_review_request() {
+            self.addons.detail = false;
+            self.addons.dismiss_manager_detail();
+            self.reveal_active_tab = true;
+            self.mobile_document_opened();
+        }
+    }
+
+    pub(super) fn document_active(&self) -> bool {
+        self.active_file.is_some() && !self.git_ui.diff_active()
+    }
+
     pub(super) fn document_tabs(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
-        if !self.open_files.is_empty() {
+        self.handle_review_request();
+        let diff_tab = self.git_ui.diff_tab();
+        let diff_active = self.git_ui.diff_active();
+        if !self.open_files.is_empty() || diff_tab.is_some() {
             let mut close_tab = None;
             let mut switch_tab = None;
             let mut pin_tab = None;
+            let mut switch_diff = false;
             let open_files = self.open_files.clone();
             let active_file = self.active_file.clone();
             egui::Frame::new()
@@ -31,15 +48,25 @@ impl EditorApp {
                                     )
                                     .show(ui, |ui| {
                                         ui.horizontal_top(|ui| {
-                                            for p in &open_files {
-                                                let active = active_file.as_ref() == Some(p);
-                                                let dirty = self.file_is_dirty(p);
-                                                let preview = self.preview_file.as_ref() == Some(p);
+                                            for (p, is_diff) in open_files
+                                                .iter()
+                                                .map(|p| (p, false))
+                                                .chain(diff_tab.as_ref().map(|(p, _)| (p, true)))
+                                            {
+                                                let active = if is_diff {
+                                                    diff_active
+                                                } else {
+                                                    !diff_active && active_file.as_ref() == Some(p)
+                                                };
+                                                let dirty = !is_diff && self.file_is_dirty(p);
+                                                let preview = !is_diff
+                                                    && self.preview_file.as_ref() == Some(p);
                                                 let label = format!(
-                                                    "{}{}",
+                                                    "{}{}{}",
                                                     p.file_name()
                                                         .unwrap_or_default()
                                                         .to_string_lossy(),
+                                                    if is_diff { " (diff)" } else { "" },
                                                     if dirty { " •" } else { "" }
                                                 );
                                                 let font = FontId::proportional(11.0);
@@ -69,7 +96,11 @@ impl EditorApp {
                                                     size,
                                                     egui::Sense::hover(),
                                                 );
-                                                let tab_id = egui::Id::new(("file_tab", p));
+                                                let tab_id = if is_diff {
+                                                    egui::Id::new("diff_tab")
+                                                } else {
+                                                    egui::Id::new(("file_tab", p))
+                                                };
                                                 let label_rect = egui::Rect::from_min_max(
                                                     rect.min,
                                                     egui::pos2(
@@ -153,7 +184,9 @@ impl EditorApp {
                                                     FontId::proportional(16.0),
                                                     theme::colors(ui).muted,
                                                 );
-                                                let tooltip = if preview {
+                                                let tooltip = if is_diff {
+                                                    diff_tab.as_ref().unwrap().1.clone()
+                                                } else if preview {
                                                     format!(
                                                         "{}\nPreview — double-click to keep open",
                                                         p.display()
@@ -163,29 +196,37 @@ impl EditorApp {
                                                 };
                                                 let select = select.on_hover_text(tooltip);
                                                 let close =
-                                                    close.on_hover_text("Close file (Ctrl+W)");
+                                                    close.on_hover_text("Close tab (Ctrl+W)");
                                                 select.context_menu(|ui| {
                                                     ui.add_enabled_ui(
                                                         self.close_confirmation.is_none(),
                                                         |ui| {
                                                             if ui.button("Close file").clicked() {
-                                                                close_tab = Some(CloseTabs::File(
-                                                                    p.clone(),
-                                                                ));
+                                                                close_tab = Some(if is_diff {
+                                                                    CloseTabs::Diff
+                                                                } else {
+                                                                    CloseTabs::File(p.clone())
+                                                                });
                                                                 ui.close();
                                                             }
                                                             if ui
                                                                 .add_enabled(
-                                                                    open_files.len() > 1,
+                                                                    open_files.len()
+                                                                        + usize::from(
+                                                                            diff_tab.is_some(),
+                                                                        )
+                                                                        > 1,
                                                                     egui::Button::new(
                                                                         "Close others",
                                                                     ),
                                                                 )
                                                                 .clicked()
                                                             {
-                                                                close_tab = Some(
-                                                                    CloseTabs::Others(p.clone()),
-                                                                );
+                                                                close_tab = Some(if is_diff {
+                                                                    CloseTabs::OthersDiff
+                                                                } else {
+                                                                    CloseTabs::Others(p.clone())
+                                                                });
                                                                 ui.close();
                                                             }
                                                             if ui.button("Close all").clicked() {
@@ -195,14 +236,22 @@ impl EditorApp {
                                                         },
                                                     );
                                                 });
-                                                if select.double_clicked() {
+                                                if !is_diff && select.double_clicked() {
                                                     pin_tab = Some(p.clone());
                                                 }
                                                 if select.clicked() {
-                                                    switch_tab = Some(p.clone());
+                                                    if is_diff {
+                                                        switch_diff = true;
+                                                    } else {
+                                                        switch_tab = Some(p.clone());
+                                                    }
                                                 }
                                                 if close.clicked() {
-                                                    close_tab = Some(CloseTabs::File(p.clone()));
+                                                    close_tab = Some(if is_diff {
+                                                        CloseTabs::Diff
+                                                    } else {
+                                                        CloseTabs::File(p.clone())
+                                                    });
                                                 }
                                                 if active {
                                                     active_tab_rect = Some(rect);
@@ -228,56 +277,82 @@ impl EditorApp {
                                             (tab_scroll.content_size.x - viewport.width()).max(0.0),
                                         );
                                         state.store(ctx, tab_scroll.id);
+                                        ctx.request_repaint();
                                     }
                                     self.reveal_active_tab = false;
                                 }
                             },
                         );
-                        ui.menu_button(format!("… {}", open_files.len()), |ui| {
-                            ui.set_min_width(240.0);
-                            ui.add(
-                                egui::TextEdit::singleline(&mut self.open_file_filter)
-                                    .hint_text("Find an open file…")
-                                    .desired_width(f32::INFINITY),
-                            );
-                            let filter = self.open_file_filter.to_lowercase();
-                            egui::ScrollArea::vertical()
-                                .max_height(360.0)
-                                .show(ui, |ui| {
-                                    for path in &open_files {
-                                        let full_path = path.display().to_string();
-                                        if !filter.is_empty()
-                                            && !full_path.to_lowercase().contains(&filter)
-                                        {
-                                            continue;
+                        ui.menu_button(
+                            format!("… {}", open_files.len() + usize::from(diff_tab.is_some())),
+                            |ui| {
+                                ui.set_min_width(240.0);
+                                ui.add(
+                                    egui::TextEdit::singleline(&mut self.open_file_filter)
+                                        .hint_text("Find an open file…")
+                                        .desired_width(f32::INFINITY),
+                                );
+                                let filter = self.open_file_filter.to_lowercase();
+                                egui::ScrollArea::vertical()
+                                    .max_height(360.0)
+                                    .show(ui, |ui| {
+                                        if let Some((path, tooltip)) = &diff_tab {
+                                            if (filter.is_empty()
+                                                || tooltip.to_lowercase().contains(&filter))
+                                                && ui
+                                                    .selectable_label(
+                                                        diff_active,
+                                                        format!(
+                                                            "{} (diff)\n{tooltip}",
+                                                            path.file_name()
+                                                                .unwrap_or_default()
+                                                                .to_string_lossy()
+                                                        ),
+                                                    )
+                                                    .clicked()
+                                            {
+                                                switch_diff = true;
+                                                ui.close();
+                                            }
                                         }
-                                        let name =
-                                            path.file_name().unwrap_or_default().to_string_lossy();
-                                        let selected = active_file.as_ref() == Some(path);
-                                        if ui
-                                            .selectable_label(selected, {
-                                                let suffix = if self.file_is_dirty(path) {
-                                                    " •"
-                                                } else {
-                                                    ""
-                                                };
-                                                let text = egui::RichText::new(format!(
-                                                    "{name}{suffix}\n{full_path}"
-                                                ));
-                                                if self.preview_file.as_ref() == Some(path) {
-                                                    text.italics()
-                                                } else {
-                                                    text
-                                                }
-                                            })
-                                            .clicked()
-                                        {
-                                            switch_tab = Some(path.clone());
-                                            ui.close();
+                                        for path in &open_files {
+                                            let full_path = path.display().to_string();
+                                            if !filter.is_empty()
+                                                && !full_path.to_lowercase().contains(&filter)
+                                            {
+                                                continue;
+                                            }
+                                            let name = path
+                                                .file_name()
+                                                .unwrap_or_default()
+                                                .to_string_lossy();
+                                            let selected =
+                                                !diff_active && active_file.as_ref() == Some(path);
+                                            if ui
+                                                .selectable_label(selected, {
+                                                    let suffix = if self.file_is_dirty(path) {
+                                                        " •"
+                                                    } else {
+                                                        ""
+                                                    };
+                                                    let text = egui::RichText::new(format!(
+                                                        "{name}{suffix}\n{full_path}"
+                                                    ));
+                                                    if self.preview_file.as_ref() == Some(path) {
+                                                        text.italics()
+                                                    } else {
+                                                        text
+                                                    }
+                                                })
+                                                .clicked()
+                                            {
+                                                switch_tab = Some(path.clone());
+                                                ui.close();
+                                            }
                                         }
-                                    }
-                                });
-                        });
+                                    });
+                            },
+                        );
                     });
                 });
             if let Some(path) = switch_tab {
@@ -285,6 +360,12 @@ impl EditorApp {
                 if self.active_file.as_ref() != Some(&path) {
                     self.activate_file(path);
                 }
+            }
+            if switch_diff {
+                self.git_ui.activate_diff();
+                self.addons.detail = false;
+                self.addons.dismiss_manager_detail();
+                self.reveal_active_tab = true;
             }
             if let Some(path) = pin_tab {
                 self.keep_preview(&path);

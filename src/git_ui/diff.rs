@@ -9,10 +9,55 @@ use super::{
 };
 use crate::ui_theme as theme;
 use eframe::egui;
+use std::path::PathBuf;
 
 impl GitUi {
     pub(crate) fn dismiss_diff(&mut self) {
         self.diff_hidden = true;
+    }
+
+    pub(crate) fn diff_active(&self) -> bool {
+        !self.diff_hidden && self.diff_target.is_some()
+    }
+
+    pub(crate) fn diff_tab(&self) -> Option<(PathBuf, String)> {
+        let target = self.diff_target.as_ref()?;
+        Some((
+            PathBuf::from(&target.path),
+            format!(
+                "{}\n{} changes",
+                self.snapshot
+                    .as_ref()
+                    .map_or_else(
+                        || PathBuf::from(&target.path),
+                        |snapshot| snapshot.root.join(&target.path)
+                    )
+                    .display(),
+                if target.side.is_staged() {
+                    "Staged"
+                } else {
+                    "Working"
+                }
+            ),
+        ))
+    }
+
+    pub(crate) fn activate_diff(&mut self) {
+        if self.diff_target.is_some() {
+            self.diff_hidden = false;
+        }
+    }
+
+    pub(crate) fn close_diff(&mut self) {
+        self.diff_hidden = true;
+        self.diff_target = None;
+        self.diff = None;
+        self.review_request = None;
+        self.review_generation = self.review_generation.wrapping_add(1);
+        self.review_status = ReviewStatus::Idle;
+        self.review_reload = false;
+        self.review_retry_after = None;
+        self.open_review_requested = false;
     }
 
     pub(crate) fn show_diff(&mut self, ui: &mut egui::Ui) -> bool {
@@ -31,8 +76,6 @@ impl GitUi {
         let loading = matches!(self.review_status, ReviewStatus::Loading);
         ui.add(egui::Label::new(egui::RichText::new(&target.path).strong()).truncate())
             .on_hover_text(&target.path);
-        let mut close = false;
-        let mut reload = false;
         let displayed_side = self
             .diff
             .as_ref()
@@ -45,22 +88,10 @@ impl GitUi {
             } else {
                 "Working changes"
             });
-            reload = ui
-                .add_enabled(!busy && !loading, egui::Button::new("Reload diff"))
-                .clicked();
-            close = ui.button("Close diff").clicked();
             if loading {
                 ui.spinner();
             }
         });
-        if close {
-            self.dismiss_diff();
-            return true;
-        }
-        if reload {
-            self.start(Action::Diff(target.clone()), ui.ctx());
-            return true;
-        }
         if let ReviewStatus::Failed(error) = &self.review_status {
             ui.colored_label(theme::colors(ui).error, error);
         }
@@ -70,7 +101,10 @@ impl GitUi {
             }
             return true;
         };
-        let actions_enabled = !busy && !loading && matches!(self.review_status, ReviewStatus::Idle);
+        let actions_enabled = !busy
+            && !loading
+            && !self.review_reload
+            && matches!(self.review_status, ReviewStatus::Idle);
         let mut selected = None;
         if let Some(reason) = &view.stale {
             ui.colored_label(theme::colors(ui).warning, reason);

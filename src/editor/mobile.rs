@@ -27,12 +27,11 @@ pub(super) struct MobileState {
     pub panel: Option<MobilePanel>,
     pub drawer_open: bool,
     pub was_compact: bool,
-    pub git_detail: bool,
 }
 
 impl EditorApp {
     fn default_mobile_panel(&self) -> MobilePanel {
-        if self.active_file.is_some() {
+        if self.active_file.is_some() || self.git_ui.diff_active() {
             MobilePanel::Editor
         } else {
             MobilePanel::Explorer
@@ -167,7 +166,7 @@ impl EditorApp {
                     );
                     if ui
                         .add_enabled(
-                            self.active_file.is_some(),
+                            self.document_active(),
                             egui::Button::new("Save").min_size(egui::vec2(48.0, 44.0)),
                         )
                         .clicked()
@@ -199,26 +198,8 @@ impl EditorApp {
                     MobilePanel::Explorer | MobilePanel::Search => self.sidebar_content(ui),
                     MobilePanel::Git => {
                         egui::Frame::new().inner_margin(8).show(ui, |ui| {
-                            if self.mobile.git_detail {
-                                self.git_ui.take_open_review_request();
-                                if ui
-                                    .add_sized(
-                                        [ui.available_width(), 44.0],
-                                        egui::Button::new("← Back to changes"),
-                                    )
-                                    .clicked()
-                                {
-                                    self.mobile.git_detail = false;
-                                }
-                                if !self.git_ui.show_diff(ui) {
-                                    self.mobile.git_detail = false;
-                                }
-                            } else {
-                                self.sidebar_content(ui);
-                                if self.git_ui.take_open_review_request() {
-                                    self.mobile.git_detail = true;
-                                }
-                            }
+                            self.sidebar_content(ui);
+                            self.handle_review_request();
                         });
                     }
                     MobilePanel::Manager => {

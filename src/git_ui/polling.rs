@@ -25,6 +25,7 @@ struct PollReply {
     versions: BTreeMap<PathBuf, DiskVersion>,
     metadata: Vec<PathBuf>,
     refresh: Option<RefreshReply>,
+    reload_failed_review: bool,
 }
 impl Polling {
     pub(super) fn reset(&mut self) {
@@ -63,7 +64,11 @@ fn metadata_paths(snapshot: &Snapshot, runtime: Option<&Runtime>) -> Result<Vec<
     }
     Ok(paths)
 }
-fn versions(snapshot: &Snapshot, metadata: &[PathBuf]) -> BTreeMap<PathBuf, DiskVersion> {
+fn versions(
+    snapshot: &Snapshot,
+    metadata: &[PathBuf],
+    review_path: Option<&str>,
+) -> BTreeMap<PathBuf, DiskVersion> {
     metadata
         .iter()
         .cloned()
@@ -71,6 +76,7 @@ fn versions(snapshot: &Snapshot, metadata: &[PathBuf]) -> BTreeMap<PathBuf, Disk
             std::iter::once(snapshot.root.join(&c.path))
                 .chain(c.old.as_ref().map(|p| snapshot.root.join(p)))
         }))
+        .chain(review_path.map(|p| snapshot.root.join(p)))
         .map(|p| {
             let v = DiskVersion::read(&p);
             (p, v)
@@ -106,6 +112,8 @@ impl GitUi {
         let runtime = self.runtime.clone();
         let before = self.polling.versions.clone();
         let metadata = self.polling.metadata.clone();
+        let target = self.diff_target.as_ref().map(|t| t.path.clone());
+        let failed = matches!(self.review_status, super::review::ReviewStatus::Failed(_));
         let review = self
             .diff
             .as_ref()
@@ -116,14 +124,16 @@ impl GitUi {
             } else {
                 metadata
             };
-            let current = versions(&snapshot, &metadata);
+            let current = versions(&snapshot, &metadata, target.as_deref());
             if !before.is_empty() && before == current {
                 return Ok(PollReply {
                     versions: current,
                     metadata,
                     refresh: None,
+                    reload_failed_review: false,
                 });
             }
+            let reload_failed_review = failed && !before.is_empty();
             let index_changed =
                 before.is_empty() || metadata.iter().any(|p| before.get(p) != current.get(p));
             let mut paths: Vec<String> = snapshot
@@ -145,6 +155,7 @@ impl GitUi {
                         .map(|p| String::from_utf8_lossy(p).into_owned()),
                 );
             }
+            paths.extend(target);
             paths.sort();
             paths.dedup();
             let invalidation = review.and_then(|(id, path, version)| {
@@ -152,7 +163,8 @@ impl GitUi {
                     .map_or(true, |v| v != version))
                 .then(|| ReviewUpdate::Invalidated {
                     id,
-                    reason: "File or index changed. Reload diff to continue.".into(),
+                    reason: "File or index changed. The comparison will refresh automatically."
+                        .into(),
                 })
             });
             let updated = snapshot_at(snapshot.root.clone(), runtime.as_ref(), Some(&paths));
@@ -165,6 +177,7 @@ impl GitUi {
             Ok(PollReply {
                 versions: current,
                 metadata,
+                reload_failed_review,
                 refresh: Some(RefreshReply {
                     snapshot: updated,
                     invalidation,
@@ -182,6 +195,7 @@ impl GitUi {
         }
         match result.and_then(|r| r) {
             Ok(reply) => {
+                self.review_reload |= reply.reload_failed_review;
                 self.polling.versions = reply.versions;
                 self.polling.metadata = reply.metadata;
                 if let Some(refresh) = reply.refresh {
@@ -304,5 +318,71 @@ mod tests {
         poll(&mut state);
         poll(&mut state);
         assert!(state.snapshot.as_ref().unwrap().files.is_empty());
+    }
+    #[test]
+    fn retained_diff_refreshes_after_edits_deletion_index_and_head_changes() {
+        use super::super::{
+            actions::Action,
+            fingerprint::FileVersion,
+            model::{Selection, Side},
+        };
+        let repo = Repo::new();
+        repo.write("file", "initial\n");
+        repo.run(&["add", "."]);
+        repo.run(&["-c", "core.hooksPath=/dev/null", "commit", "-qm", "initial"]);
+        repo.write("file", "modified\n");
+        let ctx = egui::Context::default();
+        let mut state = GitUi {
+            workspace: Some(repo.root.clone()),
+            snapshot: Some(snapshot(&repo.root).unwrap()),
+            refreshed: Some(Instant::now()),
+            ..Default::default()
+        };
+        fn settle(state: &mut GitUi, ctx: &egui::Context) {
+            state.reload_review(ctx);
+            let deadline = Instant::now() + Duration::from_secs(5);
+            while state.review_request.is_some() {
+                state.poll_reply();
+                assert!(Instant::now() < deadline);
+                std::thread::sleep(Duration::from_millis(2));
+            }
+        }
+        state.start(Action::Diff(Selection::new("file", Side::Working)), &ctx);
+        settle(&mut state, &ctx);
+        state.take_open_review_request();
+        state.dismiss_diff();
+        poll(&mut state);
+        for text in [
+            "another change\n",
+            "initial\n",
+            "changed after becoming clean\n",
+        ] {
+            repo.write("file", text);
+            poll(&mut state);
+            assert!(state.review_reload);
+            settle(&mut state, &ctx);
+            assert_eq!(
+                state.diff.as_ref().unwrap().version,
+                FileVersion::read(&repo.root, "file", None).unwrap()
+            );
+            assert!(!state.diff_active());
+            assert!(!state.take_open_review_request());
+        }
+        repo.run(&["add", "file"]);
+        poll(&mut state);
+        settle(&mut state, &ctx);
+        assert!(state.diff.as_ref().unwrap().original_staged);
+        repo.run(&["-c", "core.hooksPath=/dev/null", "commit", "-qm", "updated"]);
+        poll(&mut state);
+        settle(&mut state, &ctx);
+        assert!(state.diff.as_ref().unwrap().hunks.is_empty());
+        std::fs::remove_file(repo.root.join("file")).unwrap();
+        poll(&mut state);
+        settle(&mut state, &ctx);
+        assert_eq!(
+            state.diff.as_ref().unwrap().version,
+            FileVersion::read(&repo.root, "file", None).unwrap()
+        );
+        assert!(!state.diff.as_ref().unwrap().hunks.is_empty());
     }
 }

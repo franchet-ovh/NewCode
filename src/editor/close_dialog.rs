@@ -5,6 +5,8 @@ use std::path::PathBuf;
 
 pub(super) enum CloseTabs {
     File(PathBuf),
+    Diff,
+    OthersDiff,
     Others(PathBuf),
     All,
 }
@@ -22,11 +24,20 @@ impl EditorApp {
             return;
         }
         let paths = match action {
+            CloseTabs::Diff => {
+                self.git_ui.close_diff();
+                return;
+            }
+            CloseTabs::OthersDiff => {
+                self.git_ui.activate_diff();
+                self.open_files.clone()
+            }
             CloseTabs::File(path) => vec![path],
             CloseTabs::Others(keep) => {
                 if !self.open_files.contains(&keep) {
                     return;
                 }
+                self.git_ui.close_diff();
                 self.activate_file(keep.clone());
                 self.open_files
                     .iter()
@@ -34,7 +45,10 @@ impl EditorApp {
                     .cloned()
                     .collect()
             }
-            CloseTabs::All => self.open_files.clone(),
+            CloseTabs::All => {
+                self.git_ui.close_diff();
+                self.open_files.clone()
+            }
         };
         self.close_queue = paths.into();
         self.advance_close_queue();

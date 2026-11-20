@@ -62,7 +62,7 @@ impl DiffView {
         args.extend(["--", path]);
         let bytes = git_with(root, &args, runtime)?;
         if FileVersion::read(root, path, runtime)? != version {
-            return Err("The file changed while loading its diff. Reload diff.".into());
+            return Err("The file changed while loading its diff. The comparison will refresh after changes settle.".into());
         }
         let mut parsed = patch_model::parse(&bytes, staged);
         if version.is_symlink() {
@@ -145,6 +145,7 @@ impl GitUi {
                     if let Some(version) = applied.version {
                         view.version = version;
                     }
+                    self.review_reload |= applied.warning.is_some();
                     view.stale = applied.warning;
                     view.selected_hunk = Some(applied.hunk);
                 }
@@ -152,6 +153,7 @@ impl GitUi {
             ReviewUpdate::Invalidated { id, reason } => {
                 if let Some(view) = self.diff.as_mut().filter(|view| view.id == id) {
                     view.stale = Some(reason);
+                    self.review_reload = true;
                 }
             }
             _ => {}

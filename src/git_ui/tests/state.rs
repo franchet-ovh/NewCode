@@ -326,3 +326,100 @@ fn unavailable_status_exposes_worker_error_without_inventing_a_branch() {
         ("Git unavailable".into(), "not a repository".into())
     );
 }
+
+#[test]
+fn diff_tab_is_recycled_and_closing_discards_pending_results() {
+    let (repo, mut state) = initial();
+    let ctx = egui::Context::default();
+    state.start(Action::Diff(Selection::new("file", Side::Working)), &ctx);
+    assert!(state.diff_active());
+    assert_eq!(
+        state.diff_tab().unwrap().0,
+        std::path::PathBuf::from("file")
+    );
+    wait(&mut state);
+    state.dismiss_diff();
+    assert!(!state.diff_active());
+    assert!(state.diff_tab().is_some());
+    state.activate_diff();
+    assert!(state.diff_active());
+
+    repo.write("second", "new\n");
+    state.start(Action::Diff(Selection::new("second", Side::Working)), &ctx);
+    assert_eq!(
+        state.diff_tab().unwrap().0,
+        std::path::PathBuf::from("second")
+    );
+    let obsolete = state.review_generation;
+    state.close_diff();
+    wait(&mut state);
+    state.accept_review(super::super::review::ReviewUpdate::Loaded(Box::new(
+        DiffView::load(&repo.0, "second", false, obsolete, None, None).unwrap(),
+    )));
+    assert!(state.diff_tab().is_none());
+    assert!(state.diff.is_none());
+    assert!(!state.take_open_review_request());
+}
+
+#[test]
+fn saved_changes_and_whole_file_staging_reload_without_activating_diff() {
+    let (repo, mut state) = initial();
+    let ctx = egui::Context::default();
+    state.start(Action::Diff(Selection::new("file", Side::Working)), &ctx);
+    wait(&mut state);
+    state.take_open_review_request();
+    state.dismiss_diff();
+    repo.write("file", "saved again\n");
+    state.external_change();
+    state.reload_review(&ctx);
+    let generation = state.review_generation;
+    state.reload_review(&ctx);
+    assert_eq!(state.review_generation, generation, "reloads must coalesce");
+    wait(&mut state);
+    assert_eq!(
+        state.diff.as_ref().unwrap().version,
+        super::super::fingerprint::FileVersion::read(&repo.0, "file", None).unwrap()
+    );
+    assert!(!state.diff_active());
+    assert!(!state.take_open_review_request());
+
+    state.start(
+        Action::Index {
+            paths: vec!["file".into()],
+            stage: true,
+        },
+        &ctx,
+    );
+    wait(&mut state);
+    assert!(state.review_reload);
+    state.reload_review(&ctx);
+    wait(&mut state);
+    assert!(state.diff.as_ref().unwrap().original_staged);
+    assert!(!state.diff_active());
+}
+
+#[test]
+fn load_races_retry_after_a_delay_but_other_errors_wait_for_changes() {
+    let (_repo, mut state) = initial();
+    let ctx = egui::Context::default();
+    state.diff_target = Some(Selection::new("file", Side::Working));
+    let (tx, request) = pending(state.ticket());
+    state.review_request = Some(request);
+    tx.send(Err("The file changed while loading its diff.".into()))
+        .unwrap();
+    state.poll_reply();
+    state.reload_review(&ctx);
+    assert!(state.review_request.is_none());
+    assert!(state.review_reload);
+    state.review_retry_after = Some(Instant::now());
+    state.reload_review(&ctx);
+    assert!(state.review_request.is_some());
+    wait(&mut state);
+    let (tx, request) = pending(state.ticket());
+    state.review_request = Some(request);
+    tx.send(Err("Permission denied".into())).unwrap();
+    state.poll_reply();
+    state.reload_review(&ctx);
+    assert!(state.review_request.is_none());
+    assert!(!state.review_reload);
+}
