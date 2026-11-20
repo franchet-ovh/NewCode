@@ -1,6 +1,6 @@
 [package]
 name = "focus-addon-codex"
-version = "0.4.6"
+version = "0.4.6-1"
 edition = "2024"
 rust-version = "1.95"
 license = "Apache-2.0"
