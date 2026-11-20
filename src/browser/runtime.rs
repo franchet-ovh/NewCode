@@ -77,6 +77,19 @@ impl Runtime {
     pub fn known(&self, client: &str) -> bool {
         self.viewers.contains_key(client)
     }
+    pub fn keep_alive(&mut self, client: &str) {
+        if let Some(viewer) = self.viewers.get_mut(client) {
+            viewer.last_seen = Instant::now();
+        }
+    }
+    pub fn reset_viewer(&mut self, client: &str) {
+        if let Some(viewer) = self.viewers.get_mut(client) {
+            viewer.revision = None;
+        }
+    }
+    pub fn last_rendered(&self) -> Instant {
+        self.last_render
+    }
     pub fn remote(&self, client: &str) -> bool {
         self.viewers.get(client).is_some_and(|viewer| viewer.remote)
     }
@@ -111,10 +124,13 @@ impl Runtime {
             self.disconnect(&id);
         }
         if self.last_render.elapsed() >= Duration::from_millis(100) || self.latest.is_none() {
-            let remote = self.owner.as_ref().is_some_and(|owner| self.remote(owner));
-            if let Ok(frame) = self.renderer.render_frame(None, remote) {
-                self.publish(frame);
-            }
+            self.refresh();
+        }
+    }
+    pub fn refresh(&mut self) {
+        let remote = self.owner.as_ref().is_some_and(|owner| self.remote(owner));
+        if let Ok(frame) = self.renderer.render_frame(None, remote) {
+            self.publish(frame);
         }
     }
     fn publish(&mut self, mut frame: Frame) {
@@ -157,6 +173,10 @@ impl Runtime {
         }
     }
     pub fn frame(&mut self, client: &str, input: Input) -> Result<Option<Frame>, String> {
+        self.apply_input(client, input)?;
+        self.snapshot(client)
+    }
+    pub fn apply_input(&mut self, client: &str, input: Input) -> Result<(), String> {
         if !self.known(client) {
             return Err("Connect to this editor first".into());
         }
@@ -224,9 +244,9 @@ impl Runtime {
         } else {
             self.tick();
         }
-        self.snapshot(client)
+        Ok(())
     }
-    fn snapshot(&mut self, client: &str) -> Result<Option<Frame>, String> {
+    pub fn snapshot(&mut self, client: &str) -> Result<Option<Frame>, String> {
         if self.latest.is_none() {
             self.tick();
         }

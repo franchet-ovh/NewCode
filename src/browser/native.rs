@@ -1,21 +1,15 @@
 //! Native viewer of the same authoritative session used by browser viewers.
 use super::{
-    Host,
-    protocol::{Frame, Input},
-    registry,
+    native_worker::{CloseAction, CloseResult, Command, Event, Worker},
+    protocol::{Control, Frame, Input},
 };
 use base64::{Engine, engine::general_purpose::STANDARD};
 use eframe::egui;
 use std::{
-    collections::HashMap,
-    sync::{
-        Arc,
-        atomic::{AtomicBool, Ordering},
-        mpsc,
-    },
+    collections::{HashMap, VecDeque},
+    sync::mpsc,
     time::Duration,
 };
-use tiny_http::Server;
 
 struct Painter {
     textures: HashMap<String, egui::TextureHandle>,
@@ -130,121 +124,94 @@ impl Painter {
     }
 }
 
+/// Do not feed presentation-only repaints back into the authoritative editor.
+#[derive(Default)]
+struct InputTracker(Option<Input>);
+impl InputTracker {
+    fn changed(&mut self, input: &Input) -> bool {
+        let mut state = input.clone();
+        state.events.clear();
+        let changed = !input.events.is_empty() || self.0.as_ref() != Some(&state);
+        self.0 = Some(state);
+        changed
+    }
+}
+
 struct NativeApp {
-    host: Host,
-    incoming: mpsc::Receiver<tiny_http::Request>,
-    stopped: Arc<AtomicBool>,
-    reader: Option<std::thread::JoinHandle<()>>,
+    worker: Worker,
+    pending: VecDeque<Command>,
     painter: Painter,
     frame: Option<Frame>,
-    input: Option<Input>,
+    input: InputTracker,
     close_confirmation: bool,
+    close_pending: bool,
+    close_error: Option<String>,
+    failure: Option<String>,
     confirmed: bool,
 }
 impl NativeApp {
-    fn new(
-        ctx: &egui::Context,
-        args: &crate::logging::Arguments,
-    ) -> Result<Self, Box<dyn std::error::Error>> {
+    fn new(ctx: &egui::Context, args: &crate::logging::Arguments) -> Result<Self, String> {
         ctx.options_mut(|options| options.zoom_with_keyboard = false);
-        let server = Server::http("127.0.0.1:0").map_err(std::io::Error::other)?;
-        let origin = format!(
-            "http://{}",
-            server.server_addr().to_ip().ok_or("Invalid listener")?
-        );
-        let mut host = Host::new(args, &origin, &registry::random_id()?, "native")?;
-        host.runtime.connect("native-window", false);
-        host.runtime.renderer.set_waker(ctx.clone());
-        let (sender, incoming) = mpsc::sync_channel(64);
-        let stopped = Arc::new(AtomicBool::new(false));
-        let reader_stopped = stopped.clone();
         let wake = ctx.clone();
-        let reader = std::thread::spawn(move || {
-            while !reader_stopped.load(Ordering::Acquire) {
-                if let Ok(Some(request)) = server.recv_timeout(Duration::from_millis(100)) {
-                    if let Err(
-                        mpsc::TrySendError::Full(request)
-                        | mpsc::TrySendError::Disconnected(request),
-                    ) = sender.try_send(request)
-                    {
-                        super::respond(request, 503, "text/plain", "Editor is busy", false);
-                    }
-                    wake.request_repaint();
-                }
-            }
-        });
+        let worker = Worker::start(args, move || wake.request_repaint())?;
         Ok(Self {
-            host,
-            incoming,
-            stopped,
-            reader: Some(reader),
+            worker,
+            pending: VecDeque::new(),
             painter: Painter::default(),
             frame: None,
-            input: None,
+            input: InputTracker::default(),
             close_confirmation: false,
+            close_pending: false,
+            close_error: None,
+            failure: None,
             confirmed: false,
         })
     }
-}
-impl eframe::App for NativeApp {
-    fn raw_input_hook(&mut self, ctx: &egui::Context, raw: &mut egui::RawInput) {
-        if raw.viewport().close_requested()
-            && !self.confirmed
-            && self.frame.as_ref().is_some_and(|frame| frame.dirty)
-        {
-            ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
-            self.close_confirmation = true;
-        }
-        let control = self.host.runtime.control("native-window");
-        let size = raw
-            .screen_rect
-            .unwrap_or_else(|| ctx.viewport_rect())
-            .size();
-        self.input = Some(Input {
-            size: [size.x.max(1.0), size.y.max(1.0)],
-            pixels_per_point: raw
-                .viewport()
-                .native_pixels_per_point
-                .unwrap_or(1.0)
-                .clamp(0.5, 4.0),
-            focused: raw.focused,
-            events: if control.owned && !self.close_confirmation {
-                raw.events.clone()
-            } else {
-                vec![]
-            },
-            epoch: if !self.close_confirmation {
-                Some(control.epoch)
-            } else {
-                None
-            },
-        });
-        if control.owned && !self.close_confirmation {
-            raw.events.clear();
+    fn control(&self) -> Control {
+        self.frame
+            .as_ref()
+            .map_or(self.worker.control.clone(), |frame| frame.control.clone())
+    }
+    fn flush(&mut self, ctx: &egui::Context) {
+        while let Some(command) = self.pending.pop_front() {
+            match self.worker.sender.try_send(command) {
+                Ok(()) => {}
+                Err(mpsc::TrySendError::Full(command)) => {
+                    // Preserve key/button boundaries under backpressure without blocking
+                    // the GUI or dropping input. Only a full queue requires a timed retry.
+                    self.pending.push_front(command);
+                    ctx.request_repaint_after(Duration::from_millis(16));
+                    break;
+                }
+                Err(mpsc::TrySendError::Disconnected(_)) => break,
+            }
         }
     }
-    fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        for request in self.incoming.try_iter().take(64) {
-            self.host.handle(request);
-        }
-        if !self.host.runtime.known("native-window") {
-            self.host.runtime.connect("native-window", false);
-        }
-        let input = self.input.take().unwrap_or(Input {
-            size: [1440.0, 900.0],
-            pixels_per_point: 1.0,
-            focused: false,
-            events: vec![],
-            epoch: None,
-        });
-        match self.host.runtime.frame("native-window", input) {
-            Ok(Some(frame)) => {
-                if let Some(title) = &frame.title {
-                    ctx.send_viewport_cmd(egui::ViewportCommand::Title(title.clone()));
+    fn close(&mut self, action: CloseAction) {
+        self.close_pending = true;
+        self.close_error = None;
+        self.pending.push_back(Command::Close(action));
+    }
+    fn accept(&mut self, ctx: &egui::Context, event: Event) {
+        match event {
+            Event::Frame(frame) => {
+                let control_changed = self.control() != frame.control;
+                if frame.title
+                    != self
+                        .frame
+                        .as_ref()
+                        .and_then(|previous| previous.title.clone())
+                {
+                    if let Some(title) = &frame.title {
+                        ctx.send_viewport_cmd(egui::ViewportCommand::Title(title.clone()));
+                    }
                 }
-                if let Err(error) = self.painter.update(ctx, &frame) {
+                let reset = if let Err(error) = self.painter.update(ctx, &frame) {
                     log::warn!("Native viewer: {error}");
-                }
+                    true
+                } else {
+                    false
+                };
                 if frame.control.owned {
                     for command in &frame.output.commands {
                         match command {
@@ -257,27 +224,107 @@ impl eframe::App for NativeApp {
                         ctx.send_viewport_cmd(egui::ViewportCommand::RequestPaste);
                     }
                 }
-                self.frame = Some(frame);
+                self.frame = Some(*frame);
+                self.pending.push_back(Command::Applied { reset });
+                if control_changed {
+                    // Synchronize this window's dimensions/focus after ownership changes.
+                    ctx.request_repaint();
+                }
             }
-            Ok(None) => {}
-            Err(error) => log::warn!("Native viewer request failed: {error}"),
+            Event::Close(result) => {
+                self.close_pending = false;
+                match result {
+                    CloseResult::Allowed => {
+                        self.confirmed = true;
+                        ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                    }
+                    CloseResult::Dirty => self.close_confirmation = true,
+                    CloseResult::SaveFailed => {
+                        self.close_confirmation = true;
+                        self.close_error =
+                            Some("Could not save all documents. The editor remains open.".into());
+                    }
+                }
+            }
+            Event::Dialog(purpose, directory) => {
+                let path = crate::file_picker::pick_native(&purpose, &directory);
+                self.pending.push_back(Command::DialogResult(purpose, path));
+            }
+            Event::Failed(error) => {
+                log::error!("Native editor session failed: {error}");
+                self.failure = Some(error);
+            }
+            Event::Stopped => {
+                self.confirmed = true;
+                ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+            }
         }
-        self.host.tick();
-        if self.host.stop {
+    }
+}
+impl eframe::App for NativeApp {
+    fn raw_input_hook(&mut self, ctx: &egui::Context, raw: &mut egui::RawInput) {
+        let control = self.control();
+        let size = raw
+            .screen_rect
+            .unwrap_or_else(|| ctx.viewport_rect())
+            .size();
+        let accepts_input = control.owned
+            && !self.close_confirmation
+            && !self.close_pending
+            && self.failure.is_none();
+        let input = Input {
+            size: [size.x.max(1.0), size.y.max(1.0)],
+            pixels_per_point: raw
+                .viewport()
+                .native_pixels_per_point
+                .unwrap_or(1.0)
+                .clamp(0.5, 4.0),
+            focused: raw.focused,
+            events: if accepts_input {
+                raw.events.clone()
+            } else {
+                vec![]
+            },
+            epoch: if accepts_input {
+                Some(control.epoch)
+            } else {
+                None
+            },
+        };
+        if self.input.changed(&input) {
+            self.pending.push_back(Command::Input(input));
+        }
+        if accepts_input {
+            raw.events.clear();
+        }
+        if raw.viewport().close_requested() && self.failure.is_some() {
             self.confirmed = true;
-            ctx.send_viewport_cmd(egui::ViewportCommand::Close);
         }
-        ctx.request_repaint_after(Duration::from_millis(100));
+        if raw.viewport().close_requested() && !self.confirmed {
+            ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
+            if !self.close_pending && !self.close_confirmation {
+                // The worker checks dirty state after processing all preceding input,
+                // even when its newest frame has not reached this window yet.
+                self.close(CloseAction::Check);
+            }
+        }
+    }
+    fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        let events: Vec<_> = self.worker.incoming.try_iter().take(64).collect();
+        for event in events {
+            self.accept(ctx, event);
+        }
+        self.flush(ctx);
     }
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
-        let owned = self.host.runtime.control("native-window").owned;
+        let owned = self.control().owned;
         if !owned {
             egui::Panel::top("viewer_control").show(ui, |ui| {
                 ui.horizontal(|ui| {
                     ui.label("This editor is controlled remotely");
                     if ui.button("Take control").clicked() {
-                        self.host.runtime.claim("native-window");
+                        self.pending.push_back(Command::Claim);
                     }
                 });
             });
@@ -302,38 +349,44 @@ impl eframe::App for NativeApp {
             egui::Modal::new(egui::Id::new("close_native_editor")).show(&ctx, |ui| {
                 ui.heading("Unsaved changes");
                 ui.label("Save changes before closing this editor?");
-                ui.horizontal(|ui| {
-                    if ui.button("Save all").clicked()
-                        && self.host.runtime.renderer.save_documents()
-                    {
-                        self.confirmed = true;
-                    }
-                    if ui.button("Discard").clicked() {
-                        self.confirmed = true;
-                    }
-                    if ui.button("Cancel").clicked() {
-                        self.close_confirmation = false;
-                    }
+                if let Some(error) = &self.close_error {
+                    ui.colored_label(ui.visuals().error_fg_color, error);
+                }
+                ui.add_enabled_ui(!self.close_pending, |ui| {
+                    ui.horizontal(|ui| {
+                        if ui.button("Save all").clicked() {
+                            self.close(CloseAction::Save);
+                        }
+                        if ui.button("Discard").clicked() {
+                            self.close(CloseAction::Discard);
+                        }
+                        if ui.button("Cancel").clicked() {
+                            self.close_confirmation = false;
+                            self.close_error = None;
+                        }
+                    });
                 });
             });
-            if self.confirmed {
-                ctx.send_viewport_cmd(egui::ViewportCommand::Close);
-            }
         }
+        if let Some(error) = self.failure.clone() {
+            egui::Modal::new(egui::Id::new("native_session_failed")).show(&ctx, |ui| {
+                ui.heading("Editor session stopped");
+                ui.label(error);
+                if ui.button("Close").clicked() {
+                    self.confirmed = true;
+                    ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                }
+            });
+        }
+        // UI actions are submitted in this pass rather than waiting for another repaint.
+        self.flush(&ctx);
     }
     fn persist_egui_memory(&self) -> bool {
         false
     }
     fn save(&mut self, _storage: &mut dyn eframe::Storage) {
-        self.host.runtime.renderer.save();
-    }
-}
-impl Drop for NativeApp {
-    fn drop(&mut self) {
-        self.stopped.store(true, Ordering::Release);
-        if let Some(reader) = self.reader.take() {
-            let _ = reader.join();
-        }
+        // The worker also saves periodically and on drop if its queue is busy.
+        let _ = self.worker.sender.try_send(Command::SaveSettings);
     }
 }
 
@@ -355,4 +408,39 @@ pub(super) fn run(arguments: &crate::logging::Arguments) -> Result<(), Box<dyn s
         }),
     )?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn presentation_repaints_do_not_resubmit_input_but_events_and_view_changes_do() {
+        let mut tracker = InputTracker::default();
+        let mut input = Input {
+            size: [1200.0, 800.0],
+            pixels_per_point: 1.0,
+            focused: true,
+            events: vec![],
+            epoch: Some(2),
+        };
+        assert!(tracker.changed(&input));
+        assert!(!tracker.changed(&input));
+        input.events.push(egui::Event::Text("a".into()));
+        assert!(tracker.changed(&input));
+        assert!(tracker.changed(&input)); // Repeated text must not be deduplicated.
+        input.events.clear();
+        assert!(!tracker.changed(&input));
+        input.size[0] = 1000.0;
+        assert!(tracker.changed(&input));
+        input.pixels_per_point = 2.0;
+        assert!(tracker.changed(&input));
+        input.focused = false;
+        assert!(tracker.changed(&input));
+        input.epoch = Some(3);
+        assert!(tracker.changed(&input));
+        input.epoch = None;
+        assert!(tracker.changed(&input));
+        assert!(!tracker.changed(&input));
+    }
 }

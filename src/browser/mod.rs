@@ -1,6 +1,7 @@
 //! Shared editor instances and their private loopback bridges.
 mod launcher;
 mod native;
+mod native_worker;
 mod protocol;
 pub(crate) mod registry;
 mod renderer;
