@@ -253,7 +253,7 @@ fn text_position(output: &egui::FullOutput, text: &str) -> Option<egui::Pos2> {
 }
 
 #[test]
-fn source_control_opens_a_fullscreen_diff_and_returns_to_changes() {
+fn source_control_opens_an_editor_diff_tab_and_returns_to_changes() {
     let directory = tempfile::tempdir().unwrap();
     let workspace = directory.path();
     for args in [
@@ -290,11 +290,22 @@ fn source_control_opens_a_fullscreen_diff_and_returns_to_changes() {
         std::thread::sleep(std::time::Duration::from_millis(10));
     };
     click(&mut app, &ctx, position);
-    assert!(app.mobile.git_detail);
-    let output = frame(&mut app, &ctx, egui::vec2(390.0, 844.0), vec![]);
-    let back = text_position(&output, "Back to changes").unwrap();
-    click(&mut app, &ctx, back);
-    assert!(!app.mobile.git_detail);
+    assert_eq!(app.mobile.panel, Some(MobilePanel::Editor));
+    assert!(app.git_ui.diff_active());
+    // Allow the tab strip to settle after revealing a tab beyond the viewport.
+    for _ in 0..6 {
+        frame(&mut app, &ctx, egui::vec2(390.0, 844.0), vec![]);
+    }
+    let close = ctx
+        .read_response(egui::Id::new("diff_tab").with("close"))
+        .unwrap()
+        .rect
+        .center();
+    assert!(close.x < 390.0);
+    click(&mut app, &ctx, close);
+    assert!(app.git_ui.diff_tab().is_none());
+    app.select_mobile_panel(MobilePanel::Git, &ctx);
+    frame(&mut app, &ctx, egui::vec2(390.0, 844.0), vec![]);
     assert_eq!(app.mobile.panel, Some(MobilePanel::Git));
     assert_eq!(app.buffer, draft);
 }

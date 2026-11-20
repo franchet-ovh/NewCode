@@ -63,3 +63,5 @@ mod terminal;
 mod preview;
 
 mod addons;
+
+mod diff;

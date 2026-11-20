@@ -26,12 +26,14 @@ impl EditorApp {
         }
         let opened_find = ctx
             .input(|input| input.modifiers.command && input.key_pressed(egui::Key::F))
-            && self.active_file.is_some();
+            && self.document_active();
         if opened_find {
             self.find_open = true;
         }
         if ctx.input(|input| input.modifiers.command && input.key_pressed(egui::Key::W)) {
-            if let Some(path) = self.active_file.clone() {
+            if self.git_ui.diff_active() {
+                self.close_tabs(super::close_dialog::CloseTabs::Diff);
+            } else if let Some(path) = self.active_file.clone() {
                 self.close_file(path);
             }
         }
@@ -120,7 +122,7 @@ impl EditorApp {
         let context = ui.ctx().clone();
         let ctx = &context;
         if ui
-            .add_enabled_ui(self.active_file.is_some(), |ui| {
+            .add_enabled_ui(self.document_active(), |ui| {
                 theme::button(ui, Icon::Save, "Save", theme::colors(ui).accent, true)
             })
             .inner
@@ -132,7 +134,7 @@ impl EditorApp {
         ui.separator();
         ui.menu_button("Edit", |ui| {
             if ui
-                .add_enabled_ui(self.active_file.is_some(), |ui| {
+                .add_enabled_ui(self.document_active(), |ui| {
                     theme::button(
                         ui,
                         Icon::Save,
@@ -148,7 +150,7 @@ impl EditorApp {
                 ui.close();
             }
             if ui
-                .add_enabled_ui(self.active_file.is_some(), |ui| {
+                .add_enabled_ui(self.document_active(), |ui| {
                     theme::button(
                         ui,
                         Icon::Copy,
@@ -164,7 +166,7 @@ impl EditorApp {
                 ui.close();
             }
             if ui
-                .add_enabled_ui(self.active_file.is_some(), |ui| {
+                .add_enabled_ui(self.document_active(), |ui| {
                     theme::button(
                         ui,
                         Icon::Paste,
@@ -181,7 +183,7 @@ impl EditorApp {
             }
             ui.separator();
             if ui
-                .add_enabled_ui(self.active_file.is_some(), |ui| {
+                .add_enabled_ui(self.document_active(), |ui| {
                     theme::button(
                         ui,
                         Icon::Search,
@@ -199,7 +201,7 @@ impl EditorApp {
             }
             if ui
                 .add_enabled(
-                    self.active_file.is_some(),
+                    self.document_active(),
                     egui::Button::new("Select All   Ctrl+A"),
                 )
                 .clicked()
@@ -322,10 +324,10 @@ impl EditorApp {
         if show_details && self.sidebar_mode == SidebarMode::Addon && self.addons.central(ui) {
             return;
         }
-        if show_details && self.sidebar_mode == SidebarMode::Git && self.git_ui.show_diff(ui) {
+        if self.git_ui.show_diff(ui) {
             return;
         }
-        if self.active_file.is_some() {
+        if self.document_active() {
             self.find_bar(ui, ctx, opened_find);
             ui.add_enabled_ui(!self.addons.worktree_busy(), |ui| self.text_view(ui, ctx));
         } else {

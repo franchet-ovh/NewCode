@@ -192,6 +192,7 @@ impl EditorApp {
         let Some(index) = self.open_files.iter().position(|open| *open == path) else {
             return;
         };
+        let diff_active = self.git_ui.diff_active();
         let was_active = self.active_file.as_ref() == Some(&path);
         self.open_files.remove(index);
         self.disk_changes.forget(&path);
@@ -216,6 +217,9 @@ impl EditorApp {
             }
         } else {
             self.status = "File closed".into();
+        }
+        if diff_active {
+            self.git_ui.activate_diff();
         }
     }
 }

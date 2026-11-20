@@ -33,7 +33,7 @@ pub(super) fn apply(
 ) -> Result<AppliedPatch, String> {
     if FileVersion::read(root, &task.path, runtime)? != task.expected {
         return Err(
-            "The file or index changed outside this review. Reload diff before continuing.".into(),
+            "The file or index changed outside this review. The comparison needs to refresh before continuing.".into(),
         );
     }
     let mut command = if let Some(runtime) = runtime {
@@ -68,14 +68,14 @@ pub(super) fn apply(
     let (version, warning) = match FileVersion::read(root, &task.path, runtime) {
         Ok(version) => {
             let warning = (!version.same_sources(&task.expected)).then(|| {
-                "The file changed during the action. Reload diff before continuing.".into()
+                "The file changed during the action. The comparison needs to refresh before continuing.".into()
             });
             (Some(version), warning)
         }
         Err(error) => (
             None,
             Some(format!(
-                "Hunk applied, but the file could not be checked: {error}. Reload diff."
+                "Hunk applied, but the file could not be checked: {error}. The comparison will refresh after changes settle."
             )),
         ),
     };

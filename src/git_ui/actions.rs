@@ -114,7 +114,8 @@ impl GitUi {
                     .map_or(true, |current| current != version))
                 .then(|| ReviewUpdate::Invalidated {
                     id,
-                    reason: "File or index changed. Reload diff to continue.".into(),
+                    reason: "File or index changed. The comparison will refresh automatically."
+                        .into(),
                 })
             });
             RefreshReply {
@@ -129,6 +130,7 @@ impl GitUi {
         }
         if let Action::Diff(selection) = action {
             self.open_review_requested = true;
+            self.diff_hidden = false;
             self.load_review(selection, ctx);
             return;
         }
@@ -140,8 +142,8 @@ impl GitUi {
         self.refresh = None;
         self.polling.reset();
         if self.review_request.take().is_some() {
-            self.review_status =
-                ReviewStatus::Failed("Index changing. Reload diff to continue.".into());
+            self.review_status = ReviewStatus::Idle;
+            self.review_reload = self.diff_target.is_some();
         }
         let root = self
             .snapshot
@@ -195,7 +197,9 @@ impl GitUi {
                         Err(error) => {
                             diff = Some(ReviewUpdate::Invalidated {
                                 id: task.review_id,
-                                reason: format!("{error} Reload diff before retrying."),
+                                reason: format!(
+                                    "{error} Refreshing the comparison before retrying."
+                                ),
                             });
                             Err(error)
                         }
@@ -215,7 +219,7 @@ impl GitUi {
             if result.is_ok() && diff.is_none() {
                 diff = review_id.map(|id| ReviewUpdate::Invalidated {
                     id,
-                    reason: "Index updated. Reload diff to review the current changes.".into(),
+                    reason: "Index updated. Refreshing the comparison.".into(),
                 });
             }
             let notice = match result {
@@ -230,6 +234,22 @@ impl GitUi {
             }
         }));
     }
+    pub(super) fn reload_review(&mut self, ctx: &egui::Context) {
+        if let Some(due) = self.review_retry_after {
+            let now = Instant::now();
+            if now < due {
+                ctx.request_repaint_after(due - now);
+                return;
+            }
+            self.review_retry_after = None;
+        }
+        if self.review_reload && !self.busy() && self.review_request.is_none() {
+            if let Some(target) = self.diff_target.clone() {
+                self.load_review(target, ctx);
+            }
+        }
+    }
+
     fn load_review(&mut self, selection: Selection, ctx: &egui::Context) {
         let Some(workspace) = self.workspace.clone() else {
             return;
@@ -239,7 +259,9 @@ impl GitUi {
             .as_ref()
             .map_or(workspace, |snapshot| snapshot.root.clone());
         let runtime = self.runtime.clone();
-        let same = self.diff_target.as_ref() == Some(&selection);
+        let same = self.diff.as_ref().is_some_and(|view| {
+            view.path == selection.path && view.original_staged == selection.side.is_staged()
+        });
         let anchor = same
             .then(|| self.diff.as_ref().and_then(DiffView::anchor))
             .flatten();
@@ -248,7 +270,8 @@ impl GitUi {
         }
         self.review_generation = self.review_generation.wrapping_add(1);
         let generation = self.review_generation;
-        self.diff_hidden = false;
+        self.review_reload = false;
+        self.review_retry_after = None;
         self.review_status = ReviewStatus::Loading;
         self.diff_target = Some(selection.clone());
         // Replacing the receiver drops obsolete loads; their results cannot reach the current view.
@@ -323,7 +346,14 @@ impl GitUi {
             if ticket == self.ticket() {
                 match result.and_then(|result| result) {
                     Ok(view) => self.accept_review(ReviewUpdate::Loaded(Box::new(view))),
-                    Err(error) => self.review_status = ReviewStatus::Failed(error),
+                    Err(error) => {
+                        if error.contains("changed while loading its diff") {
+                            self.review_reload = true;
+                            self.review_retry_after =
+                                Some(Instant::now() + crate::filesystem::poll_interval());
+                        }
+                        self.review_status = ReviewStatus::Failed(error);
+                    }
                 }
             }
         }
