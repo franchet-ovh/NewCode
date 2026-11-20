@@ -96,17 +96,26 @@ impl EditorApp {
     }
     pub(super) fn disk_save_conflict(&mut self, path: &Path) -> bool {
         let current = DiskVersion::read(path);
-        if self
-            .disk_changes
-            .documents
-            .get(path)
-            .is_some_and(|doc| doc.version != current)
-        {
-            // Saving always asks again, including after Cancel.
-            self.disk_changes.notify(path.to_path_buf(), current);
-            return true;
+        let Some(doc) = self.disk_changes.documents.get(path) else {
+            return false;
+        };
+        if doc.version == current {
+            return false;
         }
-        false
+        // Metadata is a cheap change hint. A rename, touch, or restored backup
+        // can change it without changing the disk contents we originally read.
+        // Read only on this exceptional save path, and reject changes racing
+        // the verification rather than accepting an unstable disk version.
+        if std::fs::read_to_string(path).is_ok_and(|text| text == doc.text)
+            && DiskVersion::read(path) == current
+        {
+            let text = doc.text.clone();
+            self.disk_changes.remember(path, text, current);
+            return false;
+        }
+        // Saving always asks again, including after Cancel, for real changes.
+        self.disk_changes.notify(path.to_path_buf(), current);
+        true
     }
     pub(super) fn poll_disk_changes(&mut self, ctx: &egui::Context) {
         self.disk_changes
@@ -311,6 +320,40 @@ mod tests {
         assert_eq!(std::fs::read_to_string(&path).unwrap(), "my edits");
         assert!(!app.dirty);
         assert!(!app.disk_save_conflict(&path));
+    }
+    #[test]
+    fn restored_original_can_be_saved_after_a_failed_save() {
+        let (_dir, path, mut app) = document();
+        let backup = path.with_file_name("backup.txt");
+        std::fs::rename(&path, &backup).unwrap();
+        std::fs::create_dir(&path).unwrap();
+        assert!(!app.save_document(&path));
+        assert!(app.dirty);
+        assert!(app.disk_changes.has_conflict());
+        std::fs::remove_dir(&path).unwrap();
+        std::fs::rename(&backup, &path).unwrap();
+        assert!(app.save_document(&path));
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "my edits");
+        assert!(!app.dirty);
+        assert!(!app.disk_changes.has_conflict());
+    }
+    #[test]
+    fn restored_modified_file_still_requires_conflict_resolution() {
+        let (_dir, path, mut app) = document();
+        let backup = path.with_file_name("backup.txt");
+        std::fs::rename(&path, &backup).unwrap();
+        std::fs::create_dir(&path).unwrap();
+        assert!(!app.save_document(&path));
+        std::fs::write(&backup, "externally modified").unwrap();
+        std::fs::remove_dir(&path).unwrap();
+        std::fs::rename(&backup, &path).unwrap();
+        assert!(!app.save_document(&path));
+        assert_eq!(
+            std::fs::read_to_string(&path).unwrap(),
+            "externally modified"
+        );
+        assert_eq!(app.buffer, "my edits");
+        assert!(app.dirty);
     }
     #[test]
     fn failed_reload_keeps_edits_and_successful_reload_resets_history() {

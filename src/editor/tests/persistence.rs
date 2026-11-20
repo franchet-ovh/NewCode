@@ -140,15 +140,6 @@ fn workspace_switch_restores_state_and_handles_unsaved_choices() {
     std::fs::remove_dir(&file_a).unwrap();
     std::fs::write(&file_a, "a disk").unwrap();
     app.resolve_workspace_switch(CloseChoice::Save, &ctx);
-    // Replacing the file outside the editor now requires explicit conflict resolution.
-    assert_eq!(app.settings.workspace.as_ref(), Some(&a));
-    app.resolve_disk_change(
-        &file_a,
-        &crate::filesystem::DiskVersion::read(&file_a),
-        "Overwrite",
-    )
-    .unwrap();
-    app.resolve_workspace_switch(CloseChoice::Save, &ctx);
     assert_eq!(std::fs::read_to_string(&file_a).unwrap(), "edited a");
     assert_eq!(app.open_files, [file_b.clone()]);
     assert_eq!(app.buffer, "b disk");
