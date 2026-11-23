@@ -20,6 +20,19 @@ pub(super) fn load_manifest(path: &Path) -> Result<Manifest, String> {
     if manifest.protocol != focus_addon_sdk::PROTOCOL_VERSION {
         return Err(format!("Unsupported addon protocol {}", manifest.protocol));
     }
+    let mut extensions = std::collections::HashSet::new();
+    for language in &manifest.languages {
+        if !focus_addon_sdk::valid_id(&language.id)
+            || language.extensions.is_empty()
+            || language.extensions.iter().any(|e| {
+                e.is_empty()
+                    || !e.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')
+                    || !extensions.insert(e)
+            })
+        {
+            return Err("Invalid or duplicate addon language extension".into());
+        }
+    }
     let root = path
         .parent()
         .ok_or("Missing addon directory")?

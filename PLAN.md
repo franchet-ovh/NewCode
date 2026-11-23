@@ -230,3 +230,27 @@ test and 18 release-script tests. Rust formatting and whitespace checks passed.
 The native/browser integration click coordinates now account for the new row.
 Container launcher stdio and process-group cleanup were exercised locally;
 a live Docker-container LSP session and a macOS run were not exercised here.
+
+
+## Issue #66: addon-owned language support
+
+This supersedes the earlier built-in symbol-only LSP design. Installed Rust and
+Python executable addons now provision and own their servers. The generic host
+bridges LSP through generation/session-scoped addon messages, synchronizes open
+buffers, and renders completion, formatting, breadcrumb symbols, and Problems.
+Type checking and linting feed a separate Problems tab and visible-line markers.
+Syntax highlighting remains local and cached. One server runs at a time; switching
+waits for an explicit cleanup acknowledgement, and inactive sessions stop after
+two minutes. See the SDK's optional language-provider extension for the wire
+contract and README for provisioning prerequisites and workspace settings.
+
+Validation: the full editor suite passed (218 library tests and the separate
+server lifecycle integration; five Docker checks skipped), plus a subsequently
+added configuration-namespace regression test. All 75 SDK/helper/addon tests
+passed (one optional installed-OpenCode smoke skipped), and all 18 release-script
+tests passed. New bridge smoke tests passed with local and simulated Docker
+processes, simulated successful/failed Rust provisioning, real rust-analyzer,
+and real pylsp/mypy. Python automatic provisioning was exercised in isolated
+`/tmp` storage, including the missing-ensurepip fallback to pip `--python`.
+Real Dev Container execution remains unverified. Formatting and whitespace
+checks passed; the new addons were built and staged independently.

@@ -122,7 +122,7 @@ impl Process {
         process.send(Message::request(
             0,
             "initialize",
-            serde_json::json!({"protocol": focus_addon_sdk::PROTOCOL_VERSION, "context":context}),
+            serde_json::json!({"protocol": focus_addon_sdk::PROTOCOL_VERSION, "language":focus_addon_sdk::language::VERSION, "context":context}),
         ))?;
         Ok(process)
     }

@@ -1,0 +1,11 @@
+[package]
+name = "focus-language-addon"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.95"
+license = "Apache-2.0"
+
+[dependencies]
+focus-addon-sdk = { path = "../addon-sdk" }
+serde_json = "1"
+libc = "0.2"

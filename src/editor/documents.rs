@@ -169,6 +169,9 @@ impl EditorApp {
                     crate::filesystem::DiskVersion::read(path),
                 );
                 self.git_ui.external_change();
+                if let Some(provider) = &mut self.addons.language {
+                    provider.saved(path);
+                }
                 self.status = format!("Saved {}", path.display());
                 true
             }

@@ -54,6 +54,9 @@ impl DiskChanges {
     pub(super) fn has_conflict(&self) -> bool {
         self.conflict.is_some()
     }
+    pub(super) fn cached_text_ref(&self, path: &Path) -> Option<&str> {
+        self.documents.get(path).map(|doc| doc.text.as_str())
+    }
     pub(super) fn cached_text(&self, path: &Path) -> Option<String> {
         self.documents.get(path).map(|doc| doc.text.clone())
     }

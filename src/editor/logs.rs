@@ -6,6 +6,7 @@ pub(super) enum Tab {
     #[default]
     Terminal,
     Logs,
+    Problems,
 }
 pub(super) struct Logs {
     pub source: Option<Source>,

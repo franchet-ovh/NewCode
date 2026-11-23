@@ -161,3 +161,49 @@ checksum. Installation receipts are separate from addon state. Shared process
 leases prevent updates while another editor uses the executable; updates use a
 rollback journal and restart only the affected process. No protocol changes or
 addon-specific host code are needed to appear in the manager or release catalog.
+
+## Language providers (optional extension 1)
+
+Add `[[languages]]` declarations to a normal addon manifest:
+
+```toml
+[[languages]]
+id = "example-language"
+extensions = ["example", "ex"]
+```
+
+The host advertises `"language": 1` in its `initialize` parameters.
+Language addons acknowledge `"language": 1` in their `initialize` result alongside
+`"protocol": 1`. Existing non-language addons are unaffected. The host activates
+providers lazily, without selecting their sidebar. A provider must acknowledge
+initialization promptly; server provisioning runs afterward, away from protocol
+input processing. The host only starts an installed, enabled provider.
+
+- `lsp.start` notification carries `language::Start`: workspace generation, session
+  ID, language ID, runtime-specific `Context`, and optional command/argument
+  overrides. The provider installs dependencies and starts its owned server.
+- `lsp.status` carries generation/session, `status` text, and `failed` boolean.
+  Publish progress and actionable failures; do not silently switch runtimes.
+- `lsp.started` carries generation/session, fully namespaced `settings` JSON,
+  and optional `initialization_options` JSON (defaulting to `settings`).
+  The host then initializes the LSP session and synchronizes editor documents.
+- Bidirectional `lsp.message` notifications carry `language::Packet`: generation,
+  session, and a standard LSP JSON-RPC object. LSP IDs are independent of addon IDs.
+  The addon bridges JSON objects to Content-Length-framed server stdio using
+  `language::read` / `language::write` (3 MiB maximum server frame).
+- `lsp.stop` carries generation/session. Stop and reap the owned process tree,
+  then acknowledge with `lsp.stopped` carrying the same pair. The host waits for
+  this acknowledgement before starting another server.
+- `lsp.retry` carries the current generation and asks the host for a fresh
+  session, including fresh document snapshots. Obsolete incarnations are ignored.
+
+On `context.changed`, shutdown, or host disconnect, stop owned processes and
+cancel provisioning, including inside containers. Serialize shared installations
+and keep their state outside executable directories. Servers remain the addon's
+responsibility: the host never interprets server executable names or installs
+language-specific dependencies. Provider-specific options can live in
+`Context.state`; the Python addon accepts an `interpreter` path there.
+
+`crates/language-addon` supplies the common runner for the Rust and Python addon
+executables, including cancellation, framing, private environments, and local /
+container process groups. More languages may implement the protocol directly.

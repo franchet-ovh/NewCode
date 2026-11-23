@@ -1,0 +1,12 @@
+id = "lsp-python"
+name = "Python"
+description = "Python completion, mypy type checking, linting, formatting, and symbols."
+publisher = "Focus Editor project"
+version = "0.4.8"
+protocol = 1
+executable = "focus-addon-lsp-python"
+icon = "icon.png"
+
+[[languages]]
+id = "python"
+extensions = ["py", "pyi"]
