@@ -12,6 +12,7 @@ mod persistence;
 
 pub(super) fn test_app() -> EditorApp {
     EditorApp {
+        navigation: Default::default(),
         explorer_cache: Default::default(),
         disk_changes: Default::default(),
         settings: Settings::default(),

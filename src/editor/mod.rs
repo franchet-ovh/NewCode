@@ -24,6 +24,7 @@ mod explorer;
 mod layout;
 mod logs;
 mod mobile;
+mod navigation;
 mod persistence;
 mod search;
 mod shell;
@@ -46,6 +47,7 @@ enum SidebarMode {
 }
 
 pub(crate) struct EditorApp {
+    navigation: navigation::Navigation,
     explorer_cache: HashMap<PathBuf, Vec<explorer::TreeEntry>>,
     disk_changes: disk_changes::DiskChanges,
     settings: Settings,
@@ -128,6 +130,7 @@ impl EditorApp {
         addons.suppressed = arguments.disabled_addons.clone();
         addons.apply_settings(&settings.addon_enabled, &settings.addon_state);
         let mut app = Self {
+            navigation: Default::default(),
             explorer_cache: Default::default(),
             disk_changes: Default::default(),
             settings,
@@ -267,6 +270,7 @@ impl EditorApp {
         self.mobile.was_compact = mobile::is_compact(ctx.viewport_rect().width());
         self.prepare_panel_input(ctx, self.mobile.was_compact);
         self.poll_disk_changes(ctx);
+        self.update_navigation(ctx);
         if !self.disk_changes.has_conflict() {
             self.rename_dialog(ctx);
             self.close_dialog(ctx);
@@ -300,5 +304,11 @@ impl eframe::App for EditorApp {
     }
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         self.render(ui);
+    }
+}
+
+impl Drop for EditorApp {
+    fn drop(&mut self) {
+        self.navigation.client.shutdown();
     }
 }

@@ -429,3 +429,51 @@ See [PRODUCT.md](PRODUCT.md) for the current product scope and [PLAN.md](PLAN.md
 After `cargo build`, `python3 scripts/browser-smoke.py` checks the actual app window, profile isolation, renderer sandbox, editing/saving, clipboard, external links, reloads, terminal input, display scaling, and window-close cleanup. It requires a desktop session, installed Chromium with working sandbox support, Python 3.11+, `websocket-client`, and Pillow. It attaches a test debugger through a temporary launcher shim; the normal launcher does not enable remote debugging. To include built assistant panels without connecting their backends, add `--addon addons/codex --addon addons/opencode`. The screenshot is saved to `target/browser-smoke.png`. `python3 scripts/server-smoke.py` additionally checks the hub on a network IP over ordinary HTTP, both editor modes, shared unsaved state, controller handoff, multiple viewers, remote terminal input, and gateway shutdown/restart. `python3 scripts/workspace-smoke.py` tests adding/starting/stopping workspaces and reattaching to unsaved headless sessions entirely through the browser, without desktop access for editor processes. Both server smoke tests use temporary logins and data directories. Their screenshots are saved to `target/debug/server-smoke.png` and `target/debug/workspace-smoke.png`.
 
 After `cargo build --release --bins`, `python3 scripts/native-smoke.py` checks idle native-window redraws, keyboard editing/saving, and clean shutdown on an X11 desktop, including Cinnamon. It requires `libXdamage` and `libXtst` and uses temporary application data. Pass `--baseline /path/to/previous/focus-editor` to compare redraw rates and editor/compositor CPU on the same desktop. The native backend continues processing terminal, addon, and remote activity on its session worker; unchanged backend frames do not request window repaints.
+
+### File breadcrumbs and symbol navigation
+
+The row below the editor tabs shows the current file and its enclosing symbols.
+Click a folder to browse its children, the filename to search document symbols,
+or an enclosing symbol to jump to its declaration. In the symbol picker, use
+Up/Down and Enter to select, or Escape to dismiss. Symbols follow unsaved edits.
+File breadcrumbs work without a language server and for every text-file type.
+
+Rust symbols use `rust-analyzer`; Python (`.py`/`.pyi`) uses `pylsp` from
+`python-lsp-server`. Install these separately in your normal development
+environment, for example `rustup component add rust-analyzer` and
+`pipx install python-lsp-server`. Servers must be on PATH. For a connected Dev
+Container, install the servers and `setsid` (usually supplied by `util-linux`)
+inside that container. Files outside its mounted workspace use host servers.
+The application never downloads servers automatically. Missing or failed servers
+show an explanation and Retry in the filename's symbol menu.
+
+Optional overrides belong in the workspace's saved `settings.toml` (close the
+application before editing it):
+
+```toml
+[lsp]
+enabled = true # false disables both servers
+
+[lsp.rust]
+command = "rust-analyzer"
+args = []
+
+[lsp.python]
+command = "/path/to/venv/bin/pylsp"
+args = []
+```
+
+Only one server runs per editor instance, with only the active document open.
+Startup is delayed 300 ms, edit synchronization is debounced by 500 ms, and
+servers stop after two minutes without document/caret/symbol-picker activity.
+Opening the picker restarts an idle server. Switching languages shuts down the
+old server first. Symbol navigation skips files larger than 1 MiB and caps
+responses at 8 MiB and 20,000 symbols. Picker results are cached and virtualized.
+
+This LSP integration supplies document symbols, not completion, references,
+rename, diagnostics, or cross-file definitions. Rust uses standalone-file
+analysis with two workers and a small syntax cache; Cargo project discovery,
+sysroot loading, checks on save, build scripts, macro expansion, and cache
+priming are disabled. Python's bundled linting/formatting and unused features
+are disabled. These settings reduce resource use; external servers do not have
+a hard OS-enforced memory limit. No Node.js runtime is required.

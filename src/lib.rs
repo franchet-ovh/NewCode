@@ -9,6 +9,7 @@ mod file_picker;
 mod git_ui;
 mod launch;
 mod logging;
+mod lsp;
 mod platform;
 mod repository_jobs;
 mod server;

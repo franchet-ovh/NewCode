@@ -201,7 +201,8 @@ fn connect(server: &Gateway, id: &str) -> u64 {
 }
 fn edit(server: &Gateway, id: &str, epoch: u64, text: &str) {
     let mut events = pointer(150.0, 127.0);
-    events.extend(pointer(600.0, 102.0));
+    // The source row sits below tabs and the 28px breadcrumb strip.
+    events.extend(pointer(600.0, 130.0));
     events.extend(key("A", true));
     events.push(json!({"Text":text}));
     assert_eq!(frame(server, id, epoch, events).unwrap()["dirty"], true);
