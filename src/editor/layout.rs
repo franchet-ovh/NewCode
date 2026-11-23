@@ -328,6 +328,7 @@ impl EditorApp {
             return;
         }
         if self.document_active() {
+            self.navigation_row(ui);
             self.find_bar(ui, ctx, opened_find);
             ui.add_enabled_ui(!self.addons.worktree_busy(), |ui| self.text_view(ui, ctx));
         } else {

@@ -4,6 +4,7 @@ use std::path::PathBuf;
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub(crate) struct Settings {
+    pub(crate) lsp: crate::lsp::Config,
     pub(crate) workspace: Option<PathBuf>,
     pub(crate) session_workspace: Option<PathBuf>,
     pub(crate) open_files: Vec<PathBuf>,
@@ -20,6 +21,7 @@ pub(crate) struct Settings {
 impl Default for Settings {
     fn default() -> Self {
         Self {
+            lsp: Default::default(),
             workspace: None,
             session_workspace: None,
             open_files: Vec::new(),

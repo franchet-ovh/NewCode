@@ -17,6 +17,7 @@ Nord Light uses cool gray surfaces, muted blue accents, compact controls, square
 - Create on Enter only. Escape, focus loss, sidebar changes, or workspace changes cancel without filesystem writes. Validate names, preserve failed drafts for correction, and never overwrite existing entries.
 - Provide right-click Rename, Move, and Delete actions. Deletion requires an in-app confirmation, warns about folder contents and unsaved edits, and removes affected tabs only on success. Deleting a symbolic link preserves its target.
 - Edit/save text with lightweight extension-based syntax coloring. Keep source lines unwrapped and horizontally scrollable.
+- Show file breadcrumbs beneath tabs, with folder navigation menus and a searchable symbol picker. Rust (rust-analyzer) and Python (pylsp) use an optional, bounded stdio LSP client that follows unsaved edits and supplies enclosing scopes where the server provides scope ranges. Keep one active server/document, debounce edits, stop idle servers, and preserve file navigation when servers are unavailable.
 - Keep tabs on one scrollable row with close controls and a searchable open-files menu. Right-click a tab title for Close file, Close others (keeping that tab), or Close all. Closing modified files asks Save, Discard, or Cancel for each file in tab order. Cancel stops the remaining closes; failed saves preserve the file and confirmation.
 - Preserve unsaved contents and separate Undo state per open file during tab switches. Modified indicators and close confirmations cover inactive files too; Save targets the file being closed. Keep preview and document state synchronized during rename, move, and deletion.
 - Restore all tabs as permanent, including the last preview; restore workspace, tab order, and active file on relaunch, skipping missing/unreadable files. A different launch workspace does not inherit unrelated tabs. Restore saved disk contents, not unsaved buffers or caret/scroll positions.
@@ -60,7 +61,7 @@ OpenCode uses an owned localhost server and existing CLI configuration/authentic
 - Interpret only the Compose selection fields needed to connect (`dockerComposeFile`, `service`, `workspaceFolder`, and `remoteUser`). Dockerfiles and Compose define provisioning; Dev Container Features and lifecycle commands are not interpreted.
 - Git is required for Source Control; an installed, authenticated Codex CLI is required for the Codex panel. Both capabilities depend on their local tools and configuration.
 - Automatic Codex startup can be disabled in saved settings or with `--no-addon codex`; `--no-addon opencode` skips OpenCode startup. Visibility is independently controlled by the Addons menu.
-- No extension marketplace, debugger, compiler-backed language services, Git history/branch-management UI, individual-line staging, or unsaved-buffer recovery is currently provided.
+- No extension marketplace, debugger, language services beyond document-symbol navigation, Git history/branch-management UI, individual-line staging, or unsaved-buffer recovery is currently provided.
 - Renaming and moving use existing dialogs; new-entry naming and delete confirmation are handled inside the application.
 
 ## Launch behavior

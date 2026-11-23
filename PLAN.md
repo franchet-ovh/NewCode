@@ -193,3 +193,40 @@ Rebuild and Rebuild without cache are available before connection, after failure
 Regression coverage includes menu visibility and button dispatch, configuration repair, ordered commands and short-circuiting failures, persisted storage recovery, and protected legacy migration. The opt-in `cargo test --lib dev_container::recovery_tests:: -- --ignored` check uses a local `debian:trixie` image and isolated temporary Compose projects to recover from failed builds and unstartable containers with both rebuild actions, preserving a storage sentinel and cleaning its test containers/images. It never recreates the workspace's configured container. Desktop interaction remains a manual acceptance check.
 
 Validation: 163 library tests passed (five opt-in checks skipped by default), all three Compose configuration-only checks passed, and the isolated live recovery test passed for both rebuild modes. `cargo check`, `cargo fmt --check`, and whitespace checks passed. The full library suite required execution outside the sandbox for its existing local HTTP listener tests.
+
+## File breadcrumbs and LSP document symbols (#23)
+
+The editor's shared document renderer now places a bounded breadcrumb row below
+its tabs. Folder menus preserve preview behavior, the filename opens a searchable
+symbol picker, and enclosing scopes jump through the existing character-based
+cursor/scroll mechanism. Picker results are cached and virtualized.
+
+Rust uses rust-analyzer and Python uses pylsp, installed separately. The stdio
+client synchronizes only the active unsaved buffer, coalesces edits, rejects
+obsolete responses, negotiates full/incremental changes, and converts UTF-16
+positions with a linear-time index. One server is active per editor instance;
+startup/edit delays, idle shutdown, request cancellation, bounded messages/queues,
+file/symbol limits, and disabled indexing/checking services control resource use.
+Shutdown runs away from rendering; application destruction waits for cleanup.
+Dev Container commands use the existing runtime mapping and an owned remote
+process group. No new Rust dependencies or bundled third-party code were added.
+
+Tests cover wire framing, Unicode/CRLF, configuration compatibility, full and
+incremental synchronization, nested/flat symbols, edit coalescing, stale replies,
+cancellation, missing servers, capabilities, idle shutdown/restart, sequential
+language switching, remote stdio/process-group cleanup, picker keyboard/filter
+behavior and caching, and compact/desktop breadcrumb bounds. Optional real-server
+tests use FOCUS_TEST_RUST_ANALYZER and FOCUS_TEST_PYLSP executable paths.
+
+Real-server smoke tests passed with rust-analyzer 0.3.3121 and pylsp 1.15.0,
+including unsaved symbol renames without disk writes. Small-fixture measurements
+were about 35 MiB peak RSS per server, 0.34 CPU-seconds for Rust and 0.96 for
+Python across startup, two symbol requests, and graceful shutdown. These are
+fixture measurements, not a memory ceiling or a workspace-scale benchmark.
+
+Final validation: 213 library tests and the separate-server lifecycle integration
+passed (six optional tests skipped), plus the explicitly enabled real-server smoke
+test and 18 release-script tests. Rust formatting and whitespace checks passed.
+The native/browser integration click coordinates now account for the new row.
+Container launcher stdio and process-group cleanup were exercised locally;
+a live Docker-container LSP session and a macOS run were not exercised here.

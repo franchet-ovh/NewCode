@@ -68,7 +68,12 @@ fn close_result(worker: &Worker, action: CloseAction) -> CloseResult {
 }
 
 fn replace_text(worker: &Worker, epoch: u64, text: &str) {
-    let position = egui::pos2(600.0, 105.0);
+    // Source begins below the toolbar, tabs, and breadcrumb row.
+    let metrics = crate::ui_theme::nord_light().metrics;
+    let position = egui::pos2(
+        600.0,
+        metrics.toolbar_height + metrics.tab_height + 28.0 + metrics.editor_top_padding + 10.0,
+    );
     let mut next = input(
         epoch,
         vec![
