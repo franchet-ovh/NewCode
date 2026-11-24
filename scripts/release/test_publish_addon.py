@@ -1,15 +1,64 @@
 """Independent versioning and packaging behavior without GitHub requests."""
 import json
 from pathlib import Path
+import shutil
+import tarfile
 import tempfile
 import unittest
 from unittest.mock import patch
 import tomllib
-from addon_release import RELEASE_TARGETS, assets, package_addons
+from addon_release import RELEASE_TARGETS, assets, manifests, package_addons
 import publish_addon as publisher
 
 
 class AddonReleaseTests(unittest.TestCase):
+    def test_missing_compatibility_fails_before_querying_or_reserving_a_release(self):
+        for requirement in [None, '', '   ', 42]:
+            manifest = {'id': 'first', 'version': '0.4.8', 'editor_version_req': requirement}
+            with patch.object(publisher, 'definition', return_value=(None, manifest)), patch.object(publisher, 'gh') as gh:
+                with self.assertRaisesRegex(ValueError, 'first.*editor_version_req'):
+                    publisher.reserve('first', 'a' * 40, '')
+                gh.assert_not_called()
+
+    def test_all_bundled_addons_have_compatibility_metadata_for_both_release_targets(self):
+        repo = publisher.ROOT
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            definitions = manifests(repo)
+            self.assertTrue({'lsp-python', 'lsp-rust'}.issubset({m['id'] for _, m in definitions}))
+            for path, manifest in definitions:
+                for target in RELEASE_TARGETS:
+                    with self.subTest(addon=manifest['id'], target=target):
+                        build = root / target
+                        stage = build / 'addons' / manifest['id']
+                        stage.mkdir(parents=True)
+                        (stage / 'addon.toml').write_text(f'target="{target}"\n' + path.read_text())
+                        for asset in assets(manifest):
+                            if asset == 'addon.toml':
+                                continue
+                            destination = stage / asset
+                            destination.parent.mkdir(parents=True, exist_ok=True)
+                            if asset == manifest['executable']:
+                                destination.write_bytes(b'fixture executable')
+                            else:
+                                source = path.parent / asset
+                                shutil.copyfile(source if source.is_file() else repo / asset, destination)
+                        tag = f"addon_{manifest['id']}_{manifest['version']}"
+                        output = root / 'dist' / target / manifest['id']
+                        catalog = package_addons(build, output, tag, target, repo, [manifest['id']])
+                        package = catalog['packages'][0]
+                        self.assertEqual(catalog['schema'], 2)
+                        self.assertEqual(package['editor_version_req'], manifest['editor_version_req'])
+                        self.assertTrue(package['editor_version_req'].strip())
+                        with tarfile.open(output / package['archive']) as archive:
+                            packaged = tomllib.loads(archive.extractfile('addon.toml').read().decode())
+                        self.assertEqual(packaged['editor_version_req'], manifest['editor_version_req'])
+                        # Keep rejecting a staged manifest that changes compatibility.
+                        text = (stage / 'addon.toml').read_text().replace(manifest['editor_version_req'], '>=9.0.0')
+                        (stage / 'addon.toml').write_text(text)
+                        with self.assertRaisesRegex(ValueError, 'staged editor compatibility range'):
+                            package_addons(build, output, tag, target, repo, [manifest['id']])
+
     def test_release_pagination_supports_older_gh_json_streams(self):
         pages = [[{'tag_name': 'addon_first_0.4.9', 'body': 'brackets [] and newlines\n'}],
                  [{'tag_name': 'addon_first_0.4.10', 'draft': True}], []]
@@ -74,7 +123,7 @@ class AddonReleaseTests(unittest.TestCase):
     def test_reservation_reuses_draft_and_completed_release(self):
         for draft in [True, False]:
             release = {'tag_name': 'addon_first_0.4.9', 'body': 'Addon source: ' + 'a' * 40, 'draft': draft}
-            with patch.object(publisher, 'fingerprint', return_value='fingerprint'), patch.object(publisher, 'definition', return_value=(None, {'version': '0.4.8'})), patch.dict('os.environ', GH_REPO='owner/repo'), patch.object(publisher, 'gh', return_value=json.dumps([release])) as gh:
+            with patch.object(publisher, 'fingerprint', return_value='fingerprint'), patch.object(publisher, 'definition', return_value=(None, {'id': 'first', 'version': '0.4.8', 'editor_version_req': '>=0.4.8, <0.5.0'})), patch.dict('os.environ', GH_REPO='owner/repo'), patch.object(publisher, 'gh', return_value=json.dumps([release])) as gh:
                 self.assertEqual(publisher.reserve('first', 'a' * 40, ''), ('addon_first_0.4.9', not draft))
                 gh.assert_called_once()
 
@@ -83,7 +132,7 @@ class AddonReleaseTests(unittest.TestCase):
             {'tag_name': 'addon_first_0.4.10', 'body': 'Addon inputs: newer', 'draft': False},
             {'tag_name': 'addon_first_0.4.9', 'body': 'Addon inputs: old', 'draft': False},
         ]
-        with patch.object(publisher, 'definition', return_value=(None, {'version': '0.4.8'})), patch.dict('os.environ', GH_REPO='owner/repo'):
+        with patch.object(publisher, 'definition', return_value=(None, {'id': 'first', 'version': '0.4.8', 'editor_version_req': '>=0.4.8, <0.5.0'})), patch.dict('os.environ', GH_REPO='owner/repo'):
             with patch.object(publisher, 'fingerprint', return_value='newer'), patch.object(publisher, 'gh', return_value=json.dumps(releases)) as gh:
                 self.assertEqual(publisher.reserve('first', 'a' * 40, ''), ('addon_first_0.4.10', True))
                 gh.assert_called_once()

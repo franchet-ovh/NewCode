@@ -9,6 +9,7 @@ import sys
 import tomllib
 
 from publish_addon import next_version, stable, release_pages as github_release_pages
+from addon_release import require_editor_compatibility
 
 DEFAULT_REPO = 'franchet-ovh/NewCode'
 WORKFLOW = 'addon-release.yml'
@@ -49,6 +50,7 @@ def source_version(repo, sha, addon, path):
                                '-H', 'Accept: application/vnd.github.raw+json'))
     if manifest['id'] != addon:
         raise ValueError('Addon manifest ID does not match its directory')
+    require_editor_compatibility(manifest)
     stable(manifest['version'])
     return manifest['version']
 
