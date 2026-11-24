@@ -10,6 +10,23 @@ import publish_addon as publisher
 
 
 class AddonReleaseTests(unittest.TestCase):
+    def test_release_pagination_supports_older_gh_json_streams(self):
+        pages = [[{'tag_name': 'addon_first_0.4.9', 'body': 'brackets [] and newlines\n'}],
+                 [{'tag_name': 'addon_first_0.4.10', 'draft': True}], []]
+        for output in ['\n'.join(json.dumps(page, indent=2) for page in pages),
+                       ''.join(json.dumps(page) for page in pages)]:
+            with patch.object(publisher, 'gh', return_value=' \n' + output + '\n ') as gh:
+                self.assertEqual(publisher.release_pages('owner/repo'), pages)
+                gh.assert_called_once_with('api', '--paginate', 'repos/owner/repo/releases?per_page=100')
+        with patch.object(publisher, 'gh', return_value='[]'):
+            self.assertEqual(publisher.release_pages('owner/repo'), [[]])
+
+    def test_invalid_or_incomplete_release_pages_fail_instead_of_ignoring_versions(self):
+        for output in ['', ' \n ', '{"message":"error"}', '[]\n[{', '[]\ntruncated']:
+            with patch.object(publisher, 'gh', return_value=output):
+                with self.assertRaises(ValueError):
+                    publisher.release_pages('owner/repo')
+
     def test_versions(self):
         self.assertEqual(publisher.next_version('0.4.8', []), '0.4.9')
         self.assertEqual(publisher.next_version('0.4.8', ['0.4.9', '0.5.2']), '0.5.3')
@@ -57,7 +74,7 @@ class AddonReleaseTests(unittest.TestCase):
     def test_reservation_reuses_draft_and_completed_release(self):
         for draft in [True, False]:
             release = {'tag_name': 'addon_first_0.4.9', 'body': 'Addon source: ' + 'a' * 40, 'draft': draft}
-            with patch.object(publisher, 'fingerprint', return_value='fingerprint'), patch.object(publisher, 'definition', return_value=(None, {'version': '0.4.8'})), patch.dict('os.environ', GH_REPO='owner/repo'), patch.object(publisher, 'gh', return_value=json.dumps([[release]])) as gh:
+            with patch.object(publisher, 'fingerprint', return_value='fingerprint'), patch.object(publisher, 'definition', return_value=(None, {'version': '0.4.8'})), patch.dict('os.environ', GH_REPO='owner/repo'), patch.object(publisher, 'gh', return_value=json.dumps([release])) as gh:
                 self.assertEqual(publisher.reserve('first', 'a' * 40, ''), ('addon_first_0.4.9', not draft))
                 gh.assert_called_once()
 
@@ -67,11 +84,11 @@ class AddonReleaseTests(unittest.TestCase):
             {'tag_name': 'addon_first_0.4.9', 'body': 'Addon inputs: old', 'draft': False},
         ]
         with patch.object(publisher, 'definition', return_value=(None, {'version': '0.4.8'})), patch.dict('os.environ', GH_REPO='owner/repo'):
-            with patch.object(publisher, 'fingerprint', return_value='newer'), patch.object(publisher, 'gh', return_value=json.dumps([releases])) as gh:
+            with patch.object(publisher, 'fingerprint', return_value='newer'), patch.object(publisher, 'gh', return_value=json.dumps(releases)) as gh:
                 self.assertEqual(publisher.reserve('first', 'a' * 40, ''), ('addon_first_0.4.10', True))
                 gh.assert_called_once()
             # Reverting to older inputs still needs a NEW release to reach users.
-            with patch.object(publisher, 'fingerprint', return_value='old'), patch.object(publisher, 'gh', side_effect=[json.dumps([releases]), '']) as gh:
+            with patch.object(publisher, 'fingerprint', return_value='old'), patch.object(publisher, 'gh', side_effect=[json.dumps(releases), '']) as gh:
                 self.assertEqual(publisher.reserve('first', 'a' * 40, ''), ('addon_first_0.4.11', False))
                 self.assertEqual(gh.call_count, 2)
 

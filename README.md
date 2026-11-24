@@ -44,7 +44,63 @@ Branch pushes and pull requests select affected Cargo projects, including consum
 
 After successful checks on main, changed addons publish independently as `addon_<id>_<x.y.z>`, for example `addon_github_0.4.9`. Automatic releases increment the addon's own patch version, independently of the editor. Publishing compares build-input fingerprints to avoid releasing unchanged addons. Both Linux builds must succeed before the draft becomes public. Addon releases never replace GitHub's latest editor release.
 
-For a manual release, run **Independent addon release** on `main`, select the addon, and optionally supply a stable `x.y.z` version. Without a version it increments the patch; an explicit version must exceed previous releases. Rerun a failed workflow to reuse its reserved draft/version. Release builds stamp only that addon's manifest and lockfile in the isolated checkout, without committing version changes to main. To reproduce one from source, check out its tag, run `python3 scripts/release/publish_addon.py stamp --addon github --tag addon_github_0.4.9`, then build with `scripts/addons.py`.
+For a manual release, run **Independent addon release** on `main`, enter the addon ID, and optionally supply a stable `x.y.z` version. Without a version it increments the patch; an explicit version must exceed previous releases. Rerun a failed workflow to reuse its reserved draft/version. Release builds stamp only that addon's manifest and lockfile in the isolated checkout, without committing version changes to main. To reproduce one from source, check out its tag, run `python3 scripts/release/publish_addon.py stamp --addon github --tag addon_github_0.4.9`, then build with `scripts/addons.py`.
+
+Alternatively, use the interactive release helper (Python 3.11+ and authenticated
+GitHub CLI `gh` required):
+
+```sh
+python3 scripts/release/release_addon.py
+python3 scripts/release/release_addon.py --addon github
+python3 scripts/release/release_addon.py --addon github --version 0.5.0
+python3 scripts/release/release_addon.py --addon github --minor
+python3 scripts/release/release_addon.py --addon github --addon codex --patch
+python3 scripts/release/release_addon.py --all --patch
+```
+
+Omitting both `--addon` and `--all` offers an addon list, including language addons.
+Repeat `--addon` to select several, or use `--all` to select every discovered addon.
+`--major`, `--minor`, or `--patch` automatically calculates the next version for
+each selected addon independently, using its own highest source or released/reserved
+version. These flags and `--version` are mutually exclusive; `--all` and `--addon`
+are also mutually exclusive. An explicit `--version` applies to every selected addon
+and must be valid for all of them.
+
+Without a version or bump flag, the helper offers SemVer patch, minor, major, and
+custom choices for each selected addon; Enter selects
+patch. For example, after `0.4.9` these are `0.4.10`, `0.5.0`, and `1.0.0`.
+Choose patch for compatible fixes, minor for compatible features, and major for
+incompatible changes. Versions remain stable `x.y.z`; prereleases are not supported
+by the publishing workflow. Noninteractive use requires `--addon` or `--all`, plus
+`--version` or a bump flag. Use `--repo owner/repo` to select another repository
+with this workflow.
+
+The helper reads the remote `main` manifest and all existing release pages,
+including reserved drafts, and uses the highest version as the bump baseline.
+After validating all selected versions, the helper checks the manual inputs
+declared by the remote workflow, including allowed addon/version choices, before
+launching any workflows. If a selected addon is not allowed, the entire batch
+stops and identifies the workflow change to merge into `main`; it does not skip
+addons or start a partial batch. When
+`source-sha` is supported, builds are pinned to the same inspected `main` commit.
+Older workflows receive only `addon` and `version` and build `main` at dispatch
+time; the helper reports this behavior before dispatching. Local edits and version files
+are untouched. If dispatch fails partway through, it stops and lists successful
+dispatches and addons not attempted. The helper reports
+dispatch success and the workflow link; follow that link for build/publish status.
+Merge the workflow changes into `main` to enable source pinning and a free-form
+addon ID for manual releases, including language addons. A local workflow edit
+does not update GitHub's workflow until it is merged into `main`. If another
+release reserves the selected version first, the workflow will reject the
+conflict; select a newer version or rerun the original failed workflow.
+
+If an earlier batch already dispatched some addons, release only the remaining
+ones rather than rerunning `--all`. For example, after `codex` and `github` have
+been dispatched, merge the workflow update and resume with:
+
+```sh
+python3 scripts/release/release_addon.py --addon lsp-python --addon lsp-rust --addon opencode --patch
+```
 
 
 ## Build and run
