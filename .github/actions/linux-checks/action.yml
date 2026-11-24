@@ -76,10 +76,10 @@ runs:
         trap 'echo "${COMPONENT} (${TARGET}): ${SECONDS}s" >> "$GITHUB_STEP_SUMMARY"' EXIT
         project="${{ steps.project.outputs.path }}"
         cargo fmt --check --manifest-path "$project/Cargo.toml"
-        cargo test --offline --manifest-path "$project/Cargo.toml" --target-dir "$GITHUB_WORKSPACE/target" --target "$TARGET"
+        cargo test --manifest-path "$project/Cargo.toml" --target-dir "$GITHUB_WORKSPACE/target" --target "$TARGET"
         if [ "$BUILD_RELEASE" = true ]; then
           if [ "$COMPONENT" = editor ]; then
-            cargo build --offline --release --bins --target "$TARGET"
+            cargo build --release --bins --target "$TARGET"
           else
             python3 scripts/addons.py --release --target "$TARGET" --addon "$COMPONENT"
           fi
