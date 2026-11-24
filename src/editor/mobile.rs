@@ -17,6 +17,7 @@ pub(super) enum MobilePanel {
     Git,
     Terminal,
     Logs,
+    Problems,
     Manager,
     LeftAddon(String),
     RightAddon(String),
@@ -72,6 +73,7 @@ impl EditorApp {
             }
             MobilePanel::Terminal => self.bottom_tab = Tab::Terminal,
             MobilePanel::Logs => self.bottom_tab = Tab::Logs,
+            MobilePanel::Problems => self.bottom_tab = Tab::Problems,
             MobilePanel::Editor => {
                 // Desktop central content follows the sidebar selection. Returning
                 // from the phone's Editor must keep the document in the center.
@@ -130,6 +132,7 @@ impl EditorApp {
             MobilePanel::Git => "Source Control",
             MobilePanel::Terminal => "Terminal",
             MobilePanel::Logs => "Logs",
+            MobilePanel::Problems => "Problems",
             MobilePanel::Manager => "Addon Manager",
             MobilePanel::LeftAddon(id) | MobilePanel::RightAddon(id) => addons
                 .iter()
@@ -245,16 +248,16 @@ impl EditorApp {
                             .inner_margin(8)
                             .show(ui, |ui| self.addons.right_content(ui, &id));
                     }
-                    MobilePanel::Terminal | MobilePanel::Logs => {
+                    MobilePanel::Terminal | MobilePanel::Logs | MobilePanel::Problems => {
                         let cwd = self.settings.workspace.clone();
                         let runtime = self.dev_container.runtime().cloned();
                         egui::Frame::new().inner_margin(8).show(ui, |ui| {
                             self.shell_content(ui, cwd.as_deref(), runtime.as_ref())
                         });
-                        self.mobile.panel = Some(if self.bottom_tab == Tab::Terminal {
-                            MobilePanel::Terminal
-                        } else {
-                            MobilePanel::Logs
+                        self.mobile.panel = Some(match self.bottom_tab {
+                            Tab::Terminal => MobilePanel::Terminal,
+                            Tab::Logs => MobilePanel::Logs,
+                            Tab::Problems => MobilePanel::Problems,
                         });
                     }
                 });
@@ -308,6 +311,7 @@ impl EditorApp {
                             (MobilePanel::Git, "Source Control".to_owned()),
                             (MobilePanel::Terminal, "Terminal".to_owned()),
                             (MobilePanel::Logs, "Logs".to_owned()),
+                            (MobilePanel::Problems, "Problems".to_owned()),
                             (MobilePanel::Manager, "Addon Manager".to_owned()),
                         ];
                         entries.extend(addons.iter().map(|(id, name, side)| {

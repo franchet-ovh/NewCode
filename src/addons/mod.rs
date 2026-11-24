@@ -3,6 +3,7 @@ mod assistant;
 mod catalog;
 mod credentials;
 mod installation;
+mod language;
 mod manager;
 mod packages;
 mod process;
@@ -67,6 +68,11 @@ struct Credentials {
 }
 
 pub(crate) struct Addons {
+    pub language: Option<crate::lsp::Provider>,
+    language_session: u64,
+    language_idle: Option<(PathBuf, String, usize)>,
+    language_retiring: Option<language::Retiring>,
+    language_paths: BTreeMap<PathBuf, PathBuf>,
     pub entries: Vec<Addon>,
     pub active: Option<String>,
     pub detail: bool,
@@ -96,6 +102,11 @@ impl Default for Addons {
             .as_ref()
             .map(|directory| directory.path().to_path_buf());
         Self {
+            language: None,
+            language_session: 0,
+            language_idle: None,
+            language_retiring: None,
+            language_paths: BTreeMap::new(),
             entries: vec![],
             active: None,
             detail: false,
@@ -183,6 +194,9 @@ impl Addons {
         self.context.runtime = runtime.map(Into::into);
         self.runtime = runtime.cloned();
         self.context.generation = self.context.generation.wrapping_add(1);
+        self.stop_language();
+        self.language_idle = None;
+        self.language_paths.clear();
         self.cancel_assistant_requests();
         self.generation
             .store(self.context.generation, Ordering::SeqCst);
@@ -348,6 +362,7 @@ impl Addons {
         }
         let mut tasks = Vec::new();
         let mut assistant_events = Vec::new();
+        let mut language_events = Vec::new();
         for addon in &mut self.entries {
             let mut failure = None;
             if let Some(process) = &mut addon.process {
@@ -386,11 +401,33 @@ impl Addons {
                                 {
                                     failure = Some("Unsupported addon UI surface version".into());
                                 } else {
-                                    process.ready = true;
+                                    if !addon.manifest.languages.is_empty()
+                                        && message
+                                            .result
+                                            .as_ref()
+                                            .and_then(|v| v["language"].as_u64())
+                                            != Some(1)
+                                    {
+                                        failure = Some(
+                                            "Addon does not support language protocol 1".into(),
+                                        );
+                                    } else {
+                                        process.ready = true;
+                                    }
                                 }
                             } else {
                                 failure = Some("Addon protocol handshake failed".into());
                             }
+                        }
+                        Some(
+                            "lsp.started" | "lsp.stopped" | "lsp.status" | "lsp.message"
+                            | "lsp.retry",
+                        ) => {
+                            language_events.push((
+                                addon.manifest.id.clone(),
+                                addon.incarnation,
+                                message,
+                            ));
                         }
                         Some("assistant.capabilities") | None => {
                             assistant_events.push((
@@ -491,6 +528,13 @@ impl Addons {
         for (addon, incarnation, message) in assistant_events {
             self.assistant_event(addon, incarnation, message);
         }
+        for (addon, incarnation, message) in language_events {
+            self.language_event(&addon, incarnation, message);
+        }
+        self.poll_language();
+        if self.language_retiring.is_some() {
+            ctx.request_repaint_after(Duration::from_millis(50));
+        }
         for task in tasks {
             if task.call.generation != self.context.generation {
                 self.respond(task, ServiceReply::error("context", "Workspace changed"));
@@ -513,7 +557,16 @@ impl Addons {
             }
         }
         if self.entries.iter().any(|a| a.process.is_some()) {
-            ctx.request_repaint_after(Duration::from_millis(100));
+            let interval = if self
+                .entries
+                .iter()
+                .any(|a| a.process.is_some() && a.manifest.languages.is_empty())
+            {
+                100
+            } else {
+                30_000
+            };
+            ctx.request_repaint_after(Duration::from_millis(interval));
         }
         self.poll_assistants();
         changed

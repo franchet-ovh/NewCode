@@ -21,6 +21,7 @@ mod disk_changes;
 mod document_paths;
 mod documents;
 mod explorer;
+mod language;
 mod layout;
 mod logs;
 mod mobile;

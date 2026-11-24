@@ -274,3 +274,32 @@ fn unavailable_workspace_storage_never_falls_back_to_shared_data() {
     host.storage_root = None;
     assert!(host.addon_storage("codex").is_err());
 }
+
+#[test]
+fn language_manifests_validate_extensions_without_affecting_existing_addons() {
+    let fixture = Fixture::new();
+    assert!(fixture.manifest().languages.is_empty());
+    let path = fixture.0.join("addon.toml");
+    let original = fs::read_to_string(&path).unwrap();
+    fs::write(
+        &path,
+        format!("{original}\n[[languages]]\nid='python'\nextensions=['py','pyi']\n"),
+    )
+    .unwrap();
+    assert_eq!(
+        load_manifest(&path).unwrap().languages[0].extensions,
+        ["py", "pyi"]
+    );
+    for extensions in ["[]", "['../py']", "['py','py']", "['']"] {
+        fs::write(
+            &path,
+            format!("{original}\n[[languages]]\nid='python'\nextensions={extensions}\n"),
+        )
+        .unwrap();
+        assert!(
+            load_manifest(&path)
+                .unwrap_err()
+                .contains("language extension")
+        );
+    }
+}

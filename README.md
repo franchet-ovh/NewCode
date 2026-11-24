@@ -444,42 +444,86 @@ or an enclosing symbol to jump to its declaration. In the symbol picker, use
 Up/Down and Enter to select, or Escape to dismiss. Symbols follow unsaved edits.
 File breadcrumbs work without a language server and for every text-file type.
 
-Rust symbols use `rust-analyzer`; Python (`.py`/`.pyi`) uses `pylsp` from
-`python-lsp-server`. Install these separately in your normal development
-environment, for example `rustup component add rust-analyzer` and
-`pipx install python-lsp-server`. Servers must be on PATH. For a connected Dev
-Container, install the servers and `setsid` (usually supplied by `util-linux`)
-inside that container. Files outside its mounted workspace use host servers.
-The application never downloads servers automatically. Missing or failed servers
-show an explanation and Retry in the filename's symbol menu.
+### Language addons and Problems
+
+Install **Rust** (`lsp-rust`) and/or **Python** (`lsp-python`) from **Addons**.
+A language server only runs when its addon is installed and enabled. The addon
+owns server installation, configuration, and process cleanup. The existing
+extension-based syntax coloring remains available without addons, including `.pyi`.
+
+Both addons provide autocomplete, type checking, linting, formatting, and document
+symbols. Autocomplete follows typing after 300 ms, or use **Ctrl+Space**. Use
+Up/Down to select, Enter/Tab to accept, and Escape to dismiss. Right-click the
+editor and choose **Format Document**; formatting changes the buffer in one undo
+step and does not save it automatically. Completion currently inserts plain text;
+interactive snippets are not supported.
+
+The **Problems** tab beside Terminal and Logs lists reported errors and warnings
+with their source, file, and position. Filter the list or click a problem to open
+its location. Red error and amber warning dots and straight underlines mark
+visible source lines; hover an underline for its message. Editing invalidates old
+results, and stopping/disabling a language addon clears its problems.
+
+On first use, the addon automatically installs missing server dependencies:
+
+- Rust uses rust-analyzer, Cargo/Clippy checks on save, and rustfmt. Install a Rust
+  toolchain with rustup first; the addon adds missing language-tool components.
+- Python uses pylsp/Jedi, mypy type checking on save, Pyflakes/pycodestyle linting,
+  and autopep8 formatting. Provide Python 3.9+ with `venv` support and either `ensurepip` or pip with `--python` support. The addon reuses
+  a compatible environment or installs pinned direct dependencies in private
+  workspace addon storage. A project `.venv` is detected for analysis; an explicit
+  interpreter may be set in `[addon_state.lsp-python]` as `interpreter`.
+
+For a connected Dev Container, installation and execution happen inside the
+container, using its configured user. Containers also need `setsid` and `flock`
+(normally from `util-linux`). Python tooling is cached below that user's
+`~/.cache/focus-editor/`; host executable paths are not copied into the container.
+Files outside the mounted workspace use local tools. Installation failures show
+progress/error details and **Retry** in the addon panel or filename symbol menu;
+backend diagnostics appear under Logs → Addons.
 
 Optional overrides belong in the workspace's saved `settings.toml` (close the
 application before editing it):
 
 ```toml
 [lsp]
-enabled = true # false disables both servers
+enabled = true
 
-[lsp.rust]
-command = "rust-analyzer"
-args = []
-
-[lsp.python]
+[lsp.servers.lsp-python]
 command = "/path/to/venv/bin/pylsp"
 args = []
+
+# Only needed if multiple enabled addons claim this extension:
+[lsp.providers]
+py = "lsp-python"
 ```
 
-Only one server runs per editor instance, with only the active document open.
-Startup is delayed 300 ms, edit synchronization is debounced by 500 ms, and
-servers stop after two minutes without document/caret/symbol-picker activity.
-Opening the picker restarts an idle server. Switching languages shuts down the
-old server first. Symbol navigation skips files larger than 1 MiB and caps
-responses at 8 MiB and 20,000 symbols. Picker results are cached and virtualized.
+An explicit command override bypasses provisioning; its environment must contain
+the required plugins. Existing custom `[lsp.rust]` and `[lsp.python]` commands
+are imported into addon overrides. `[lsp].enabled = false` disables all language
+servers. When multiple addons claim a file extension, choose one in the editor's
+context menu; the selection is saved per workspace.
 
-This LSP integration supplies document symbols, not completion, references,
-rename, diagnostics, or cross-file definitions. Rust uses standalone-file
-analysis with two workers and a small syntax cache; Cargo project discovery,
-sysroot loading, checks on save, build scripts, macro expansion, and cache
-priming are disabled. Python's bundled linting/formatting and unused features
-are disabled. These settings reduce resource use; external servers do not have
-a hard OS-enforced memory limit. No Node.js runtime is required.
+Only one server runs per editor instance, tracking open buffers of its language,
+including inactive unsaved files. Switching languages waits for server cleanup.
+Edits synchronize after 500 ms, and completion/format requests flush the current
+buffer first. Servers stop after two minutes without document/caret/picker
+activity. Opening the picker or editing restarts an idle server. Files larger
+than 1 MiB skip language features. Server frames are bounded to 3 MiB, symbols
+and diagnostics to 20,000 entries, and displayed completion candidates to 200.
+Problems rows and source markers render only their visible content.
+
+Rust project discovery and checks are enabled, with two analysis workers and
+cache priming disabled. Expensive checks run on save; inexpensive server syntax
+and lint results may arrive sooner. External servers have no hard OS memory
+ceiling. References, rename, quick fixes, semantic highlighting, and VS Code
+extension compatibility are outside this integration.
+
+
+After building the addons, `python3 scripts/language-smoke.py --fake` exercises
+both bridges without downloads; add `--fake-container` to test remote command
+and process cleanup with a Docker shim. Omit `--fake` to exercise real servers
+and automatic provisioning in temporary storage, or pass `--rust-server` /
+`--python-server` for existing installations. `--data-root /tmp/focus-language-tools`
+preserves downloaded test dependencies between runs. Real Dev Container smoke
+tests still require a Docker daemon and suitable container toolchains.

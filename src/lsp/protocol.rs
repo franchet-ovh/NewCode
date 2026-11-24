@@ -1,72 +1,21 @@
 //! Small, bounded LSP wire and position helpers. Offsets in the editor are characters.
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::io::{self, BufRead, Read, Write};
 
-pub(super) const MAX_MESSAGE: usize = 8 * 1024 * 1024;
-pub(super) const MAX_SYMBOLS: usize = 20_000;
-
-pub(super) fn read_message(reader: &mut impl BufRead) -> io::Result<Option<Value>> {
-    let mut length = None;
-    let mut total = 0;
-    loop {
-        let mut line = Vec::new();
-        let read = reader.take(8193).read_until(b'\n', &mut line)?;
-        if read == 0 && total == 0 {
-            return Ok(None);
-        }
-        total += read;
-        if read == 0 || total > 8192 || !line.ends_with(b"\r\n") {
-            return Err(io::Error::other("Invalid LSP header"));
-        }
-        if line == b"\r\n" {
-            break;
-        }
-        let line = std::str::from_utf8(&line).map_err(io::Error::other)?;
-        let (key, value) = line
-            .split_once(':')
-            .ok_or_else(|| io::Error::other("Invalid LSP header"))?;
-        if key.eq_ignore_ascii_case("Content-Length") {
-            if length.is_some() {
-                return Err(io::Error::other("Duplicate LSP length"));
-            }
-            length = Some(value.trim().parse::<usize>().map_err(io::Error::other)?);
-        }
-    }
-    let length = length
-        .filter(|n| *n <= MAX_MESSAGE)
-        .ok_or_else(|| io::Error::other("Missing or oversized LSP length"))?;
-    let mut bytes = vec![0; length];
-    reader.read_exact(&mut bytes)?;
-    let value: Value = serde_json::from_slice(&bytes).map_err(io::Error::other)?;
-    if value.get("jsonrpc").and_then(Value::as_str) != Some("2.0") {
-        return Err(io::Error::other("Invalid JSON-RPC version"));
-    }
-    Ok(Some(value))
-}
-
-pub(super) fn write_message(writer: &mut impl Write, value: &Value) -> io::Result<()> {
-    let bytes = serde_json::to_vec(value)?;
-    if bytes.len() > MAX_MESSAGE {
-        return Err(io::Error::other("LSP message too large"));
-    }
-    write!(writer, "Content-Length: {}\r\n\r\n", bytes.len())?;
-    writer.write_all(&bytes)?;
-    writer.flush()
-}
+pub(crate) const MAX_SYMBOLS: usize = 20_000;
 
 #[derive(Clone, Copy, Default, Debug, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
-pub(super) struct Position {
+pub(crate) struct Position {
     pub line: u32,
     pub character: u32,
 }
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
-pub(super) struct Range {
+pub(crate) struct Range {
     pub start: Position,
     pub end: Position,
 }
 
-pub(super) fn position(text: &str, offset: usize) -> Position {
+pub(crate) fn position(text: &str, offset: usize) -> Position {
     let mut p = Position::default();
     for ch in text.chars().take(offset) {
         if ch == '\n' {
@@ -78,12 +27,12 @@ pub(super) fn position(text: &str, offset: usize) -> Position {
     }
     p
 }
-struct Positions {
+pub(crate) struct Positions {
     units: Vec<u32>,
     lines: Vec<(usize, usize)>,
 }
 impl Positions {
-    fn new(text: &str) -> Self {
+    pub(crate) fn new(text: &str) -> Self {
         let mut units = vec![0];
         let mut count = 0u32;
         for ch in text.chars() {
@@ -107,7 +56,7 @@ impl Positions {
         }
         Self { units, lines }
     }
-    fn offset(&self, p: Position) -> Option<usize> {
+    pub(crate) fn offset(&self, p: Position) -> Option<usize> {
         let (start, len) = *self.lines.get(p.line as usize)?;
         if p.character as usize > len {
             return None;
@@ -116,8 +65,7 @@ impl Positions {
         (offset != u32::MAX).then_some(offset as usize)
     }
 }
-#[cfg(test)]
-pub(super) fn offset(text: &str, p: Position) -> Option<usize> {
+pub(crate) fn offset(text: &str, p: Position) -> Option<usize> {
     Positions::new(text).offset(p)
 }
 
@@ -133,7 +81,7 @@ pub(crate) struct Symbol {
     pub enclosing: bool,
 }
 
-pub(super) fn symbols(value: &Value, text: &str, uri: &str) -> Result<Vec<Symbol>, String> {
+pub(crate) fn symbols(value: &Value, text: &str, uri: &str) -> Result<Vec<Symbol>, String> {
     fn walk(
         value: &Value,
         positions: &Positions,
@@ -222,7 +170,7 @@ pub(super) fn symbols(value: &Value, text: &str, uri: &str) -> Result<Vec<Symbol
 }
 
 /// One replacement spanning the changed middle, computed on Unicode boundaries.
-pub(super) fn change(old: &str, new: &str) -> Value {
+pub(crate) fn change(old: &str, new: &str) -> Value {
     let mut prefix = old
         .chars()
         .zip(new.chars())

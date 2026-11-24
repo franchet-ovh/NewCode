@@ -33,6 +33,7 @@ impl EditorLayoutCache {
 
 impl EditorApp {
     pub(super) fn text_view(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
+        self.language_keys(ctx);
         let path = self.active_file.clone().unwrap();
         let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
         let find_query = if self.find_open {
@@ -210,6 +211,9 @@ impl EditorApp {
                         if changed {
                             ui.ctx().request_repaint();
                         }
+                        self.paint_language_diagnostics(ui, &edit, gutter_rect, source_clip);
+                        self.completion_ui(ui, &edit);
+                        self.language_context_menu(&edit.response);
                         edit.response
                     })
                     .inner;

@@ -9,12 +9,15 @@ use std::{
 
 mod assistant;
 pub use assistant::*;
+pub mod language;
 
 pub const PROTOCOL_VERSION: u32 = 1;
 pub const MAX_MESSAGE: usize = 8 * 1024 * 1024;
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct Manifest {
+    #[serde(default)]
+    pub languages: Vec<language::Language>,
     pub id: String,
     pub name: String,
     pub version: String,
