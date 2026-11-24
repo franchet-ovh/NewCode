@@ -107,6 +107,16 @@ impl EditorApp {
         ui.horizontal(|ui| {
             ui.selectable_value(&mut self.bottom_tab, super::logs::Tab::Terminal, "Terminal");
             ui.selectable_value(&mut self.bottom_tab, super::logs::Tab::Logs, "Logs");
+            let count = self
+                .addons
+                .language
+                .as_ref()
+                .map_or(0, |p| p.diagnostics.values().map(Vec::len).sum::<usize>());
+            ui.selectable_value(
+                &mut self.bottom_tab,
+                super::logs::Tab::Problems,
+                format!("Problems ({count})"),
+            );
             if self.bottom_tab == super::logs::Tab::Terminal {
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     if theme::button(ui, Icon::Refresh, "", theme::colors(ui).accent, false)
@@ -131,7 +141,11 @@ impl EditorApp {
             ctx.data_mut(|data| {
                 data.remove::<egui::Rect>(super::terminal_input::terminal_id().with("rect"))
             });
-            self.logs.ui(ui);
+            if self.bottom_tab == super::logs::Tab::Problems {
+                self.problems_ui(ui);
+            } else {
+                self.logs.ui(ui);
+            }
         }
     }
 }

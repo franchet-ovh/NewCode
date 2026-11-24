@@ -54,6 +54,9 @@ runs:
           addons/codex -> ../../target
           addons/opencode -> ../../target
           addons/github -> ../../target
+          crates/language-addon -> ../../target
+          addons/lsp-rust -> ../../target
+          addons/lsp-python -> ../../target
     - name: Check Rust formatting
       shell: bash
       run: cargo fmt --check
@@ -70,6 +73,16 @@ runs:
       env:
         TARGET: ${{ inputs.target }}
       run: python3 scripts/addons.py --test --target "$TARGET"
+    - name: Test language addon bridges
+      shell: bash
+      env:
+        TARGET: ${{ inputs.target }}
+      run: |
+        python3 scripts/addons.py --addon lsp-rust --addon lsp-python --target "$TARGET"
+        python3 scripts/language-smoke.py --fake --binary-dir "target/$TARGET/debug"
+        python3 scripts/language-smoke.py --fake --fake-container --binary-dir "target/$TARGET/debug"
+        python3 scripts/language-smoke.py --fake --fake-provision --language rust --binary-dir "target/$TARGET/debug"
+        python3 scripts/language-smoke.py --fake --fake-provision --fake-install-failure --language rust --binary-dir "target/$TARGET/debug"
     - name: Build optimized executables
       if: inputs.build-release == 'true'
       env:

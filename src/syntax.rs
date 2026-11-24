@@ -5,7 +5,7 @@ use eframe::egui::{FontId, TextFormat, text::LayoutJob};
 pub(crate) fn language(ext: &str) -> (&'static str, &'static str) {
     match ext {
         "rs" => ("Rust", "rust"),
-        "py" => ("Python", "python"),
+        "py" | "pyi" => ("Python", "python"),
         "js" => ("JavaScript", "js"),
         "jsx" => ("JavaScript JSX", "js"),
         "ts" => ("TypeScript", "js"),

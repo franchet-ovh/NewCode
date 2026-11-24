@@ -27,7 +27,7 @@ def main():
     selected = [(p,m) for p,m in manifests(ROOT) if not args.addon or m["id"] in args.addon]
     projects = [p.parent / "Cargo.toml" for p, _ in selected]
     if args.test:
-        projects = [ROOT / "crates/addon-sdk/Cargo.toml", ROOT / "crates/addon-support/Cargo.toml"] + projects
+        projects = [ROOT / "crates/addon-sdk/Cargo.toml", ROOT / "crates/addon-support/Cargo.toml", ROOT / "crates/language-addon/Cargo.toml"] + projects
     for project in projects:
         if args.test:
             subprocess.run(["cargo", "fmt", "--check", "--manifest-path", str(project)], cwd=ROOT, check=True)

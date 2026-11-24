@@ -10,6 +10,7 @@ use std::{
 
 #[derive(Default)]
 pub(super) struct Navigation {
+    pub(super) problems_query: String,
     pub client: lsp::Client,
     query: String,
     selected: usize,
@@ -30,15 +31,58 @@ impl EditorApp {
                     .map(|c| c.primary.index.0)
             })
             .unwrap_or(0);
-        self.navigation.client.tick(
-            self.active_file.as_deref(),
+        let Some(path) = self.active_file.clone() else {
+            self.addons.stop_language();
+            self.navigation.client.output = Default::default();
+            return;
+        };
+        // Import legacy custom commands once; defaults now belong to the addons.
+        for (id, old, default) in [
+            ("lsp-rust", &self.settings.lsp.rust, "rust-analyzer"),
+            ("lsp-python", &self.settings.lsp.python, "pylsp"),
+        ] {
+            if old.command != default || !old.args.is_empty() {
+                self.settings
+                    .lsp
+                    .servers
+                    .entry(id.into())
+                    .or_insert_with(|| old.clone());
+            }
+        }
+        let buffer = &self.buffer;
+        let unsaved = &self.unsaved_files;
+        let disk = &self.disk_changes;
+        let dirty = self.dirty;
+        let documents = self
+            .open_files
+            .iter()
+            .filter_map(|p| {
+                let text = if p == &path {
+                    Some(buffer.as_str())
+                } else {
+                    unsaved
+                        .get(p)
+                        .map(String::as_str)
+                        .or_else(|| disk.cached_text_ref(p))
+                }?;
+                Some((
+                    p.clone(),
+                    text,
+                    p == &path && dirty || unsaved.contains_key(p),
+                ))
+            })
+            .collect();
+        self.navigation.client.output = self.addons.update_language(
+            &path,
             &self.buffer,
-            self.settings.workspace.as_deref(),
-            self.dev_container.runtime(),
-            &self.settings.lsp,
             cursor,
+            documents,
+            &self.settings.lsp,
+            std::mem::take(&mut self.navigation.client.wake),
+            std::mem::take(&mut self.navigation.client.restart),
             ctx,
         );
+        self.apply_language_changes(ctx);
     }
     pub(super) fn navigation_row(&mut self, ui: &mut egui::Ui) {
         let Some(path) = self.active_file.clone() else {
