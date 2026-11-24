@@ -47,7 +47,7 @@ class ReleaseAddonTests(unittest.TestCase):
     def invoke(self, args=(), answers=(), interactive=True, releases=None, source='0.4.8',
                addon='github', failure=None, available=True, responses=None, workflow=PINNED_WORKFLOW):
         replies = list(responses) if responses is not None else [
-            '', SHA, json.dumps(TREE), f'id="{addon}"\nversion="{source}"',
+            '', SHA, json.dumps(TREE), f'id="{addon}"\nversion="{source}"\neditor_version_req=">=0.4.8, <0.5.0"',
             page_stream(releases or [[]]), workflow, '']
         if failure:
             replies[failure[0]] = RuntimeError(failure[1])
@@ -65,13 +65,22 @@ class ReleaseAddonTests(unittest.TestCase):
     def assert_no_dispatch(self, gh):
         self.assertFalse(any(call.args[:2] == ('workflow', 'run') for call in gh.call_args_list))
 
+    def test_missing_compatibility_in_remote_manifest_stops_the_whole_batch(self):
+        replies = self.batch_replies()
+        # The last addon lacks compatibility metadata, matching the failed runs.
+        replies[6] = 'id="lsp-rust"\nversion="0.4.8"'
+        code, _, err, gh = self.invoke(['--all', '--patch'], interactive=False, responses=replies)
+        self.assertEqual(code, 1)
+        self.assertIn('lsp-rust must declare a nonempty editor_version_req', err)
+        self.assert_no_dispatch(gh)
+
     def batch_replies(self, selected=('codex', 'github', 'lsp-rust'), workflow=PINNED_WORKFLOW):
         sources = {'codex': '0.4.8', 'github': '1.5.0', 'lsp-rust': '0.2.0'}
         pages = [[release('addon_codex_0.8.9', draft=True), release('addon_github_2.3.4')],
                  [release('addon_lsp-rust_0.1.5')]]
         replies = ['', SHA, json.dumps(TREE)]
         for index, addon in enumerate(selected):
-            replies.append(f'id="{addon}"\nversion="{sources[addon]}"')
+            replies.append(f'id="{addon}"\nversion="{sources[addon]}"\neditor_version_req=">=0.4.8, <0.5.0"')
             if index == 0:
                 replies.append(page_stream(pages))
         return replies + [workflow] + [''] * len(selected)

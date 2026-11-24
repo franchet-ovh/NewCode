@@ -8,7 +8,7 @@ from pathlib import Path
 import re
 import subprocess
 import tomllib
-from addon_release import manifests, package_addons, RELEASE_TARGETS, index_name, digest, archive_name
+from addon_release import manifests, package_addons, RELEASE_TARGETS, index_name, digest, archive_name, require_editor_compatibility
 from prepare_version import replace_version, release_version
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -119,6 +119,7 @@ def fingerprint(addon, sha):
 
 def reserve(addon, sha, explicit):
     _, manifest = definition(addon)
+    require_editor_compatibility(manifest)
     prefix = f'addon_{addon}_'
     pages = release_pages(os.environ['GH_REPO'])
     releases = [r for page in pages for r in page if r['tag_name'].startswith(prefix)

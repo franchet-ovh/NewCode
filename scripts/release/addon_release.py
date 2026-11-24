@@ -54,6 +54,13 @@ def digest(path):
         return hashlib.file_digest(stream, "sha256").hexdigest()
 
 
+def require_editor_compatibility(manifest):
+    requirement = manifest.get("editor_version_req")
+    if not isinstance(requirement, str) or not requirement.strip():
+        raise ValueError(f"Addon {manifest.get('id', '<unknown>')} must declare a nonempty editor_version_req for independent releases")
+    return requirement
+
+
 def package_addons(binary_directory, destination, tag, target, root=Path("."), selected=None):
     destination.mkdir(parents=True, exist_ok=True)
     packages = []
@@ -64,8 +71,10 @@ def package_addons(binary_directory, destination, tag, target, root=Path("."), s
         manifest = tomllib.loads((source / "addon.toml").read_text())
         if manifest["target"] != target or any(manifest[key] != definition[key] for key in ("id", "version", "protocol", "executable", "icon")):
             raise ValueError("Staged addon identity/platform mismatch")
-        if selected is not None and (not manifest.get("editor_version_req") or manifest.get("editor_version_req") != definition.get("editor_version_req")):
-            raise ValueError("Missing or mismatched editor compatibility range")
+        if selected is not None:
+            expected = require_editor_compatibility(definition)
+            if require_editor_compatibility(manifest) != expected:
+                raise ValueError(f"Addon {manifest['id']} staged editor compatibility range does not match its source manifest")
         name = archive_name(tag, target, manifest["id"])
         path = destination / name
         with tarfile.open(path, "w:gz", format=tarfile.PAX_FORMAT) as archive:
