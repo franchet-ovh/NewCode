@@ -149,6 +149,7 @@ Installed addons live beside the logs directory:
 ~/.local/share/focus-editor/
 ├── logs/
 ├── addons/github/       # executables and assets
+├── editor-settings.toml # global editor defaults and file-type preferences
 ├── workspaces/<id>/
 │   ├── settings.toml    # workspace settings, tabs, and addon activation
 │   └── addon-data/      # workspace-specific non-secret addon state
@@ -209,7 +210,64 @@ Temporarily disable an addon for one launch:
 cargo run --release -- --no-addon codex ~/projects/my-app
 ```
 
-The first build downloads crates from crates.io. Launching without a folder opens an empty explorer and editor. Click **Workspace** to select a folder and restore its saved tabs and settings. Each workspace has its own `workspaces/<id>/settings.toml` under the application data root, beside logs and installed addons. The ID is a hash of the canonical folder path, so symlink aliases share a workspace. Addon installation is shared; enablement, dock settings, and addon data are workspace-specific. Switching workspaces prompts to save or discard unsaved edits, or cancel. Settings are read only from workspace records; old global settings and shared addon data are ignored.
+The first build downloads crates from crates.io. Launching without a folder opens an empty explorer and editor. Click **Workspace** to select a folder and restore its saved tabs and settings. Each workspace has its own `workspaces/<id>/settings.toml` under the application data root, beside logs and installed addons. The ID is a hash of the canonical folder path, so symlink aliases share a workspace. Addon installation is shared; enablement, dock settings, and addon data are workspace-specific. Switching workspaces prompts to save or discard unsaved edits, or cancel. Editor indentation preferences also have a global `editor-settings.toml`; session state remains workspace-specific. Old global session settings and shared addon data are ignored.
+
+### Tabs and indentation
+
+Open **Edit → Indentation Settings…**, or click the indentation status widget, to
+edit **Global** or **Workspace** preferences. Choose **All file types** for defaults
+or a file type for specific overrides. Each value can inherit independently;
+uncheck its override or choose **Reset to inherited** to remove it. Changes apply
+immediately and persist. With no workspace, global preferences still apply.
+
+Values resolve in this order, with later values winning: built-in defaults,
+global defaults, global file-type overrides, matching `.editorconfig` properties,
+workspace defaults, workspace file-type overrides. Workspace overrides therefore
+take priority over `.editorconfig`. EditorConfig rules are refreshed on file
+activation and checked once per second while an editor is visible.
+
+- `tab_size` sets the distance between visual tab stops. At column 6 with a tab
+  size of 4, a literal tab advances two columns to column 8 (columns here start at zero).
+- `indent_size` sets the columns added or removed by block indentation.
+- `insert_spaces` controls whether Tab inserts spaces or a literal tab character.
+- `auto_indent` preserves indentation on Enter and adds a level after Python block
+  colons and opening delimiters in Rust, JavaScript/TypeScript, JSON, and CSS.
+- `smart_backspace` deletes leading indentation back to the previous indent stop.
+- `smart_tabs` uses tabs for nesting and spaces for alignment when tab mode is enabled.
+
+Both widths default to 4; spaces, auto-indent, and smart Backspace are enabled.
+Smart tabs are disabled. Makefiles default to literal tabs. Existing indentation
+is reported in the status details but does not override configured values.
+Supported widths are 1–256 columns.
+
+For example, global `editor-settings.toml` can contain:
+
+```toml
+[defaults]
+tab_size = 4
+indent_size = 4
+insert_spaces = true
+
+[file_types.python]
+tab_size = 6
+indent_size = 6
+
+[file_types.makefile]
+insert_spaces = false
+```
+
+The equivalent workspace sections are `[editor.defaults]` and
+`[editor.file_types.python]` inside its existing `settings.toml`. File-type keys
+are `rust`, `python`, `javascript`, `typescript`, `json`, `toml`, `html`, `css`,
+`sh`, `sql`, `md`, `yaml`, `makefile`, and `plain`.
+
+Tab indents selected lines; Shift+Tab unindents them. With no selection, Tab moves
+to the next configured tab stop. Each indentation command is one undo step.
+**Convert Indentation to Spaces / Tabs**, available in the Edit menu and
+indentation dialog, converts leading whitespace while preserving visual depth.
+Inline tabs and line endings are preserved. Opening, saving, pasting, and changing
+settings do not normalize the buffer. Formatting requests use effective tab size
+and insertion mode; language servers may also apply their own formatting rules.
 
 The bundled Rust Dev Container image updates the stable Rust toolchain during its build, installs matching `llvm-tools-preview`, and installs `grcov` with its published lockfile. Use **Dev Container → Rebuild** after changing the Dockerfile. The image also runs the official installers at `https://chatgpt.com/codex/install.sh` and `https://opencode.ai/install`; rebuilding selects their current default releases.
 

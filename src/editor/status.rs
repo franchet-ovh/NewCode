@@ -7,6 +7,7 @@ use eframe::egui;
 enum Action {
     Git,
     Logs,
+    Indentation,
 }
 struct Item {
     text: String,
@@ -68,14 +69,14 @@ pub(super) fn indentation(text: &str) -> String {
 }
 
 impl EditorApp {
-    fn status_items(&self, ctx: &egui::Context) -> Vec<Item> {
+    fn status_items(&mut self, ctx: &egui::Context) -> Vec<Item> {
         let (git, git_details) = self.git_ui.status_summary();
         let (errors, warnings) = session::diagnostic_counts();
         let mut items = vec![
             Item { text: git, details: git_details, action: Some(Action::Git), max_width: 240.0 },
             Item { text: format!("Logs: {errors} errors, {warnings} warnings"), details: "Retained application logs for this session, not compiler diagnostics. Click to view warnings and errors.".into(), action: Some(Action::Logs), max_width: 230.0 },
         ];
-        if let Some(path) = &self.active_file {
+        if let Some(path) = self.active_file.clone() {
             let cursor = self
                 .pending_editor_cursor
                 .or_else(|| {
@@ -86,14 +87,19 @@ impl EditorApp {
                 .unwrap_or(0);
             let (line, column) = cursor_position(&self.buffer, cursor);
             items.push(Item::label(format!("Ln {line}, Col {column}")));
-            let mut indent = Item::label(
-                self.editor_layout_cache
-                    .lock()
-                    .unwrap()
-                    .indentation(&self.buffer),
-            );
-            indent.details =
-                "Detected from the current buffer; does not change Tab insertion.".into();
+            let config = self.indent_config();
+            let mut indent = Item::label(format!(
+                "{}: {} · Tab: {}",
+                if config.insert_spaces {
+                    "Spaces"
+                } else {
+                    "Tabs"
+                },
+                config.indent_size,
+                config.tab_size
+            ));
+            indent.details = self.indent_details();
+            indent.action = Some(Action::Indentation);
             items.push(indent);
             items.push(Item::label("UTF-8"));
             items.push(Item::label(
@@ -120,6 +126,7 @@ impl EditorApp {
                     self.sidebar_mode = SidebarMode::Git;
                 }
             }
+            Action::Indentation => self.indentation.open = true,
             Action::Logs => {
                 self.logs.show_diagnostics();
                 self.bottom_tab = Tab::Logs;
@@ -290,7 +297,7 @@ mod tests {
         }
     }
 
-    fn labels(app: &EditorApp, ctx: &egui::Context) -> Vec<String> {
+    fn labels(app: &mut EditorApp, ctx: &egui::Context) -> Vec<String> {
         app.status_items(ctx)
             .into_iter()
             .map(|item| item.text)
@@ -315,25 +322,25 @@ mod tests {
         selection.primary = CCursor::new(4);
         state.cursor.set_char_range(Some(selection));
         egui::TextEdit::store_state(&ctx, app.editor_id(), state);
-        assert!(labels(&app, &ctx).contains(&"Ln 2, Col 3".into()));
-        assert!(labels(&app, &ctx).contains(&"Rust".into()));
+        assert!(labels(&mut app, &ctx).contains(&"Ln 2, Col 3".into()));
+        assert!(labels(&mut app, &ctx).contains(&"Rust".into()));
         app.pending_editor_cursor = Some(1);
-        assert!(labels(&app, &ctx).contains(&"Ln 1, Col 2".into()));
+        assert!(labels(&mut app, &ctx).contains(&"Ln 1, Col 2".into()));
         let _ = crate::test_frame(&ctx, Default::default(), |root| {
             egui::CentralPanel::default().show(root, |ui| app.text_view(ui, &ctx));
         });
-        assert!(labels(&app, &ctx).contains(&"Spaces: 4".into()));
+        assert!(labels(&mut app, &ctx).contains(&"Spaces: 4 · Tab: 4".into()));
         app.buffer = "\tunsaved".into();
         app.mark_modified();
-        assert!(labels(&app, &ctx).contains(&"Tabs".into()));
+        assert!(labels(&mut app, &ctx).contains(&"Spaces: 4 · Tab: 4".into()));
         app.open_file(ts.clone());
-        assert!(labels(&app, &ctx).contains(&"TypeScript".into()));
+        assert!(labels(&mut app, &ctx).contains(&"TypeScript".into()));
         app.activate_file(rust.clone());
         assert_eq!(app.buffer, "\tunsaved");
-        assert!(labels(&app, &ctx).contains(&"Tabs".into()));
+        assert!(labels(&mut app, &ctx).contains(&"Spaces: 4 · Tab: 4".into()));
         app.finish_close_file(ts);
         app.finish_close_file(rust);
-        let labels = labels(&app, &ctx);
+        let labels = labels(&mut app, &ctx);
         assert!(
             !labels
                 .iter()

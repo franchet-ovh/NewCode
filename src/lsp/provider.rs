@@ -478,7 +478,7 @@ impl Provider {
             );
         }
     }
-    pub fn format(&mut self) {
+    pub fn format(&mut self, tab_size: usize, insert_spaces: bool) {
         if !self.ready || !enabled(&self.capabilities["documentFormattingProvider"]) {
             self.output.status = "This language server does not provide formatting".into();
             return;
@@ -488,7 +488,7 @@ impl Provider {
         self.synchronize(&uri);
         self.request(
             "textDocument/formatting",
-            json!({"textDocument":{"uri":uri},"options":{"tabSize":4,"insertSpaces":true}}),
+            json!({"textDocument":{"uri":uri},"options":{"tabSize":tab_size,"insertSpaces":insert_spaces}}),
             Kind::Format,
             uri,
         );
@@ -996,7 +996,7 @@ mod tests {
     fn formatting_is_versioned_and_never_writes_to_disk() {
         let mut p = provider();
         wire(&mut p);
-        p.format();
+        p.format(4, true);
         response(
             &mut p,
             "textDocument/formatting",
@@ -1005,7 +1005,7 @@ mod tests {
         let edit = p.changes.pop_front().unwrap();
         assert_eq!(&*edit.before, "pr");
         assert_eq!(edit.after, "print()");
-        p.format();
+        p.format(4, true);
         let id = wire(&mut p)
             .iter()
             .find(|m| m["method"] == "textDocument/formatting")
@@ -1018,6 +1018,21 @@ mod tests {
         );
         p.receive(json!({"jsonrpc":"2.0","id":id,"result":[]}));
         assert!(p.changes.is_empty());
+    }
+    #[test]
+    fn formatting_uses_effective_indentation_options() {
+        let mut p = provider();
+        wire(&mut p);
+        p.format(6, false);
+        let messages = wire(&mut p);
+        let request = messages
+            .iter()
+            .find(|m| m["method"] == "textDocument/formatting")
+            .unwrap();
+        assert_eq!(
+            request["params"]["options"],
+            json!({"tabSize":6,"insertSpaces":false})
+        );
     }
     #[test]
     fn idle_activity_and_symbol_switching_follow_user_events() {

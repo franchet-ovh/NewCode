@@ -21,6 +21,7 @@ mod disk_changes;
 mod document_paths;
 mod documents;
 mod explorer;
+mod indentation;
 mod language;
 mod layout;
 mod logs;
@@ -31,6 +32,7 @@ mod search;
 mod shell;
 mod sidebar;
 mod status;
+mod tab_layout;
 mod tabs;
 mod terminal_input;
 mod text_view;
@@ -48,6 +50,7 @@ enum SidebarMode {
 }
 
 pub(crate) struct EditorApp {
+    indentation: indentation::State,
     navigation: navigation::Navigation,
     explorer_cache: HashMap<PathBuf, Vec<explorer::TreeEntry>>,
     disk_changes: disk_changes::DiskChanges,
@@ -131,6 +134,7 @@ impl EditorApp {
         addons.suppressed = arguments.disabled_addons.clone();
         addons.apply_settings(&settings.addon_enabled, &settings.addon_state);
         let mut app = Self {
+            indentation: indentation::State::load(),
             navigation: Default::default(),
             explorer_cache: Default::default(),
             disk_changes: Default::default(),
@@ -202,6 +206,7 @@ impl EditorApp {
 
     pub(crate) fn render(&mut self, root: &mut egui::Ui) {
         let context = root.ctx().clone();
+        self.indentation_dialog(&context);
         let ctx = &context;
         if let Some((purpose, path)) = crate::file_picker::take(ctx) {
             match purpose {

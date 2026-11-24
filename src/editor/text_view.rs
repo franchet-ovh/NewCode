@@ -19,6 +19,7 @@ pub(super) struct EditorLayoutCache {
     colors: Option<theme::Colors>,
     font: Option<FontId>,
     line_height: f32,
+    tab_size: usize,
 }
 
 impl EditorLayoutCache {
@@ -33,7 +34,9 @@ impl EditorLayoutCache {
 
 impl EditorApp {
     pub(super) fn text_view(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
+        ctx.request_repaint_after(std::time::Duration::from_secs(1));
         self.language_keys(ctx);
+        let tab_size = self.indent_config().tab_size;
         let path = self.active_file.clone().unwrap();
         let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
         let find_query = if self.find_open {
@@ -58,6 +61,7 @@ impl EditorApp {
                     && cached.colors == Some(colors)
                     && cached.font.as_ref() == Some(&font)
                     && cached.line_height == line_height
+                    && cached.tab_size == tab_size
                 {
                     if let Some(galley) = &cached.galley {
                         if galley.pixels_per_point == ui.ctx().pixels_per_point() {
@@ -74,6 +78,8 @@ impl EditorApp {
                 section.format.line_height = Some(line_height);
             }
             let galley = ui.fonts_mut(|fonts| fonts.layout_job(job));
+            let space = ui.fonts_mut(|fonts| fonts.glyph_width(&font, ' '));
+            let galley = super::tab_layout::tab_stops(galley, space * tab_size as f32);
             let mut cached = layout_cache.lock().unwrap();
             if cached.text != source || cached.indentation.is_empty() {
                 cached.indentation = super::status::indentation(source);
@@ -86,6 +92,7 @@ impl EditorApp {
             cached.colors = Some(colors);
             cached.font = Some(font);
             cached.line_height = line_height;
+            cached.tab_size = tab_size;
             galley
         };
         let editor_id = self.editor_id();
@@ -145,15 +152,8 @@ impl EditorApp {
                             viewport_clip.max,
                         );
                         ui.set_clip_rect(source_clip);
-                        let edit = egui::TextEdit::multiline(&mut self.buffer)
-                            .id(editor_id)
-                            .font(TextStyle::Monospace)
-                            .desired_width(text_width)
-                            .desired_rows(1)
-                            .code_editor()
-                            .frame(egui::Frame::NONE)
-                            .layouter(&mut layouter)
-                            .show(ui);
+                        let edit =
+                            super::indentation::source_edit(self, ui, text_width, &mut layouter);
                         ui.set_clip_rect(viewport_clip);
                         let painter = ui
                             .painter()

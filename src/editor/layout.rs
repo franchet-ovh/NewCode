@@ -199,6 +199,8 @@ impl EditorApp {
                 ctx.memory_mut(|memory| memory.request_focus(egui::Id::new("find_in_file_query")));
                 ui.close();
             }
+            ui.separator();
+            self.indentation_menu(ui);
             if ui
                 .add_enabled(
                     self.document_active(),
