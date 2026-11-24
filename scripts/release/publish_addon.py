@@ -18,6 +18,29 @@ def gh(*args):
     return subprocess.check_output(['gh', *args], text=True).strip()
 
 
+def release_pages(repo, query=None):
+    """Decode the consecutive JSON arrays emitted by gh api --paginate.
+
+    Parse the stream ourselves so older GitHub CLI versions work without
+    --slurp, which was added after pagination support.
+    """
+    output = (query or gh)('api', '--paginate', f'repos/{repo}/releases?per_page=100')
+    decoder = json.JSONDecoder()
+    pages = []
+    offset = 0
+    while offset < len(output):
+        if output[offset].isspace():
+            offset += 1
+            continue
+        page, offset = decoder.raw_decode(output, offset)
+        if not isinstance(page, list):
+            raise ValueError('Expected a GitHub release page to be a JSON array')
+        pages.append(page)
+    if not pages:
+        raise ValueError('GitHub returned no release pages')
+    return pages
+
+
 def stable(version):
     release_version(version)
     if not re.fullmatch(r'\d+\.\d+\.\d+', version):
@@ -97,7 +120,7 @@ def fingerprint(addon, sha):
 def reserve(addon, sha, explicit):
     _, manifest = definition(addon)
     prefix = f'addon_{addon}_'
-    pages = json.loads(gh('api', '--paginate', '--slurp', f'repos/{os.environ["GH_REPO"]}/releases?per_page=100'))
+    pages = release_pages(os.environ['GH_REPO'])
     releases = [r for page in pages for r in page if r['tag_name'].startswith(prefix)
                 and re.fullmatch(r'\d+\.\d+\.\d+', r['tag_name'][len(prefix):])]
     releases.sort(key=lambda r: stable(r['tag_name'][len(prefix):]), reverse=True)

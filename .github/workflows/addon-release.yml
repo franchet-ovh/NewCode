@@ -15,9 +15,11 @@ on:
     inputs:
       addon:
         description: Addon ID
-        type: choice
-        options: [github, codex, opencode]
+        type: string
         required: true
+      source-sha:
+        description: Optional source commit SHA; otherwise use main at dispatch
+        type: string
       version:
         description: Optional explicit x.y.z; otherwise increment patch
         type: string
