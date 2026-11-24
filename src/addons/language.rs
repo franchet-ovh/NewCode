@@ -483,7 +483,7 @@ for line in sys.stdin:
         host.language.as_mut().unwrap().accept_completion(0);
         let edit = host.language.as_mut().unwrap().changes.pop_front().unwrap();
         assert_eq!(edit.after, "print");
-        host.language.as_mut().unwrap().format();
+        host.language.as_mut().unwrap().format(4, true);
         host.flush_language();
         wait(&mut host, &ctx, &path, |h| {
             !h.language.as_ref().unwrap().changes.is_empty()

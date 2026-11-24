@@ -79,8 +79,9 @@ impl EditorApp {
     pub(super) fn language_context_menu(&mut self, response: &egui::Response) {
         response.context_menu(|ui| {
             if ui.button("Format Document").clicked() {
+                let config = self.indent_config();
                 if let Some(provider) = &mut self.addons.language {
-                    provider.format();
+                    provider.format(config.tab_size, config.insert_spaces);
                 }
                 self.addons.flush_language();
                 ui.close();

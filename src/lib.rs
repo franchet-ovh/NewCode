@@ -7,6 +7,7 @@ mod dev_container;
 mod editor;
 mod file_picker;
 mod git_ui;
+mod indentation;
 mod launch;
 mod logging;
 mod lsp;

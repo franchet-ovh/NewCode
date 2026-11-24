@@ -6,12 +6,14 @@ use std::{
 };
 mod explorer;
 mod geometry;
+mod indentation;
 mod layout;
 mod mobile;
 mod persistence;
 
 pub(super) fn test_app() -> EditorApp {
     EditorApp {
+        indentation: Default::default(),
         navigation: Default::default(),
         explorer_cache: Default::default(),
         disk_changes: Default::default(),

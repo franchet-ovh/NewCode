@@ -4,6 +4,7 @@ use std::path::PathBuf;
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub(crate) struct Settings {
+    pub(crate) editor: crate::indentation::Preferences,
     pub(crate) lsp: crate::lsp::Config,
     pub(crate) workspace: Option<PathBuf>,
     pub(crate) session_workspace: Option<PathBuf>,
@@ -21,6 +22,7 @@ pub(crate) struct Settings {
 impl Default for Settings {
     fn default() -> Self {
         Self {
+            editor: Default::default(),
             lsp: Default::default(),
             workspace: None,
             session_workspace: None,
@@ -65,6 +67,7 @@ fn load_workspace_file(
         Err(e) => return Err(format!("Cannot read workspace settings: {e}")),
     };
     settings.workspace = Some(workspace.to_path_buf());
+    settings.editor.sanitize();
     Ok(settings)
 }
 
@@ -83,6 +86,32 @@ pub(crate) fn write_workspace(path: &std::path::Path, settings: &Settings) -> Re
 #[cfg(test)]
 mod workspace_tests {
     use super::*;
+    #[test]
+    fn editor_overrides_are_sparse_and_isolated_between_workspaces() {
+        let root = tempfile::tempdir().unwrap();
+        let a = root.path().join("a/settings.toml");
+        let b = root.path().join("b/settings.toml");
+        let mut settings = Settings::default();
+        settings.editor.file_types.insert(
+            "rust".into(),
+            crate::indentation::Overrides {
+                tab_size: Some(6),
+                insert_spaces: Some(false),
+                ..Default::default()
+            },
+        );
+        write_workspace(&a, &settings).unwrap();
+        write_workspace(&b, &Settings::default()).unwrap();
+        let loaded_a = load_workspace_file(root.path(), &a).unwrap();
+        let loaded_b = load_workspace_file(root.path(), &b).unwrap();
+        assert_eq!(loaded_a.editor.file_types["rust"].tab_size, Some(6));
+        assert_eq!(
+            loaded_a.editor.file_types["rust"].insert_spaces,
+            Some(false)
+        );
+        assert!(loaded_a.editor.file_types["rust"].indent_size.is_none());
+        assert!(loaded_b.editor.file_types.is_empty());
+    }
     #[test]
     fn plain_launch_has_no_workspace_or_restored_state() {
         let (settings, path) = load_workspace(None).unwrap();
