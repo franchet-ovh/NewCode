@@ -13,8 +13,41 @@ class ChangeTests(unittest.TestCase):
         self.assertEqual(select(['src/main.rs', 'Cargo.lock'])[0], ['editor'])
 
     def test_shared_consumers(self):
-        self.assertEqual(select(['crates/addon-support/src/lib.rs'])[0], ['addon-support', 'codex', 'editor', 'opencode'])
-        self.assertEqual(select(['crates/addon-sdk/src/lib.rs'])[0], ['addon-sdk', 'addon-support', 'codex', 'editor', 'github', 'opencode'])
+        # Keep the dependency graph explicit so new repository addons do not
+        # change this test's expectations.
+        manifests = {
+            'Cargo.toml': {'sdk': 'crates/addon-sdk', 'support': 'crates/addon-support'},
+            'crates/addon-sdk/Cargo.toml': {},
+            'crates/addon-support/Cargo.toml': {'sdk': '../addon-sdk'},
+            'crates/language-addon/Cargo.toml': {'sdk': '../addon-sdk'},
+            'addons/codex/Cargo.toml': {'support': '../../crates/addon-support'},
+            'addons/opencode/Cargo.toml': {'support': '../../crates/addon-support'},
+            'addons/github/Cargo.toml': {'sdk': '../../crates/addon-sdk'},
+            'addons/lsp-python/Cargo.toml': {'language': '../../crates/language-addon'},
+            'addons/lsp-rust/Cargo.toml': {'language': '../../crates/language-addon'},
+            'addons/unrelated/Cargo.toml': {},
+        }
+        cases = {
+            'addon-support': ['addon-support', 'codex', 'editor', 'opencode'],
+            'addon-sdk': ['addon-sdk', 'addon-support', 'codex', 'editor', 'github',
+                          'language-addon', 'lsp-python', 'lsp-rust', 'opencode'],
+            'language-addon': ['language-addon', 'lsp-python', 'lsp-rust'],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for relative, dependencies in manifests.items():
+                manifest = root / relative
+                manifest.parent.mkdir(parents=True, exist_ok=True)
+                manifest.write_text(
+                    '[package]\nname="fixture"\nversion="0.1.0"\n\n[dependencies]\n'
+                    + ''.join(f'{name} = {{ path = "{path}" }}\n'
+                              for name, path in dependencies.items())
+                )
+            for crate, expected in cases.items():
+                with self.subTest(crate=crate):
+                    selected, tooling = select([f'crates/{crate}/src/lib.rs'], root=root)
+                    self.assertEqual(selected, expected)
+                    self.assertFalse(tooling)
 
     def test_docs_and_assets(self):
         self.assertEqual(select(['README.md', 'crates/addon-sdk/README.md']), ([], False))
