@@ -31,7 +31,7 @@ for command in curl jq tar sha256sum install mktemp awk tr mv mkdir rm; do
 done
 : "${HOME:?HOME must be set}"
 destination="$HOME/.local/share/focus-editor/bin"
-repository='https://github.com/nfranchet/NewCode'
+repository='https://github.com/franchet-ovh/NewCode'
 work_dir=$(mktemp -d "${TMPDIR:-/tmp}/focus-editor-release.XXXXXX")
 install_stage=''
 cleanup() {
@@ -49,9 +49,25 @@ download() {
 }
 
 printf 'Finding the latest release for %s…\n' "$platform"
-download 'https://api.github.com/repos/nfranchet/NewCode/releases/latest' "$work_dir/release.json"
+download 'https://api.github.com/repos/franchet-ovh/NewCode/releases/latest' "$work_dir/release.json"
 tag=$(jq -er '.tag_name | select(type == "string" and length > 0)' "$work_dir/release.json") \
     || die 'GitHub did not return a valid latest release.'
+# Independent addon releases must never become editor download candidates.
+if [[ "$tag" == addon_* ]]; then
+    page=1
+    while :; do
+        download "https://api.github.com/repos/franchet-ovh/NewCode/releases?per_page=100&page=$page" "$work_dir/releases.json"
+        jq -e 'type == "array"' "$work_dir/releases.json" >/dev/null || die 'Invalid release list.'
+        if jq -e '[.[] | select(.draft != true and .prerelease != true) | select(.tag_name | test("^v?[0-9]+\\.[0-9]+\\.[0-9]+$"))] | .[0] // empty' \
+            "$work_dir/releases.json" > "$work_dir/editor.json"; then
+            mv "$work_dir/editor.json" "$work_dir/release.json"
+            tag=$(jq -er '.tag_name' "$work_dir/release.json")
+            break
+        fi
+        [[ $(jq 'length' "$work_dir/releases.json") -eq 100 && $page -lt 100 ]] || die 'No stable editor release found.'
+        page=$((page + 1))
+    done
+fi
 safe_tag=$(printf '%s' "$tag" | LC_ALL=C tr -c 'A-Za-z0-9._-' '-')
 archive="focus-editor-${safe_tag}-${platform}.tar.gz"
 asset_url() {

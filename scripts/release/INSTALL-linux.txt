@@ -3,7 +3,6 @@ Focus Editor for Linux
 Extract the archive and put focus-editor on your PATH, for example:
   mkdir -p ~/.local/bin
   install -m 755 focus-editor focus-editor-server ~/.local/bin/
-  python3 install-addons.py
   focus-editor ~/projects/my-project
   focus-editor --ui ~/projects/my-project
 
@@ -16,14 +15,11 @@ Closing the app window warns about unsaved documents, stops the backend, and
 removes its temporary profile. Reloads and connection loss retain the session
 while the window is alive. External links open in the system browser.
 
-The addon installer requires Python 3.11 or newer. It installs all bundled
-addons in $XDG_DATA_HOME/focus-editor/addons/<id> (normally
-~/.local/share/focus-editor/addons/<id>), beside the logs directory.
-Add --addon github to install only GitHub. Existing addon data and OS-keyring
-credentials are preserved; data is stored separately under addon-data/<id>.
-Open Addons below Source Control and choose Rescan installed afterward.
-The same manager installs individual addons from the release catalog or a
-local addon .tar.gz, checks updates, and enables, restarts, or uninstalls addons.
+Addons are distributed separately. Open Addons below Source Control and choose
+Refresh / check updates to find compatible versions, then Install. The manager
+also installs a local addon.toml or addon .tar.gz and provides update, enable,
+restart, credential, and uninstall controls. Each addon declares supported editor
+versions, protocol, and platform. Updates preserve addon data and credentials.
 
 These binaries are built on Ubuntu 24.04 with glibc (2.39 or newer).
 They are not static binaries. Use ldd focus-editor to identify missing shared

@@ -11,7 +11,7 @@ import tempfile
 import unittest
 
 SCRIPT = Path(__file__).resolve().parents[1] / 'install-release.sh'
-REPOSITORY = 'https://github.com/nfranchet/NewCode'
+REPOSITORY = 'https://github.com/franchet-ovh/NewCode'
 
 
 @unittest.skipUnless(shutil.which('jq'), 'installer tests require jq')
@@ -37,7 +37,7 @@ args = sys.argv[1:]
 url = args[-1]
 with open(os.environ['INSTALL_TEST_REQUESTS'], 'a') as log:
     log.write(json.dumps(url) + '\\n')
-name = 'release.json' if url.endswith('/releases/latest') else url.rsplit('/', 1)[-1]
+name = 'release.json' if url.endswith('/releases/latest') else ('releases.json' if '/releases?' in url else url.rsplit('/', 1)[-1])
 shutil.copyfile(pathlib.Path(os.environ['INSTALL_TEST_FIXTURES']) / name, args[args.index('--output') + 1])
 ''')
         self.tag = 'v1.2.3'
@@ -79,6 +79,14 @@ shutil.copyfile(pathlib.Path(os.environ['INSTALL_TEST_FIXTURES']) / name, args[a
 
     def run_installer(self):
         return subprocess.run(['bash', str(SCRIPT)], env=self.env, capture_output=True, text=True, timeout=10)
+
+    def test_addon_latest_release_falls_back_to_editor(self):
+        (self.fixtures / 'releases.json').write_text(json.dumps([
+            {'tag_name': 'addon_github_9.0.0', 'assets': []}, self.release]))
+        (self.fixtures / 'release.json').write_text(json.dumps({'tag_name': 'addon_github_9.0.0', 'assets': []}))
+        result = self.run_installer()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue((self.destination / 'focus-editor').is_file())
 
     def seed_installation(self):
         self.destination.mkdir(parents=True)

@@ -4,13 +4,31 @@ inputs:
   target:
     description: Native Rust target triple
     required: true
+  component:
+    description: editor, addon-sdk, addon-support, or addon ID
+    default: editor
   build-release:
     description: Build optimized binaries and populate the shared release cache
     default: 'false'
 runs:
   using: composite
   steps:
+    - name: Select project
+      id: project
+      shell: bash
+      env:
+        COMPONENT: ${{ inputs.component }}
+      run: |
+        project=.
+        cache_target=target
+        if [ "$COMPONENT" != editor ]; then
+          if [ -f "crates/$COMPONENT/Cargo.toml" ]; then project="crates/$COMPONENT"; else project="addons/$COMPONENT"; fi
+          cache_target=../../target
+        fi
+        echo "path=$project" >> "$GITHUB_OUTPUT"
+        echo "cache-target=$cache_target" >> "$GITHUB_OUTPUT"
     - name: Install Linux build and test dependencies
+      if: inputs.component == 'editor'
       shell: bash
       run: |
         sudo apt-get update
@@ -37,6 +55,7 @@ runs:
         fi
         rustup target add "$TARGET"
     - name: Install pinned Zig toolchain for Ghostty
+      if: inputs.component == 'editor'
       shell: bash
       run: |
         python3 scripts/install-zig.py "$RUNNER_TEMP/focus-zig"
@@ -59,12 +78,8 @@ runs:
           addons/lsp-python -> ../../target
     - name: Check Rust formatting
       shell: bash
-      run: cargo fmt --check
-    - name: Test release packaging scripts
-      shell: bash
-      run: python3 -m unittest discover -s scripts/release -p 'test_*.py'
-    - name: Run Rust tests
       env:
+        COMPONENT: ${{ inputs.component }}
         TARGET: ${{ inputs.target }}
       shell: bash
       run: cargo test --locked --target "$TARGET"
@@ -89,5 +104,14 @@ runs:
         TARGET: ${{ inputs.target }}
       shell: bash
       run: |
-        cargo build --release --bins --locked --target "$TARGET"
-        python3 scripts/addons.py --release --target "$TARGET"
+        trap 'echo "${COMPONENT} (${TARGET}): ${SECONDS}s" >> "$GITHUB_STEP_SUMMARY"' EXIT
+        project="${{ steps.project.outputs.path }}"
+        cargo fmt --check --manifest-path "$project/Cargo.toml"
+        cargo test --locked --manifest-path "$project/Cargo.toml" --target-dir "$GITHUB_WORKSPACE/target" --target "$TARGET"
+        if [ "$BUILD_RELEASE" = true ]; then
+          if [ "$COMPONENT" = editor ]; then
+            cargo build --release --bins --locked --target "$TARGET"
+          else
+            python3 scripts/addons.py --release --target "$TARGET" --addon "$COMPONENT"
+          fi
+        fi

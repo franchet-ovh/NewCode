@@ -15,7 +15,7 @@ bash scripts/install-release.sh
 
 The installer requires `curl`, `jq`, `tar`, and `sha256sum`. It verifies the release
 checksum and installs `focus-editor` and `focus-editor-server` into
-`$HOME/local/share/focus-editor/bin` (without a leading dot), leaving addons and
+`$HOME/.local/share/focus-editor/bin` (without a leading dot), leaving addons and
 their data untouched. Add this directory to `PATH` if needed. If the latest
 release's assets have not finished uploading, rerun the installer after its build
 completes.
@@ -24,13 +24,11 @@ Publishing a GitHub release (including a prerelease) builds the tagged source an
 
 - `focus-editor-<tag>-linux-amd64.tar.gz`
 - `focus-editor-<tag>-linux-arm64.tar.gz`
-- `focus-addon-<id>-<tag>-linux-{amd64,arm64}.tar.gz` for every addon in the tagged source
-- `addons.json` (the manager catalog) and per-platform catalogs
 - `SHA256SUMS`
 
 Linux binaries are built on Ubuntu 24.04 and require glibc 2.39 or newer. The default app window requires installed Chromium or Google Chrome with WebGL 2 and a working browser sandbox. Native mode (`--ui`) requires an X11 or Wayland desktop and working OpenGL/EGL libraries. Both modes use the same dynamically linked executable; run `ldd focus-editor` to identify missing runtime libraries. A desktop portal provides native file dialogs. Extract the archive and install both executables with `install -m 755 focus-editor focus-editor-server ~/.local/bin/` after creating that directory.
 
-Open **Addons** in the activity bar to install individual addons from the release catalog. The editor archives also include addon executables: run `python3 install-addons.py` from the extracted archive to install all of them, or add `--addon github` to select one (Python 3.11 or newer). Use **Rescan installed** in the manager afterward. The installer preserves addon data and installs executables beside logs.
+Editor archives contain only the editor/server and installation/legal files. The source installer (`scripts/install.sh`) also installs only editor/server binaries. Open **Addons** in the activity bar to install independently released addons. Each addon release provides its own Linux amd64/arm64 archives, per-platform catalogs, combined `addons.json`, and `SHA256SUMS`. Installing or updating an addon preserves its data.
 
 HTTPS requests from the editor and bundled Rust addons trust the system certificate store. On Linux, install your distribution's `ca-certificates` package and add any corporate proxy CA to that store. Restart the editor after updating certificates. To select a PEM CA bundle explicitly, launch with `SSL_CERT_FILE=/path/to/ca-bundle.pem focus-editor`. `SSL_CERT_FILE` and `SSL_CERT_DIR` override the native certificate locations, so the selected bundle or directories must include all the roots you need, including the proxy CA. External tools such as Git, Codex, and OpenCode manage their own TLS settings.
 
@@ -40,7 +38,14 @@ Finder launches retain the inherited PATH and add `~/.local/bin`, `~/.opencode/b
 
 To publish: merge the workflow and packaging scripts into the default branch, bump the Cargo package version as appropriate, create a tag containing those changes, then publish a release for that tag. Saving a draft or pushing a tag alone does not build downloads. Both Linux native builds and packaging checks must pass before any assets are uploaded. Rerun failed jobs from GitHub Actions to retry; matching assets are replaced. Release tags containing filename-unsafe characters such as `/` use `-` in download names. The bundle and executable version come from Cargo metadata; release filenames use the tag.
 
-The workflow needs no personal access token: its final upload job uses GitHub's built-in token with `contents: write`. Native Linux amd64 and arm64 builds test the editor, SDK, and every addon discovered through `addons/*/addon.toml`, validate architectures and runtime dependencies, and verify package contents. Every editor/addon archive and both platform catalogs must be present and consistent before the combined catalog and checksums are generated and assets are uploaded. Builds are not triggered until a release is published. Branch pushes run the same shared checks.
+Editor releases retain the existing release-version GitHub App and environment setup for committing the editor version to main. Asset upload uses GitHub's built-in token with `contents: write`. Editor release preparation leaves addon versions unchanged. Editor builds validate both native Linux architectures, runtime dependencies, package contents, and checksums.
+
+Branch pushes and pull requests select affected Cargo projects, including consumers of changed local dependencies. Documentation-only changes skip compilation. SDK changes test all consumers; support changes test the editor and assistant addons. CI reports selected jobs and check durations. Feature branches compare with their merge base against main; main compares against its last successful run, so changes from interrupted runs are included.
+
+After successful checks on main, changed addons publish independently as `addon_<id>_<x.y.z>`, for example `addon_github_0.4.9`. Automatic releases increment the addon's own patch version, independently of the editor. Publishing compares build-input fingerprints to avoid releasing unchanged addons. Both Linux builds must succeed before the draft becomes public. Addon releases never replace GitHub's latest editor release.
+
+For a manual release, run **Independent addon release** on `main`, select the addon, and optionally supply a stable `x.y.z` version. Without a version it increments the patch; an explicit version must exceed previous releases. Rerun a failed workflow to reuse its reserved draft/version. Release builds stamp only that addon's manifest and lockfile in the isolated checkout, without committing version changes to main. To reproduce one from source, check out its tag, run `python3 scripts/release/publish_addon.py stamp --addon github --tag addon_github_0.4.9`, then build with `scripts/addons.py`.
+
 
 ## Build and run
 
@@ -132,7 +137,9 @@ cargo run --release -- ~/projects/my-app
 
 Addons compile independently from the editor and run as separate executables. The main Rust process renders their native panels. Open **Addons**, the activity-bar entry immediately below Source Control, or use **Addons → Manage addons…**. **Installed** lists local addons and their status; **Available** lists the official release packages. Search either list and select an addon to see its details in the center. Enable/disable, restart, credentials, and uninstall controls are in those details.
 
-Choose **Refresh / check updates** to load the catalog from `nfranchet/NewCode`. Release builds default to their own release tag; source builds default to `latest`. You can enter an explicit tag, including a prerelease. Installation requires matching editor version, addon protocol, and platform. Older releases without `addons.json` cannot supply a catalog; use a new release or a local package. Catalog requests are anonymous and do not use stored addon credentials.
+Choose **Refresh / check updates** to discover independently released addons from `franchet-ovh/NewCode`. The default `latest` selects the highest compatible stable version of each addon for this platform. You can enter an explicit addon release tag, or an older editor release tag with a legacy catalog. Catalog requests are anonymous and do not use stored addon credentials.
+
+Each addon declares `editor_version_req` using Cargo/Rust SemVer requirement syntax, initially `>=0.4.8, <0.5.0` for the included addons. Installation, upgrades, and loading check that range, the addon protocol, and the platform. This allows editor patch updates to reuse an addon without republishing it. Legacy schema-1 catalogs retain exact editor-version matching; older installed manifests without a range retain protocol/platform validation. Install an updated editor before using schema-2 catalogs.
 
 Installation and updates are manual. **Install local addon…** accepts a trusted `addon.toml` or standalone addon `.tar.gz`. Downloads, checksum checks, extraction, and replacement run in the background. Failed replacements restore the previous installation; an interrupted replacement is recovered on discovery. Updating restarts only the affected addon, and another editor instance using it prevents replacement. **Rescan installed** finds packages installed outside the editor. Installation does not load code from the open repository.
 
@@ -153,11 +160,12 @@ Linux respects `XDG_DATA_HOME`; macOS uses `~/Library/Application Support/focus-
 The editor loads installed addons only from this shared application data root. Build and install GitHub from source separately:
 
 ```sh
+cargo build --release --bins
 python3 scripts/addons.py --release --install --addon github
 cargo run --release -- .
 ```
 
-Omit `--addon` to build/install every discovered addon; repeat it to select several. Run `python3 scripts/addons.py --test` to format-check and test the SDK and addon crates. For an isolated Linux development installation, use `--data-root "$PWD/target/dev-data/focus-editor"` and launch the editor with `XDG_DATA_HOME="$PWD/target/dev-data"`. A plain `cargo build` builds the editor and SDK, without compiling addon executables. See the [addon SDK contract](crates/addon-sdk/README.md) for manifests, packaging, and development.
+Omit `--addon` to build/install every discovered addon; repeat it to select several. Local source installation uses the built editor (or `focus-editor` on PATH) for compatibility validation. Run `python3 scripts/addons.py --test` to format-check and test the SDK and addon crates. For an isolated Linux development installation, use `--data-root "$PWD/target/dev-data/focus-editor"` and launch the editor with `XDG_DATA_HOME="$PWD/target/dev-data"`. A plain `cargo build` builds the editor and SDK, without compiling addon executables. See the [addon SDK contract](crates/addon-sdk/README.md) for manifests, packaging, and development.
 
 Codex and OpenCode are optional, independently compiled addons. They occupy the existing right-hand dock. Install either one or both, and use the **Enabled** control in the Addons manager to choose which run. When both are enabled, status-bearing tabs select the visible panel while both continue processing events. Disabling every right-dock addon gives the width back to the editor. A fresh installation enables Codex by default and leaves OpenCode disabled.
 
@@ -166,8 +174,6 @@ To install only selected addons:
 ```sh
 python3 scripts/addons.py --release --addon codex --install
 python3 scripts/addons.py --release --addon opencode --install
-# From an extracted release:
-python3 install-addons.py --addon codex --addon opencode
 ```
 
 All addon installations share the directory beside logs. Omitted addons are not required by the editor. The SDK's `panel = "right"` capability is available to any addon; simple panels use native declarative widgets, and richer panels can use the optional shared surface runner. See [the UI addon helper](crates/addon-support/README.md).

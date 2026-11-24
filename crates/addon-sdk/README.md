@@ -21,6 +21,7 @@ name = "Example"
 description = "What this addon provides"
 publisher = "Your name or organization"
 version = "0.1.0"
+editor_version_req = ">=0.4.8, <0.5.0"
 protocol = 1
 executable = "example-addon"
 icon = "icon.png"
@@ -31,6 +32,31 @@ an optional top-level `target`, such as `x86_64-unknown-linux-gnu`; the host rej
 packages for another target. Keep the manifest version equal to the addon Cargo
 package version. The ID must match its directory and contain only letters,
 digits, `_`, and `-`.
+
+## Independent releases and compatibility
+
+Each addon owns its semantic version, independently of the editor. Releases use
+`addon_<id>_<x.y.z>` tags. Main publishes changed addons after successful checks,
+incrementing the patch version; the manual release workflow accepts an explicit
+stable version. Release stamping updates only the selected addon in an isolated
+checkout. Reproduce a tagged version with `scripts/release/publish_addon.py stamp`.
+
+New packages require `editor_version_req`, parsed with Rust's `semver::VersionReq`.
+The editor checks it together with `protocol` and `target` during loading and
+installation, including local packages. Update the range deliberately when host
+changes require a newer editor; bump the protocol for incompatible wire changes.
+Legacy manifests without a range retain protocol/platform checks.
+
+Schema-2 `addons.json` contains `schema`, `release`, and `packages`; every package
+includes its own version, editor requirement, protocol, target, archive name, size,
+and SHA-256. Catalog and archive compatibility fields must agree. Schema 1 remains
+readable with its catalog-wide exact editor version. Discovery tracks each
+package's source release, selecting an older compatible version when necessary.
+Installation and upgrades remain manual and transactional.
+
+The source installer calls `focus-editor --check-addon-compatibility addon.toml`
+without opening a window. Use its `--editor` option to choose a specific built
+editor executable; incompatibility fails before an existing installation changes.
 
 ## Lifecycle and UI
 
@@ -121,15 +147,16 @@ Place a crate and `addon.toml` under `addons/<id>/`. The build helper and releas
 workflow discover all such manifests; the editor crate does not compile them.
 Use `python3 scripts/addons.py --release --target <triple>` to build and stage all
 addons under `target/<triple>/release/addons/`. `--addon <id>` selects one and can
-be repeated. `--test` checks formatting and tests the SDK and selected crates.
+be repeated. `--test` checks formatting and tests the selected crates and their local dependencies;
+GitHub-only tests do not build the UI support crate.
 Release executables must support `--version`, printing their executable basename
 followed by the version without starting the addon protocol. The release job
 checks architecture, shared libraries, and that version response. Addon-specific
 license/notices files take precedence over the repository defaults.
 
-`scripts/release/package.py <triple> <tag>` emits a separate
-`focus-addon-<id>-<tag>-<platform>.tar.gz` for every staged addon, as well as the
-editor archive and `addons-<platform>.json`. Each addon archive contains files
+`scripts/release/publish_addon.py package --addon <id> --tag <tag> --target <triple>`
+emits only the selected `focus-addon-<id>-<tag>-<platform>.tar.gz` and
+`addons-<platform>.json`. Editor packaging is separate. Each addon archive contains files
 directly at its root: `addon.toml`, its declared executable and PNG icon,
 `LICENSE`, and `THIRD_PARTY_NOTICES.txt`. Relative asset subdirectories are
 supported. Runtime state, credentials, extra files, symlinks, and hardlinks are
@@ -137,18 +164,18 @@ excluded. The editor accepts only those declared assets and optional notices;
 compressed and expanded size limits are 256 MiB and 512 MiB.
 
 The final release job checks the complete platform matrix and emits `addons.json`
-and `SHA256SUMS`. `Catalog` and `Package` in this SDK define catalog schema 1:
+and `SHA256SUMS`. `Catalog` and `Package` in this SDK define catalog schema 2:
 
 ```json
 {
-  "schema": 1,
-  "release": "v0.1.0",
-  "editor_version": "0.1.0",
+  "schema": 2,
+  "release": "addon_example_0.1.0",
   "packages": [{
     "id": "example", "name": "Example", "description": "An example addon",
     "publisher": "Example project", "version": "0.1.0", "protocol": 1,
+    "editor_version_req": ">=0.4.8, <0.5.0",
     "target": "x86_64-unknown-linux-gnu",
-    "archive": "focus-addon-example-v0.1.0-linux-amd64.tar.gz",
+    "archive": "focus-addon-example-addon_example_0.1.0-linux-amd64.tar.gz",
     "size": 1234, "sha256": "<64 hexadecimal characters>"
   }]
 }

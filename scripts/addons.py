@@ -11,6 +11,8 @@ import tomllib
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts/release"))
 from addon_release import manifests, assets
+sys.path.insert(0, str(ROOT / "scripts/ci"))
+from changes import local_dependencies
 
 
 def main():
@@ -27,7 +29,18 @@ def main():
     selected = [(p,m) for p,m in manifests(ROOT) if not args.addon or m["id"] in args.addon]
     projects = [p.parent / "Cargo.toml" for p, _ in selected]
     if args.test:
-        projects = [ROOT / "crates/addon-sdk/Cargo.toml", ROOT / "crates/addon-support/Cargo.toml", ROOT / "crates/language-addon/Cargo.toml"] + projects
+        ordered, seen = [], set()
+        def visit(project):
+            project = project.resolve()
+            if project in seen:
+                return
+            seen.add(project)
+            for dependency in sorted(local_dependencies(project)):
+                visit(dependency)
+            ordered.append(project)
+        for project in projects:
+            visit(project)
+        projects = ordered
     for project in projects:
         if args.test:
             subprocess.run(["cargo", "fmt", "--check", "--manifest-path", str(project)], cwd=ROOT, check=True)
@@ -69,6 +82,9 @@ def main():
         command = [sys.executable, str(script), "--source", str(output / "addons")]
         for _, manifest in selected:
             command += ["--addon", manifest["id"]]
+        editor = output / "focus-editor"
+        if editor.is_file():
+            command += ["--editor", str(editor)]
         if args.data_root:
             command += ["--data-root", str(args.data_root)]
         subprocess.run(command, check=True)

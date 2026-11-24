@@ -10,7 +10,7 @@ import subprocess
 import tarfile
 import tempfile
 from prepare_version import validate_versions
-from addon_release import TARGETS, RELEASE_TARGETS, safe_tag, manifests, assets as addon_files, package_addons
+from addon_release import TARGETS, RELEASE_TARGETS, safe_tag
 
 
 def asset_name(tag, target):
@@ -57,27 +57,13 @@ def verify_binary(binary, target, name="focus-editor", expected_version=None):
     print(version)
 
 
-ADDON_ASSETS = tuple("addons/" + m["id"] + "/" + name for _, m in manifests() for name in addon_files(m))
-ADDON_EXECUTABLES = tuple("addons/" + m["id"] + "/" + m["executable"] for _, m in manifests())
-
-
-def copy_addons(binary, destination, addon_source=None):
-    source = Path(addon_source) if addon_source else binary.parent
-    for relative in ADDON_ASSETS:
-        target = destination / relative
-        target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(source / relative, target)
-
-
-def package_linux(binary, output, stage, addon_source=None):
+def package_linux(binary, output, stage):
     shutil.copy2(binary, stage / "focus-editor")
     shutil.copy2(binary.with_name("focus-editor-server"), stage / "focus-editor-server")
     shutil.copy2("scripts/release/INSTALL-linux.txt", stage / "INSTALL.txt")
     shutil.copy2("LICENSE", stage / "LICENSE")
     shutil.copy2("THIRD_PARTY_NOTICES.txt", stage / "THIRD_PARTY_NOTICES.txt")
-    shutil.copy2("scripts/release/install-addons.py", stage / "install-addons.py")
-    copy_addons(binary, stage, addon_source)
-    assets = ("focus-editor", "focus-editor-server", "INSTALL.txt", "LICENSE", "THIRD_PARTY_NOTICES.txt", "install-addons.py") + ADDON_ASSETS
+    assets = ("focus-editor", "focus-editor-server", "INSTALL.txt", "LICENSE", "THIRD_PARTY_NOTICES.txt")
     with tarfile.open(output, "w:gz") as archive:
         for name in assets:
             archive.add(stage / name, arcname=name)
@@ -87,9 +73,6 @@ def package_linux(binary, output, stage, addon_source=None):
         for name in ("focus-editor", "focus-editor-server"):
             if not archive.getmember(name).mode & 0o111:
                 raise RuntimeError("Packaged executable lost its execute permission")
-        for name in ADDON_EXECUTABLES:
-            if not archive.getmember(name).mode & 0o111:
-                raise RuntimeError("Packaged addon lost its execute permission")
 
 
 def package_macos(binary, output, stage):
@@ -104,7 +87,6 @@ def package_macos(binary, output, stage):
     shutil.copy2(binary.with_name("focus-editor-server"), contents / "MacOS/focus-editor-server")
     shutil.copy2("LICENSE", contents / "Resources/LICENSE")
     shutil.copy2("THIRD_PARTY_NOTICES.txt", contents / "Resources/THIRD_PARTY_NOTICES.txt")
-    copy_addons(binary, contents / "Resources")
     # Rust's macOS target supports 11.0 and later; keep bundle and binary aligned.
     with (contents / "Info.plist").open("wb") as stream:
         plistlib.dump({
@@ -121,15 +103,12 @@ def package_macos(binary, output, stage):
         }, stream)
     run("plutil", "-lint", str(contents / "Info.plist"))
     run("codesign", "--force", "--sign", "-", str(contents / "MacOS/focus-editor-server"))
-    for name in ADDON_EXECUTABLES:
-        run("codesign", "--force", "--sign", "-", str(contents / "Resources" / name))
     run("codesign", "--force", "--sign", "-", str(app))
     run("codesign", "--verify", "--deep", "--strict", "--verbose=2", str(app))
     os.symlink("/Applications", stage / "Applications")
     shutil.copy2("scripts/release/INSTALL-macos.txt", stage / "INSTALL.txt")
     shutil.copy2("LICENSE", stage / "LICENSE")
     shutil.copy2("THIRD_PARTY_NOTICES.txt", stage / "THIRD_PARTY_NOTICES.txt")
-    shutil.copy2("scripts/release/install-addons.py", stage / "install-addons.py")
     run("hdiutil", "create", "-volname", "Focus Editor", "-srcfolder", str(stage),
         "-format", "UDZO", "-ov", str(output))
     run("hdiutil", "verify", str(output))
@@ -156,9 +135,6 @@ def main():
     version = validate_versions(args.tag)
     verify_binary(binary, args.target, expected_version=version)
     verify_binary(binary.with_name("focus-editor-server"), args.target, "focus-editor-server", version)
-    for name in ADDON_EXECUTABLES:
-        executable = binary.parent / name
-        verify_binary(executable, args.target, executable.name, version)
     destination = Path("dist").resolve()
     destination.mkdir(exist_ok=True)
     output = destination / asset_name(args.tag, args.target)
@@ -169,7 +145,6 @@ def main():
             package_macos(binary, output, stage)
         else:
             package_linux(binary, output, stage)
-    package_addons(binary.parent, destination, args.tag, args.target)
     print(f"Verified release asset: {output.name}")
 
 

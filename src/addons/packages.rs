@@ -315,6 +315,7 @@ pub(super) fn prepare_archive(
         if manifest.id != package.id
             || manifest.version != package.version
             || manifest.protocol != package.protocol
+            || manifest.editor_version_req != package.editor_version_req
             || manifest.target.as_deref() != Some(&package.target)
         {
             return Err("Addon manifest does not match the release catalog".into());
@@ -671,8 +672,10 @@ mod tests {
             publisher: String::new(),
             version: "1".into(),
             protocol: 1,
+            editor_version_req: None,
             target: target().unwrap().into(),
             archive: "fixture.tar.gz".into(),
+            source_release: None,
             size: file.as_file().metadata().unwrap().len(),
             sha256: "0".repeat(64),
         };

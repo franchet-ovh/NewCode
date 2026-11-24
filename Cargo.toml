@@ -11,6 +11,7 @@ name = "focus-editor-server"
 path = "src/server_main.rs"
 
 [dependencies]
+semver = "1"
 eframe = { version = "0.36.2", default-features = false, features = ["persistence", "default_fonts", "glow", "wayland", "x11", "accesskit"] }
 egui_commonmark = { version = "=0.25.0", default-features = false, features = ["pulldown_cmark", "better_syntax_highlighting", "load-images"] }
 portable-pty = "0.9"

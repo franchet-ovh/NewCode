@@ -12,7 +12,7 @@ import unittest
 from unittest import mock
 import fcntl
 
-from package import RELEASE_TARGETS, ADDON_ASSETS, ADDON_EXECUTABLES, asset_name, package_linux
+from package import RELEASE_TARGETS, asset_name, package_linux
 import importlib.util
 
 spec = importlib.util.spec_from_file_location("install_addons", Path(__file__).with_name("install-addons.py"))
@@ -34,23 +34,14 @@ class PackagingTests(unittest.TestCase):
             stage.mkdir()
             (stage / "auth.json").write_text("must not ship")
             output = root / "release.tar.gz"
-            addon = root / "addon"
-            addon.mkdir()
-            for name in ADDON_ASSETS:
-                (addon / name).parent.mkdir(parents=True, exist_ok=True)
-                (addon / name).write_bytes(b"fixture addon")
-                if name in ADDON_EXECUTABLES:
-                    (addon / name).chmod(0o755)
-            package_linux(binary, output, stage, addon)
+            package_linux(binary, output, stage)
             with tarfile.open(output) as archive:
-                self.assertEqual(set(archive.getnames()), {"focus-editor", "focus-editor-server", "INSTALL.txt", "LICENSE", "THIRD_PARTY_NOTICES.txt", "install-addons.py"} | set(ADDON_ASSETS))
+                self.assertEqual(set(archive.getnames()), {"focus-editor", "focus-editor-server", "INSTALL.txt", "LICENSE", "THIRD_PARTY_NOTICES.txt"})
                 self.assertEqual(archive.extractfile("LICENSE").read(), Path("LICENSE").read_bytes())
                 self.assertTrue(archive.getmember("focus-editor").mode & 0o111)
                 self.assertTrue(archive.getmember("focus-editor-server").mode & 0o111)
                 self.assertEqual(archive.extractfile("focus-editor-server").read(), server.read_bytes())
                 self.assertEqual(archive.extractfile("focus-editor").read(), binary.read_bytes())
-                for name in ADDON_EXECUTABLES:
-                    self.assertTrue(archive.getmember(name).mode & 0o111)
 
     def test_addon_installer_places_assets_beside_logs_and_preserves_state(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -101,18 +92,6 @@ class PackagingTests(unittest.TestCase):
             for name in names:
                 self.assertEqual(Path(name).name, name)
                 (root / name).write_bytes(name.encode())
-            for target in RELEASE_TARGETS:
-                build = root / "build" / target
-                for path, manifest in manifests():
-                    stage = build / "addons" / manifest["id"]
-                    stage.mkdir(parents=True)
-                    (stage / "addon.toml").write_text(f"target='{target}'\n" + path.read_text())
-                    for relative in addon_files(manifest):
-                        if relative != "addon.toml":
-                            (stage / relative).parent.mkdir(parents=True, exist_ok=True)
-                            (stage / relative).write_bytes(b"fixture")
-                package_addons(build, root, "release/v1.2.3", target)
-            shutil.rmtree(root / "build")
 
             def generate():
                 return subprocess.run([sys.executable, str(script), str(root), "release/v1.2.3"],

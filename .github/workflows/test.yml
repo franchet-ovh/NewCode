@@ -1,53 +1,99 @@
 name: Branch tests
-
 on:
   push:
-    branches:
-      - '**'
-
+    branches: ['**']
+  pull_request:
 permissions:
   contents: read
-
+  actions: read
 concurrency:
   group: branch-tests-${{ github.ref }}
-  cancel-in-progress: true
-
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 env:
   CARGO_TERM_COLOR: always
-
 jobs:
+  changes:
+    runs-on: ubuntu-24.04
+    outputs:
+      matrix: ${{ steps.select.outputs.matrix }}
+      has_checks: ${{ steps.select.outputs.has_checks }}
+      tooling: ${{ steps.select.outputs.tooling }}
+      addons: ${{ steps.select.outputs.addons }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - id: select
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+          EVENT: ${{ github.event_name }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          REF: ${{ github.ref }}
+        run: |
+          if [ "$EVENT" = pull_request ]; then
+            python3 scripts/ci/changes.py --base "$BASE" --merge-base
+          else
+            if [ "$REF" = refs/heads/main ]; then
+              # Include changes from cancelled, failed, or coalesced main runs.
+              if ! BASE=$(gh api "repos/$GH_REPO/actions/workflows/test.yml/runs?branch=main&event=push&status=success&per_page=1" --jq '.workflow_runs[0].head_sha // "0000000000000000000000000000000000000000"'); then
+                BASE=0000000000000000000000000000000000000000
+              fi
+              python3 scripts/ci/changes.py --base "$BASE"
+            else
+              # Include earlier branch commits even if their CI was cancelled.
+              python3 scripts/ci/changes.py --base origin/main --merge-base
+            fi
+          fi
+  tooling:
+    needs: changes
+    if: needs.changes.outputs.tooling == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - run: python3 -m unittest discover -s scripts/release -p 'test_*.py'
+      - run: python3 -m unittest discover -s scripts/ci -p 'test_*.py'
   test:
-    name: Test ${{ matrix.platform }}
-    runs-on: ${{ fromJSON(matrix.runner) }}
-    container: ubuntu:24.04
-    defaults:
-      run:
-        shell: bash
+    needs: changes
+    if: needs.changes.outputs.has_checks == 'true'
+    name: Test ${{ matrix.component }} (${{ matrix.target }})
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - platform: linux-amd64
-            #runner: '{"group":"NewCode-group","labels":"arc-franchet-ovh"}'
-            # in house runner is too slow. Need more CPUs
-            runner: '"ubuntu-24.04"'
-            target: x86_64-unknown-linux-gnu
-          - platform: linux-arm64
-            runner: '"ubuntu-24.04-arm"'
-            target: aarch64-unknown-linux-gnu
+      matrix: ${{ fromJSON(needs.changes.outputs.matrix) }}
     steps:
-      - name: Install job prerequisites
-        run: |
-          apt-get update
-          apt-get install -y --no-install-recommends ca-certificates curl git python3 sudo file gh xz-utils unzip
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
           persist-credentials: false
-      - name: Configure workspace Git
-        uses: ./.github/actions/git-workspace
-      - name: Run shared Linux checks
-        uses: ./.github/actions/linux-checks
+      - uses: ./.github/actions/linux-checks
         with:
           target: ${{ matrix.target }}
-          build-release: ${{ github.ref == 'refs/heads/main' }}
+          component: ${{ matrix.component }}
+  summary:
+    name: CI summary
+    needs: [changes, tooling, test]
+    if: always()
+    runs-on: ubuntu-24.04
+    steps:
+      - env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          echo "$RESULTS" >> "$GITHUB_STEP_SUMMARY"
+          echo "$RESULTS" | jq -e 'all(.[]; .result == "success" or .result == "skipped")'
+  publish-addons:
+    needs: [changes, summary]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.changes.outputs.addons != '[]'
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        addon: ${{ fromJSON(needs.changes.outputs.addons) }}
+    uses: ./.github/workflows/addon-release.yml
+    with:
+      addon: ${{ matrix.addon }}
+      source-sha: ${{ github.sha }}

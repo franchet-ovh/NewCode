@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import re
 import shutil
+import subprocess
 import sys
 import tomllib
 
@@ -21,7 +22,7 @@ def data_root():
     return base / "focus-editor"
 
 
-def install(source, destination, ids=None):
+def install(source, destination, ids=None, editor="focus-editor"):
     source = Path(source).resolve(strict=True)
     installed = []
     for directory in sorted(source.iterdir()):
@@ -33,6 +34,8 @@ def install(source, destination, ids=None):
             raise ValueError("Invalid addon ID/directory")
         if manifest["protocol"] != 1:
             raise ValueError("Unsupported addon protocol")
+        if manifest.get("editor_version_req") is not None:
+            subprocess.run([str(editor), "--check-addon-compatibility", str(directory / "addon.toml")], check=True)
         assets = ["addon.toml", manifest["executable"], manifest["icon"]]
         assets += [name for name in ("LICENSE", "THIRD_PARTY_NOTICES.txt") if (directory / name).is_file()]
         target = Path(destination) / "addons" / addon_id
@@ -130,8 +133,9 @@ def main():
     parser.add_argument("--addon", action="append", help="Install only this addon ID; repeat for several")
     parser.add_argument("--source", type=Path, default=source)
     parser.add_argument("--data-root", type=Path, default=data_root())
+    parser.add_argument("--editor", default="focus-editor", help="Editor executable used for compatibility validation")
     args = parser.parse_args()
-    for path in install(args.source, args.data_root, args.addon):
+    for path in install(args.source, args.data_root, args.addon, args.editor):
         print(f"Installed {path}")
 
 
