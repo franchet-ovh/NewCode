@@ -17,8 +17,17 @@ pub(super) fn load_manifest(path: &Path) -> Result<Manifest, String> {
     {
         return Err("Addon ID must contain letters, digits, - or _".into());
     }
-    if manifest.protocol != focus_addon_sdk::PROTOCOL_VERSION {
-        return Err(format!("Unsupported addon protocol {}", manifest.protocol));
+    focus_addon_sdk::check_compatibility(
+        manifest.editor_version_req.as_deref(),
+        manifest.protocol,
+        env!("CARGO_PKG_VERSION"),
+    )?;
+    if manifest
+        .target
+        .as_deref()
+        .is_some_and(|target| Some(target) != packages::target())
+    {
+        return Err("Addon package targets a different platform".into());
     }
     let root = path
         .parent()

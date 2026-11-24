@@ -4,7 +4,6 @@ from pathlib import Path
 import re
 import tomllib
 
-from addon_release import manifests
 
 
 def release_version(tag):
@@ -31,10 +30,6 @@ def replace_version(text, version):
 def validate_versions(tag, root=Path(".")):
     version = release_version(tag)
     projects = [root / "Cargo.toml"]
-    for path, manifest in manifests(root):
-        if manifest["version"] != version:
-            raise ValueError(f"Addon version does not match release: {path}")
-        projects.append(path.with_name("Cargo.toml"))
     for path in projects:
         if tomllib.loads(path.read_text())["package"]["version"] != version:
             raise ValueError(f"Cargo version does not match release: {path}")
@@ -45,9 +40,6 @@ def prepare(tag, root=Path(".")):
     version = release_version(tag)
     changes = {}
     projects = [root / "Cargo.toml"]
-    for path, _ in manifests(root):
-        changes[path] = replace_version(path.read_text(), version)
-        projects.append(path.with_name("Cargo.toml"))
     for project in projects:
         text = project.read_text()
         name = tomllib.loads(text)["package"]["name"]

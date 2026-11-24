@@ -40,7 +40,7 @@ impl Default for Manager {
             installed: true,
             query: String::new(),
             selected: None,
-            release: option_env!("FOCUS_RELEASE_TAG").unwrap_or("latest").into(),
+            release: "latest".into(),
             catalog: None,
             receipts: BTreeMap::new(),
             pending: None,
@@ -115,8 +115,10 @@ mod tests {
             publisher: String::new(),
             version: "1.0.0".into(),
             protocol: 1,
+            editor_version_req: None,
             target: packages::target().unwrap().into(),
             archive: "fixture.tar.gz".into(),
+            source_release: None,
             size: 1,
             sha256: "0".repeat(64),
         }
@@ -298,14 +300,18 @@ mod tests {
     }
 }
 fn compatibility(catalog: &Catalog, package: &Package) -> Option<String> {
-    if catalog.editor_version != env!("CARGO_PKG_VERSION") {
+    if catalog.schema == 1 && catalog.editor_version != env!("CARGO_PKG_VERSION") {
         Some(format!(
             "Requires editor {}; this editor is {}",
             catalog.editor_version,
             env!("CARGO_PKG_VERSION")
         ))
-    } else if package.protocol != focus_addon_sdk::PROTOCOL_VERSION {
-        Some(format!("Requires addon protocol {}", package.protocol))
+    } else if let Err(reason) = focus_addon_sdk::check_compatibility(
+        package.editor_version_req.as_deref(),
+        package.protocol,
+        env!("CARGO_PKG_VERSION"),
+    ) {
+        Some(reason)
     } else if Some(package.target.as_str()) != packages::target() {
         Some(format!("Not built for this platform ({})", package.target))
     } else {
@@ -802,10 +808,13 @@ impl Addons {
                 if let (Some(catalog), Some(package)) = (&self.manager.catalog, remote) {
                     ui.separator();
                     ui.label(format!("Available: {} · release {} · {}", package.version,
-                        catalog.release, package.target));
+                        package.source_release.as_deref().unwrap_or(&catalog.release), package.target));
                     ui.label(&package.description);
                     if !package.publisher.is_empty() {
                         ui.label(format!("Publisher: {}", package.publisher));
+                    }
+                    if let Some(requirement) = &package.editor_version_req {
+                        ui.label(format!("Supported editors: {requirement}"));
                     }
                     let reason = compatibility(catalog, &package);
                     if let Some(reason) = &reason {
@@ -814,7 +823,8 @@ impl Addons {
                     let can_install = reason.is_none() && !self.manager_busy();
                     let label = if installed.is_some() { "Update / install selected release" } else { "Install" };
                     if ui.add_enabled(can_install, egui::Button::new(label)).clicked() {
-                        action = Some(Action::Install(package, catalog.release.clone()));
+                        let release = package.source_release.clone().unwrap_or_else(|| catalog.release.clone());
+                        action = Some(Action::Install(package, release));
                     }
                 }
                 if let Ok(root) = crate::app_paths::data_root() {

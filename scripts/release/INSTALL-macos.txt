@@ -8,15 +8,13 @@ desktop window, run its executable with --ui. No Node.js or Electron is needed.
 Closing the window warns about unsaved documents, stops the backend, and removes
 the temporary profile. Reloads and connection loss retain the session
 while the window is alive. External links open in the normal system browser.
-To install bundled addons, run python3 install-addons.py from the
-mounted image (Python 3.11 or newer). Add --addon github to install only GitHub.
-Open Addons below Source Control and choose Rescan installed afterward. Addons are
-installed beside logs in ~/Library/Application Support/focus-editor/addons.
-Persistent data is kept separately under focus-editor/addon-data/<id>.
-Updates and default uninstall preserve data and OS-keyring credentials.
-The Addons manager also installs local addon .tar.gz packages and provides
-enable, restart, credential, and uninstall controls. Automatic release catalogs
-currently provide Linux packages only.
+Addons are distributed separately. Open Addons below Source Control to install
+local addon.toml or addon .tar.gz packages and manage updates, enablement,
+credentials, and uninstall. Installed addons live beside logs under
+~/Library/Application Support/focus-editor/addons. Updates preserve workspace data
+and OS-keyring credentials. Automatic addon releases currently provide Linux
+packages only; build macOS addons from source. The manager checks supported
+editor versions, protocol, and platform before installation.
 This download has an ad-hoc signature, not an Apple Developer ID signature,
 and is not notarized. macOS may block the first launch. After attempting to
 open it, use System Settings > Privacy & Security > Open Anyway if offered.

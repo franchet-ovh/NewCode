@@ -38,7 +38,8 @@ class CommitVersionTests(unittest.TestCase):
             self.assertEqual(git(remote, "rev-parse", "main"), sha)
             self.assertEqual(git(root, "show", "-s", "--format=%s", sha), "chore: release 1.2.3")
             self.assertEqual(set(git(root, "diff-tree", "--no-commit-id", "--name-only", "-r", sha).splitlines()), {
-                "Cargo.toml", "Cargo.lock", "addons/fixture/Cargo.toml", "addons/fixture/Cargo.lock", "addons/fixture/addon.toml"})
+                "Cargo.toml", "Cargo.lock"})
+            self.assertIn('version = "0.1.0"', (root / "addons/fixture/Cargo.toml").read_text())
             self.assertEqual(commit_version("v1.2.3", root), sha)
             git(root, "commit", "--allow-empty", "-m", "Main advanced")
             git(root, "checkout", "--detach", sha)

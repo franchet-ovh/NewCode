@@ -33,6 +33,20 @@ pub fn editor_main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn run() -> Result<(), Box<dyn std::error::Error>> {
+    let mut raw = std::env::args_os().skip(1);
+    if raw.next().as_deref() == Some(std::ffi::OsStr::new("--check-addon-compatibility")) {
+        let path = raw.next().ok_or("Expected an addon.toml path")?;
+        if raw.next().is_some() {
+            return Err("Expected one addon.toml path".into());
+        }
+        let manifest: focus_addon_sdk::Manifest = toml::from_str(&std::fs::read_to_string(path)?)?;
+        focus_addon_sdk::check_compatibility(
+            manifest.editor_version_req.as_deref(),
+            manifest.protocol,
+            env!("CARGO_PKG_VERSION"),
+        )?;
+        return Ok(());
+    }
     let arguments = logging::Arguments::parse(std::env::args_os().skip(1))?;
     if arguments.version {
         println!("focus-editor {}", env!("CARGO_PKG_VERSION"));

@@ -39,7 +39,7 @@ class VersionTests(unittest.TestCase):
             self.assertEqual(validate_versions("v2.3.4-rc.1", root), "2.3.4-rc.1")
             with self.assertRaises(ValueError):
                 validate_versions("v2.3.5", root)
-            for project in [root / "Cargo.toml", *root.glob("addons/*/Cargo.toml")]:
+            for project in [root / "Cargo.toml"]:
                 package = tomllib.loads(project.read_text())["package"]
                 self.assertEqual(package["version"], "2.3.4-rc.1")
                 lock = project.with_name("Cargo.lock")
@@ -50,7 +50,10 @@ class VersionTests(unittest.TestCase):
                         entry["version"] = "2.3.4-rc.1"
                 self.assertEqual(old, new)
             for manifest in root.glob("addons/*/addon.toml"):
-                self.assertEqual(tomllib.loads(manifest.read_text())["version"], "2.3.4-rc.1")
+                self.assertEqual(manifest.read_bytes(), before[manifest])
+                for filename in ("Cargo.toml", "Cargo.lock"):
+                    file = manifest.with_name(filename)
+                    self.assertEqual(file.read_bytes(), before[file])
             stamped = {p: p.read_bytes() for p in before}
             prepare("v2.3.4-rc.1", root)
             self.assertEqual(stamped, {p: p.read_bytes() for p in before})

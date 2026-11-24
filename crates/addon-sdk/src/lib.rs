@@ -19,6 +19,8 @@ pub struct Manifest {
     pub name: String,
     pub version: String,
     pub protocol: u32,
+    #[serde(default)]
+    pub editor_version_req: Option<String>,
     pub executable: PathBuf,
     pub icon: PathBuf,
     #[serde(default)]
@@ -58,6 +60,7 @@ pub enum Presentation {
 pub struct Catalog {
     pub schema: u32,
     pub release: String,
+    #[serde(default)]
     pub editor_version: String,
     pub packages: Vec<Package>,
 }
@@ -71,18 +74,34 @@ pub struct Package {
     pub publisher: String,
     pub version: String,
     pub protocol: u32,
+    #[serde(default)]
+    pub editor_version_req: Option<String>,
     pub target: String,
     pub archive: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_release: Option<String>,
     pub size: u64,
     pub sha256: String,
 }
 impl Catalog {
     pub fn validate(&self) -> Result<(), String> {
-        if self.schema != 1 || self.release.is_empty() || self.editor_version.is_empty() {
+        if !matches!(self.schema, 1 | 2)
+            || self.release.is_empty()
+            || (self.schema == 1 && self.editor_version.is_empty())
+        {
             return Err("Unsupported or incomplete addon catalog".into());
         }
         let mut keys = std::collections::HashSet::new();
         for package in &self.packages {
+            if self.schema == 2 {
+                let req = package
+                    .editor_version_req
+                    .as_deref()
+                    .ok_or("Missing editor compatibility range")?;
+                semver::VersionReq::parse(req)
+                    .map_err(|e| format!("Invalid editor compatibility range: {e}"))?;
+                semver::Version::parse(&package.version).map_err(|e| e.to_string())?;
+            }
             if !valid_id(&package.id)
                 || package.name.is_empty()
                 || package.version.is_empty()
@@ -102,6 +121,28 @@ impl Catalog {
         Ok(())
     }
 }
+/// Shared by loading, local installation, and remote package selection.
+pub fn check_compatibility(
+    requirement: Option<&str>,
+    protocol: u32,
+    editor: &str,
+) -> Result<(), String> {
+    if protocol != PROTOCOL_VERSION {
+        return Err(format!("Requires addon protocol {protocol}"));
+    }
+    if let Some(requirement) = requirement {
+        let range = semver::VersionReq::parse(requirement)
+            .map_err(|e| format!("Invalid editor compatibility range: {e}"))?;
+        let version = semver::Version::parse(editor).map_err(|e| e.to_string())?;
+        if !range.matches(&version) {
+            return Err(format!(
+                "Requires editor {requirement}; this editor is {editor}"
+            ));
+        }
+    }
+    Ok(())
+}
+
 pub fn valid_id(id: &str) -> bool {
     !id.is_empty()
         && id
@@ -495,6 +536,19 @@ impl<R: BufRead, W: Write> Connection<R, W> {
 mod tests {
     use super::*;
     #[test]
+    fn editor_range_boundaries_and_legacy_protocol_compatibility() {
+        for version in ["0.4.8", "0.4.9", "0.4.99"] {
+            assert!(check_compatibility(Some(">=0.4.8, <0.5.0"), 1, version).is_ok());
+        }
+        for version in ["0.4.7", "0.5.0", "0.5.0-rc.1"] {
+            assert!(check_compatibility(Some(">=0.4.8, <0.5.0"), 1, version).is_err());
+        }
+        assert!(check_compatibility(Some("bad range"), 1, "0.4.8").is_err());
+        assert!(check_compatibility(Some("*"), 99, "0.4.8").is_err());
+        assert!(check_compatibility(None, 1, "0.4.8").is_ok());
+    }
+
+    #[test]
     fn catalog_rejects_duplicate_packages_and_unsafe_archive_names() {
         let package = Package {
             id: "example".into(),
@@ -503,8 +557,10 @@ mod tests {
             publisher: String::new(),
             version: "1.0.0".into(),
             protocol: 1,
+            editor_version_req: None,
             target: "linux".into(),
             archive: "example.tar.gz".into(),
+            source_release: None,
             size: 1,
             sha256: "a".repeat(64),
         };
@@ -518,6 +574,14 @@ mod tests {
         catalog.packages.push(package);
         assert!(catalog.validate().is_err());
         catalog.packages.pop();
+        catalog.schema = 2;
+        catalog.editor_version.clear();
+        assert!(catalog.validate().is_err());
+        catalog.packages[0].editor_version_req = Some(">=1.0.0, <2.0.0".into());
+        assert!(catalog.validate().is_ok());
+        catalog.packages[0].editor_version_req = Some("invalid".into());
+        assert!(catalog.validate().is_err());
+        catalog.packages[0].editor_version_req = Some("*".into());
         catalog.packages[0].archive = "../bad.tar.gz".into();
         assert!(catalog.validate().is_err());
     }

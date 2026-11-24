@@ -4,7 +4,6 @@ import os
 from pathlib import Path
 import subprocess
 
-from addon_release import manifests
 from prepare_version import prepare, validate_versions
 
 
@@ -20,9 +19,6 @@ def commit_version(tag, root=Path(".")):
     version = prepare(tag, root)
     validate_versions(tag, root)
     files = ["Cargo.toml", "Cargo.lock"]
-    for path, _ in manifests(root):
-        files.extend(str(p.relative_to(root)) for p in (
-            path, path.with_name("Cargo.toml"), path.with_name("Cargo.lock")))
     git(root, "add", "--", *files)
     if git(root, "diff", "--cached", "--name-only"):
         git(root, "commit", "-m", f"chore: release {version}")

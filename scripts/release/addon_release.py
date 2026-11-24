@@ -54,14 +54,18 @@ def digest(path):
         return hashlib.file_digest(stream, "sha256").hexdigest()
 
 
-def package_addons(binary_directory, destination, tag, target, root=Path(".")):
+def package_addons(binary_directory, destination, tag, target, root=Path("."), selected=None):
     destination.mkdir(parents=True, exist_ok=True)
     packages = []
     for _, definition in manifests(root):
+        if selected is not None and definition["id"] not in selected:
+            continue
         source = binary_directory / "addons" / definition["id"]
         manifest = tomllib.loads((source / "addon.toml").read_text())
         if manifest["target"] != target or any(manifest[key] != definition[key] for key in ("id", "version", "protocol", "executable", "icon")):
             raise ValueError("Staged addon identity/platform mismatch")
+        if selected is not None and (not manifest.get("editor_version_req") or manifest.get("editor_version_req") != definition.get("editor_version_req")):
+            raise ValueError("Missing or mismatched editor compatibility range")
         name = archive_name(tag, target, manifest["id"])
         path = destination / name
         with tarfile.open(path, "w:gz", format=tarfile.PAX_FORMAT) as archive:
@@ -75,8 +79,9 @@ def package_addons(binary_directory, destination, tag, target, root=Path(".")):
         packages.append({"id": manifest["id"], "name": manifest["name"],
                          "description": manifest.get("description", ""), "publisher": manifest.get("publisher", ""),
                          "version": manifest["version"], "protocol": manifest["protocol"], "target": target,
+                         "editor_version_req": manifest.get("editor_version_req"),
                          "archive": name, "size": path.stat().st_size, "sha256": digest(path)})
-    catalog = {"schema": 1, "release": tag,
+    catalog = {"schema": 2 if selected is not None else 1, "release": tag,
                "editor_version": tomllib.loads((root / "Cargo.toml").read_text())["package"]["version"],
                "packages": packages}
     (destination / index_name(target)).write_text(json.dumps(catalog, indent=2) + "\n")

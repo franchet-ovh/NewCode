@@ -596,6 +596,7 @@ dependencies = [
 name = "focus-addon-sdk"
 version = "0.1.0"
 dependencies = [
+ "semver",
  "serde",
  "serde_json",
 ]

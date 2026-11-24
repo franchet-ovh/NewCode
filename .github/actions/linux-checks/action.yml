@@ -4,13 +4,31 @@ inputs:
   target:
     description: Native Rust target triple
     required: true
+  component:
+    description: editor, addon-sdk, addon-support, or addon ID
+    default: editor
   build-release:
     description: Build optimized binaries and populate the shared release cache
     default: 'false'
 runs:
   using: composite
   steps:
+    - name: Select project
+      id: project
+      shell: bash
+      env:
+        COMPONENT: ${{ inputs.component }}
+      run: |
+        project=.
+        cache_target=target
+        if [ "$COMPONENT" != editor ]; then
+          if [ -f "crates/$COMPONENT/Cargo.toml" ]; then project="crates/$COMPONENT"; else project="addons/$COMPONENT"; fi
+          cache_target=../../target
+        fi
+        echo "path=$project" >> "$GITHUB_OUTPUT"
+        echo "cache-target=$cache_target" >> "$GITHUB_OUTPUT"
     - name: Install Linux build and test dependencies
+      if: inputs.component == 'editor'
       shell: bash
       run: |
         sudo apt-get update
@@ -37,44 +55,32 @@ runs:
         fi
         rustup target add "$TARGET"
     - name: Install pinned Zig toolchain for Ghostty
+      if: inputs.component == 'editor'
       shell: bash
       run: |
         python3 scripts/install-zig.py "$RUNNER_TEMP/focus-zig"
         echo "$RUNNER_TEMP/focus-zig" >> "$GITHUB_PATH"
     - uses: Swatinem/rust-cache@2201cc584a476d1b508be977bbe4b7d1c7a52e9c # v2.9.3
       with:
-        # Main-branch builds seed optimized dependencies for release-tag jobs.
-        # Keep debug-only jobs separate so an immutable debug cache cannot
-        # prevent the optimized artifacts from being saved.
-        shared-key: linux-${{ inputs.target }}-${{ inputs.build-release == 'true' && 'release' || 'debug' }}
-        workspaces: |
-          . -> target
-          crates/addon-sdk -> ../../target
-          crates/addon-support -> ../../target
-          addons/codex -> ../../target
-          addons/opencode -> ../../target
-          addons/github -> ../../target
-    - name: Check Rust formatting
-      shell: bash
-      run: cargo fmt --check
-    - name: Test release packaging scripts
-      shell: bash
-      run: python3 -m unittest discover -s scripts/release -p 'test_*.py'
-    - name: Run Rust tests
-      env:
-        TARGET: ${{ inputs.target }}
-      shell: bash
-      run: cargo test --locked --target "$TARGET"
-    - name: Test SDK and addon projects
+        # Isolate project/profile caches so independent immutable cache writes
+        # do not starve other projects of their compiled artifacts.
+        shared-key: linux-${{ inputs.target }}-${{ inputs.component }}-${{ inputs.build-release == 'true' && 'release' || 'debug' }}
+        workspaces: ${{ steps.project.outputs.path }} -> ${{ steps.project.outputs.cache-target }}
+    - name: Check selected project
       shell: bash
       env:
+        COMPONENT: ${{ inputs.component }}
         TARGET: ${{ inputs.target }}
-      run: python3 scripts/addons.py --test --target "$TARGET"
-    - name: Build optimized executables
-      if: inputs.build-release == 'true'
-      env:
-        TARGET: ${{ inputs.target }}
-      shell: bash
+        BUILD_RELEASE: ${{ inputs.build-release }}
       run: |
-        cargo build --release --bins --locked --target "$TARGET"
-        python3 scripts/addons.py --release --target "$TARGET"
+        trap 'echo "${COMPONENT} (${TARGET}): ${SECONDS}s" >> "$GITHUB_STEP_SUMMARY"' EXIT
+        project="${{ steps.project.outputs.path }}"
+        cargo fmt --check --manifest-path "$project/Cargo.toml"
+        cargo test --locked --manifest-path "$project/Cargo.toml" --target-dir "$GITHUB_WORKSPACE/target" --target "$TARGET"
+        if [ "$BUILD_RELEASE" = true ]; then
+          if [ "$COMPONENT" = editor ]; then
+            cargo build --release --bins --locked --target "$TARGET"
+          else
+            python3 scripts/addons.py --release --target "$TARGET" --addon "$COMPONENT"
+          fi
+        fi
