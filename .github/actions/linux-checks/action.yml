@@ -79,7 +79,7 @@ runs:
         cargo test --locked --manifest-path "$project/Cargo.toml" --target-dir "$GITHUB_WORKSPACE/target" --target "$TARGET"
         if [ "$BUILD_RELEASE" = true ]; then
           if [ "$COMPONENT" = editor ]; then
-            cargo build --release --bins --locked --target "$TARGET"
+            cargo build --offline --release --bins --locked --target "$TARGET"
           else
             python3 scripts/addons.py --release --target "$TARGET" --addon "$COMPONENT"
           fi
