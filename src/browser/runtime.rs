@@ -152,6 +152,7 @@ impl Runtime {
                 || previous.size != frame.size
                 || previous.title != frame.title
                 || previous.dirty != frame.dirty
+                || previous.dark_mode != frame.dark_mode
                 || previous.pixels_per_point != frame.pixels_per_point
                 || previous.output != frame.output
         }) || !frame.textures.is_empty()

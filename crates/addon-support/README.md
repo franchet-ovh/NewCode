@@ -73,3 +73,9 @@ focus-editor --no-addon codex --no-addon opencode .
 
 Build/release tooling discovers bundled manifests. Packaged executables support
 `--version`, printing their executable name followed by the version.
+
+## Shared controls
+
+`ui_theme` re-exports shared control constructors and semantic `ButtonRole`. Use `action_button` for vector-icon actions and `icon_button` for labeled icon-only actions, `role_button` for semantic actions, and `control_button` when a caller needs egui builder options. The former color/boolean button signature has been removed. Use `singleline`/`multiline` for builder-based fields, or `text_field` for persistent labels, hints, and help. `list_row`, `panel_header`, `card`, `badge`, `text`, and `empty_state` share host appearance. Selectors and checkboxes inherit the same egui style.
+
+The editor owns Nord Light/Dark presets and workspace appearance settings. Addons consume the resolved theme, including defaulted control height, spacing, and radius metrics. Do not hardcode a preset or reset widget memory when appearance changes.

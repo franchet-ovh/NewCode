@@ -148,7 +148,7 @@ impl App {
         Ok(())
     }
     pub(crate) fn issue_assistant_widgets(&self) -> Vec<W> {
-        let mut widgets = vec![W::Separator, W::text("Start an AI session from this issue")];
+        let mut widgets = vec![W::heading("Work with an assistant")];
         if !self.assistant_notice.is_empty() {
             widgets.push(W::text(&self.assistant_notice));
         }
@@ -194,6 +194,10 @@ impl App {
         }
         widgets.push(W::button("assistant_refresh", "Reload AI options"));
         widgets.push(W::Button {
+            style: focus_addon_sdk::ButtonStyle {
+                role: focus_addon_sdk::ButtonRole::Primary,
+                ..Default::default()
+            },
             id: "issue_assistant".into(),
             label: "Create branch, checkout & start AI".into(),
             enabled: assistant.is_some_and(|a| a.enabled && a.error.is_none())

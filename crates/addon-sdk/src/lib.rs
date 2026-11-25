@@ -198,11 +198,58 @@ pub struct View {
     pub detail: Vec<Widget>,
 }
 
+/// Semantic presentation only; addon widgets never embed editor colors.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ButtonRole {
+    Primary,
+    #[default]
+    Secondary,
+    Quiet,
+    Destructive,
+}
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct ButtonStyle {
+    pub role: ButtonRole,
+    pub selected: bool,
+    pub description: String,
+}
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TextRole {
+    #[default]
+    Body,
+    Heading,
+    Muted,
+    Success,
+    Warning,
+    Error,
+}
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RowLayout {
+    #[default]
+    Wrap,
+    Stack,
+    Card,
+    Columns,
+}
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct InputOptions {
+    pub placeholder: String,
+    pub help: String,
+    pub on_change: Option<String>,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Widget {
     Text {
         text: String,
+        #[serde(default)]
+        role: TextRole,
     },
     Markdown {
         text: String,
@@ -212,6 +259,8 @@ pub enum Widget {
         label: String,
         #[serde(default = "yes")]
         enabled: bool,
+        #[serde(default)]
+        style: ButtonStyle,
     },
     Input {
         id: String,
@@ -219,6 +268,8 @@ pub enum Widget {
         value: String,
         #[serde(default)]
         multiline: bool,
+        #[serde(default)]
+        options: InputOptions,
     },
     Checkbox {
         id: String,
@@ -238,6 +289,8 @@ pub enum Widget {
         url: String,
     },
     Row {
+        #[serde(default)]
+        layout: RowLayout,
         children: Vec<Widget>,
     },
     Separator,
@@ -247,13 +300,17 @@ fn yes() -> bool {
 }
 impl Widget {
     pub fn text(text: impl Into<String>) -> Self {
-        Self::Text { text: text.into() }
+        Self::Text {
+            text: text.into(),
+            role: TextRole::Body,
+        }
     }
     pub fn button(id: impl Into<String>, label: impl Into<String>) -> Self {
         Self::Button {
             id: id.into(),
             label: label.into(),
             enabled: true,
+            style: ButtonStyle::default(),
         }
     }
     pub fn input(
@@ -266,7 +323,57 @@ impl Widget {
             label: label.into(),
             value: value.into(),
             multiline: false,
+            options: InputOptions::default(),
         }
+    }
+    pub fn heading(text: impl Into<String>) -> Self {
+        Self::Text {
+            text: text.into(),
+            role: TextRole::Heading,
+        }
+    }
+    pub fn muted(text: impl Into<String>) -> Self {
+        Self::Text {
+            text: text.into(),
+            role: TextRole::Muted,
+        }
+    }
+    pub fn status(text: impl Into<String>, role: TextRole) -> Self {
+        Self::Text {
+            text: text.into(),
+            role,
+        }
+    }
+    pub fn row(layout: RowLayout, children: Vec<Self>) -> Self {
+        Self::Row { layout, children }
+    }
+    pub fn styled(mut self, role: ButtonRole) -> Self {
+        if let Self::Button { style, .. } = &mut self {
+            style.role = role;
+        }
+        self
+    }
+    pub fn selected(mut self, selected: bool) -> Self {
+        if let Self::Button { style, .. } = &mut self {
+            style.selected = selected;
+        }
+        self
+    }
+    pub fn description(mut self, description: impl Into<String>) -> Self {
+        if let Self::Button { style, .. } = &mut self {
+            style.description = description.into();
+        }
+        self
+    }
+    pub fn input_options(mut self, placeholder: &str, help: &str, on_change: Option<&str>) -> Self {
+        if let Self::Input { options, .. } = &mut self {
+            *options = InputOptions {
+                placeholder: placeholder.into(),
+                help: help.into(),
+                on_change: on_change.map(Into::into),
+            };
+        }
+        self
     }
 }
 
@@ -622,5 +729,67 @@ mod tests {
     fn rejects_truncated_and_oversized_frames() {
         assert!(read_message(&mut io::Cursor::new(b"{")).is_err());
         assert!(read_message(&mut io::Cursor::new(vec![b' '; MAX_MESSAGE + 1])).is_err());
+    }
+}
+
+#[cfg(test)]
+mod presentation_tests {
+    use super::*;
+    #[test]
+    fn legacy_widgets_receive_default_presentation() {
+        let button: Widget =
+            serde_json::from_str(r#"{"kind":"button","id":"go","label":"Go"}"#).unwrap();
+        assert!(matches!(
+            button,
+            Widget::Button {
+                enabled: true,
+                style: ButtonStyle {
+                    role: ButtonRole::Secondary,
+                    selected: false,
+                    ..
+                },
+                ..
+            }
+        ));
+        let row: Widget =
+            serde_json::from_str(r#"{"kind":"row","children":[{"kind":"text","text":"hello"}]}"#)
+                .unwrap();
+        assert!(matches!(
+            row,
+            Widget::Row {
+                layout: RowLayout::Wrap,
+                ..
+            }
+        ));
+        let input: Widget =
+            serde_json::from_str(r#"{"kind":"input","id":"query","label":"Filter","value":""}"#)
+                .unwrap();
+        assert!(matches!(
+            input,
+            Widget::Input {
+                options: InputOptions {
+                    on_change: None,
+                    ..
+                },
+                ..
+            }
+        ));
+        let widget = Widget::button("go", "Go")
+            .styled(ButtonRole::Primary)
+            .selected(true)
+            .description("Next step");
+        let roundtrip: Widget =
+            serde_json::from_str(&serde_json::to_string(&widget).unwrap()).unwrap();
+        assert!(matches!(
+            roundtrip,
+            Widget::Button {
+                style: ButtonStyle {
+                    role: ButtonRole::Primary,
+                    selected: true,
+                    ..
+                },
+                ..
+            }
+        ));
     }
 }

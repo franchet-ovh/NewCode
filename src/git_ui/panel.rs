@@ -8,7 +8,11 @@ impl GitUi {
     pub(super) fn panel_header(&self, ui: &mut egui::Ui) -> bool {
         let mut refresh = false;
         ui.horizontal(|ui| {
-            let width = (ui.available_width() - 48.0 - 2.0 * ui.spacing().item_spacing.x).max(1.0);
+            let width = (ui.available_width()
+                - 20.0
+                - ui.spacing().interact_size.y
+                - 2.0 * ui.spacing().item_spacing.x)
+                .max(1.0);
             fixed_label(
                 ui,
                 [width, 28.0],
@@ -44,7 +48,12 @@ impl GitUi {
             });
             refresh = ui
                 .add_enabled_ui(self.workspace.is_some(), |ui| {
-                    theme::button(ui, Icon::Refresh, "", theme::colors(ui).success, false)
+                    theme::action_button(
+                        ui,
+                        Icon::Refresh,
+                        "",
+                        focus_addon_sdk::ButtonRole::Secondary,
+                    )
                 })
                 .inner
                 .on_hover_text("Refresh repository status")
@@ -88,13 +97,14 @@ impl GitUi {
         refresh
     }
     pub(super) fn commit_form(&mut self, ui: &mut egui::Ui) {
+        ui.label(egui::RichText::new("Commit message").small().strong());
         egui::ScrollArea::vertical()
             .id_salt(("git_commit_draft", &self.workspace))
             .max_height(52.0)
             .auto_shrink([false, false])
             .show(ui, |ui| {
                 ui.add(
-                    egui::TextEdit::multiline(&mut self.commit)
+                    focus_addon_support::ui_theme::multiline(&mut self.commit)
                         .id(egui::Id::new(("git_commit_message", &self.workspace)))
                         .hint_text("Commit message")
                         .desired_rows(2)
@@ -104,10 +114,12 @@ impl GitUi {
         let blocker = self.commit_blocker();
         let button = ui.add_enabled(
             blocker.is_none(),
-            egui::Button::new(RichText::new("Commit staged").color(theme::colors(ui).on_accent))
-                .fill(theme::colors(ui).success)
-                .stroke(egui::Stroke::NONE)
-                .min_size(egui::vec2(ui.available_width(), 28.0)),
+            focus_addon_support::ui_theme::control_button(
+                RichText::new("Commit staged").color(theme::colors(ui).on_accent),
+            )
+            .fill(theme::colors(ui).success)
+            .stroke(egui::Stroke::NONE)
+            .min_size(egui::vec2(ui.available_width(), 28.0)),
         );
         let clicked = button
             .on_hover_text(blocker.unwrap_or("Commit only the staged changes"))
@@ -142,8 +154,13 @@ impl GitUi {
             ui.set_min_size(egui::vec2(width, 24.0));
             if let Some(notice) = &self.notice {
                 ui.horizontal(|ui| {
-                    let label_width =
-                        (width - if notice.details.is_some() { 36.0 } else { 0.0 }).max(1.0);
+                    let label_width = (width
+                        - if notice.details.is_some() {
+                            ui.spacing().interact_size.y + ui.spacing().item_spacing.x
+                        } else {
+                            0.0
+                        })
+                    .max(1.0);
                     fixed_label(
                         ui,
                         [label_width, 20.0],

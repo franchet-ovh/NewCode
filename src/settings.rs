@@ -4,6 +4,7 @@ use std::path::PathBuf;
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub(crate) struct Settings {
+    pub(crate) appearance: crate::ui_theme::Appearance,
     pub(crate) editor: crate::indentation::Preferences,
     pub(crate) lsp: crate::lsp::Config,
     pub(crate) workspace: Option<PathBuf>,
@@ -22,6 +23,7 @@ pub(crate) struct Settings {
 impl Default for Settings {
     fn default() -> Self {
         Self {
+            appearance: Default::default(),
             editor: Default::default(),
             lsp: Default::default(),
             workspace: None,
@@ -29,8 +31,8 @@ impl Default for Settings {
             open_files: Vec::new(),
             active_file: None,
             top_height: 210.0,
-            explorer_width: 232.0,
-            right_width: 310.0,
+            explorer_width: 282.0,
+            right_width: 340.0,
             right_command: String::new(),
             addon_enabled: Default::default(),
             selected_right_addon: None,
@@ -199,5 +201,20 @@ mod workspace_tests {
         ] {
             assert!(!text.contains(key));
         }
+    }
+}
+
+#[cfg(test)]
+mod appearance_tests {
+    use super::*;
+    #[test]
+    fn appearance_defaults_and_round_trips_with_existing_workspace_data() {
+        let legacy: Settings = toml::from_str("explorer_width = 275.0").unwrap();
+        assert_eq!(legacy.appearance, crate::ui_theme::Appearance::Light);
+        let mut settings = legacy;
+        settings.appearance = crate::ui_theme::Appearance::Dark;
+        let restored: Settings = toml::from_str(&toml::to_string(&settings).unwrap()).unwrap();
+        assert_eq!(restored.appearance, crate::ui_theme::Appearance::Dark);
+        assert_eq!(restored.explorer_width, 275.0);
     }
 }

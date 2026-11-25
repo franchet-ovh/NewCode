@@ -5,7 +5,7 @@ use eframe::egui;
 #[test]
 fn addon_manager_is_the_fourth_activity_and_preserves_file_tabs() {
     let ctx = egui::Context::default();
-    theme::apply(&ctx);
+    theme::apply(&ctx, crate::ui_theme::Appearance::Light);
     let mut app = test_app();
     let files = app.open_files.clone();
     let buffer = app.buffer.clone();
@@ -43,7 +43,7 @@ fn addon_manager_is_the_fourth_activity_and_preserves_file_tabs() {
 #[test]
 fn themed_window_fits_compact_and_standard_sizes() {
     let ctx = egui::Context::default();
-    theme::apply(&ctx);
+    theme::apply(&ctx, crate::ui_theme::Appearance::Light);
     let mut app = test_app();
     for size in [egui::vec2(900.0, 600.0), egui::vec2(1440.0, 900.0)] {
         for sidebar in [

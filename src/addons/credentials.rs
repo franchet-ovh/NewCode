@@ -25,12 +25,13 @@ impl Addons {
             ui.label("Reuse an existing CLI login, or store a personal access token in the OS keyring.");
             ui.label(&addon.manifest.credential.as_ref().unwrap().instructions);
             ui.label(&addon.manifest.credential.as_ref().unwrap().origin);
-            ui.add(egui::TextEdit::singleline(&mut dialog.secret).password(true).hint_text("Personal access token"));
+            ui.label(egui::RichText::new("Personal access token").small().strong());
+            ui.add(focus_addon_support::ui_theme::singleline(&mut dialog.secret).password(true).hint_text("Personal access token"));
             ui.label(&dialog.result);
             ui.add_enabled_ui(dialog.pending.is_none(), |ui| {
-                ui.horizontal(|ui| {
-                    let save = ui.add_enabled(!dialog.secret.trim().is_empty(), egui::Button::new("Save in OS keyring")).clicked();
-                    let delete = ui.button("Forget saved token").clicked();
+                ui.horizontal_wrapped(|ui| {
+                    let save = ui.add_enabled(!dialog.secret.trim().is_empty(), focus_addon_support::ui_theme::control_button("Save in OS keyring")).clicked();
+                    let delete = crate::ui_theme::role_button(ui, "Forget saved token", crate::ui_theme::ButtonRole::Destructive).clicked();
                     if save || delete {
                         let secret = std::mem::take(&mut dialog.secret); let manifest = addon.manifest.clone(); let ctx = ctx.clone();
                         let (tx, rx) = mpsc::channel(); dialog.pending = Some(rx);
@@ -42,7 +43,7 @@ impl Addons {
                             let _ = tx.send(result); ctx.request_repaint();
                         });
                     }
-                    close = ui.button("Close").clicked();
+                    close = ui.add(focus_addon_support::ui_theme::control_button("Close")).clicked();
                 });
             });
         });

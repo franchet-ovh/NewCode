@@ -115,7 +115,7 @@ impl EditorApp {
             Ok(terminal) => (Some(terminal), None),
             Err(error) => (None, Some(format!("Terminal failed to start: {error}"))),
         };
-        theme::apply(ctx);
+        theme::apply(ctx, settings.appearance);
         let (open_files, active_file, buffer) = restore_open_files(&settings);
         let next_document_id = open_files.len() as u64;
         let document_ids = open_files

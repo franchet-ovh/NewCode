@@ -234,3 +234,14 @@ language-specific dependencies. Provider-specific options can live in
 `crates/language-addon` supplies the common runner for the Rust and Python addon
 executables, including cancellation, framing, private environments, and local /
 container process groups. More languages may implement the protocol directly.
+
+## Shared presentation
+
+Declarative widgets retain protocol v1. Optional metadata supplies semantic roles, never colors:
+
+- `Button.style`: `role` (`primary`, `secondary`, `quiet`, `destructive`), `selected`, and `description` for list rows.
+- `Text.role`: `body`, `heading`, `muted`, `success`, `warning`, or `error`.
+- `Input.options`: `placeholder`, `help`, and optional `on_change` action ID.
+- `Row.layout`: `wrap` (default), `stack`, `card`, or responsive `columns`.
+
+Use the `Widget` builder methods to compose these elements. Omitted metadata keeps existing widgets valid; older hosts ignore the additional fields. Reactive inputs send the existing Action with current values; keep handlers local for filtering loaded results. The host retains edits during busy updates and submits the latest value when ready. Constructors and direct Rust variant initializers must include the new metadata fields when rebuilding against this SDK.

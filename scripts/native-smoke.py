@@ -60,7 +60,10 @@ class Desktop:
             (self.x, "XCloseDisplay", [display], C.c_int),
             (self.x, "XInternAtom", [display, C.c_char_p, C.c_int], window),
             (self.x, "XSendEvent", [display, window, C.c_int, C.c_long, pointer(XEvent)], C.c_int),
+            (self.x, "XRaiseWindow", [display, window], C.c_int),
+            (self.x, "XQueryPointer", [display, window, pointer(window), pointer(window), pointer(C.c_int), pointer(C.c_int), pointer(C.c_int), pointer(C.c_int), pointer(C.c_uint)], C.c_int),
             (self.x, "XSetInputFocus", [display, window, C.c_int, C.c_ulong], C.c_int),
+            (self.x, "XGetGeometry", [display, window, pointer(window), pointer(C.c_int), pointer(C.c_int), pointer(C.c_uint), pointer(C.c_uint), pointer(C.c_uint), pointer(C.c_uint)], C.c_int),
             (self.x, "XTranslateCoordinates", [display, window, window, C.c_int, C.c_int, pointer(C.c_int), pointer(C.c_int), pointer(window)], C.c_int),
             (self.x, "XStringToKeysym", [C.c_char_p], window),
             (self.x, "XKeysymToKeycode", [display, window], C.c_uint),
@@ -143,11 +146,55 @@ class Desktop:
         self.key("Control_L", False)
         time.sleep(0.15)
 
-    def edit(self, window):
+    def activate(self, window):
+        event = XEvent()
+        event.client.type = 33
+        event.client.display, event.client.window = self.display, window
+        event.client.message_type = self.x.XInternAtom(self.display, b"_NET_ACTIVE_WINDOW", False)
+        event.client.format = 32
+        event.client.data.longs[0] = 2  # Pager/test activation request.
+        self.x.XSendEvent(self.display, self.root, False, (1 << 20) | (1 << 19), C.byref(event))
+        self.x.XRaiseWindow(self.display, window)
         self.x.XSetInputFocus(self.display, window, 2, 0)
+        self.x.XSync(self.display, False)
+        time.sleep(.2)
+
+    def pointer_targets(self, window):
+        top = window
+        while True:
+            root, parent, count = C.c_ulong(), C.c_ulong(), C.c_uint()
+            children = C.POINTER(C.c_ulong)()
+            if not self.x.XQueryTree(self.display, top, C.byref(root), C.byref(parent), C.byref(children), C.byref(count)):
+                return False
+            if children:
+                self.x.XFree(children)
+            if parent.value == self.root:
+                break
+            if not parent.value:
+                return False
+            top = parent.value
+        root, child = C.c_ulong(), C.c_ulong()
+        rx, ry, wx, wy, mask = C.c_int(), C.c_int(), C.c_int(), C.c_int(), C.c_uint()
+        self.x.XQueryPointer(self.display, self.root, C.byref(root), C.byref(child), C.byref(rx), C.byref(ry), C.byref(wx), C.byref(wy), C.byref(mask))
+        return child.value == top
+
+    def bounds(self, window):
+        root = C.c_ulong()
+        gx, gy = C.c_int(), C.c_int()
+        width, height, border, depth = C.c_uint(), C.c_uint(), C.c_uint(), C.c_uint()
+        assert self.x.XGetGeometry(self.display, window, C.byref(root), C.byref(gx), C.byref(gy), C.byref(width), C.byref(height), C.byref(border), C.byref(depth))
         x, y, child = C.c_int(), C.c_int(), C.c_ulong()
-        self.x.XTranslateCoordinates(self.display, window, self.root, 600, 105, C.byref(x), C.byref(y), C.byref(child))
+        self.x.XTranslateCoordinates(self.display, window, self.root, 0, 0, C.byref(x), C.byref(y), C.byref(child))
+        return x.value, y.value, width.value, height.value
+
+    def edit(self, window):
+        self.activate(window)
+        left, top, width, height = self.bounds(window)
+        # Target the first source line; blank space below a short document has no TextEdit response.
+        x, y = C.c_int(left + int(width * .65)), C.c_int(top + int(height * .16))
         self.test.XTestFakeMotionEvent(self.display, -1, x.value, y.value, 0)
+        self.x.XSync(self.display, False)
+        assert self.pointer_targets(window), "Refusing synthetic input: the test window is obscured"
         self.test.XTestFakeButtonEvent(self.display, 1, True, 0)
         self.test.XTestFakeButtonEvent(self.display, 1, False, 0)
         self.x.XFlush(self.display)
@@ -195,7 +242,7 @@ def compositor_pids():
 def run(binary, desktop, seconds, check_input):
     with tempfile.TemporaryDirectory(prefix="focus-native-smoke-") as temporary:
         root = Path(temporary)
-        workspace = root / "workspace"
+        workspace = root / root.name
         workspace.mkdir()
         source = workspace / "example.txt"
         source.write_text("original\n")
@@ -207,10 +254,11 @@ def run(binary, desktop, seconds, check_input):
                             f"open_files = [{quoted(source)}]\nactive_file = {quoted(source)}\n")
         environment = dict(os.environ, XDG_DATA_HOME=str(root / "data"), XDG_CONFIG_HOME=str(root / "config"), SHELL="/bin/sh")
         with (root / "app.log").open("w+") as log:
-            app = subprocess.Popen([str(binary), "--ui", "--foreground", "--log-level=off", str(workspace)],
+            app = subprocess.Popen([str(binary), "--foreground", "--log-level=off", str(workspace)],
                                    env=environment, stdout=log, stderr=log)
             try:
-                window = wait_until(lambda: desktop.find("Focus Editor — workspace"))
+                window = wait_until(lambda: desktop.find(f"Focus Editor — {workspace.name}"))
+                desktop.activate(window)
                 time.sleep(3)  # Initial fonts, layout, tooltips, and WM animations.
                 assert app.poll() is None, "Native editor exited during startup"
                 measurements = desktop.measure(window, app.pid, seconds)
@@ -224,6 +272,17 @@ def run(binary, desktop, seconds, check_input):
                 assert not list((root / "data/focus-editor/runtime/instances").glob("*.json")), "Session registration survived close"
                 return measurements
             except Exception:
+                print("Fixture document:", repr(source.read_text()), flush=True)
+                try:
+                    from PIL import ImageGrab
+                    desktop.activate(window)
+                    left, top, width, height = desktop.bounds(window)
+                    screenshot = Path("target/native-smoke-failure.png")
+                    screenshot.parent.mkdir(parents=True, exist_ok=True)
+                    ImageGrab.grab(bbox=(left, top, left+width, top+height), xdisplay=os.environ.get("DISPLAY")).save(screenshot)
+                    print("Native failure screenshot:", screenshot, flush=True)
+                except Exception as error:
+                    print("Could not capture native window:", error, flush=True)
                 log.seek(0)
                 print(log.read(), flush=True)
                 raise

@@ -67,7 +67,7 @@ fn frame_events(
 fn narrow_layout_and_commit_position_stay_stable_during_refresh_and_selection() {
     for width in [150.0, 250.0, 500.0] {
         let ctx = egui::Context::default();
-        crate::ui_theme::apply(&ctx);
+        crate::ui_theme::apply(&ctx, crate::ui_theme::Appearance::Light);
         let mut state = panel();
         frame(&mut state, &ctx, width);
         let id = egui::Id::new(("git_commit_message", &state.workspace));
@@ -141,7 +141,7 @@ fn text_shapes<'a>(shape: &'a egui::Shape, texts: &mut Vec<&'a egui::epaint::Tex
 fn compact_rows_have_four_columns_with_aligned_green_counts() {
     for width in [150.0, 250.0, 500.0] {
         let ctx = egui::Context::default();
-        crate::ui_theme::apply(&ctx);
+        crate::ui_theme::apply(&ctx, crate::ui_theme::Appearance::Light);
         let mut state = panel();
         let path = state.snapshot.as_ref().unwrap().files[0].path.clone();
         let mut same_name = state.snapshot.as_ref().unwrap().files[0].clone();
@@ -183,7 +183,11 @@ fn compact_rows_have_four_columns_with_aligned_green_counts() {
             );
             for label in &labels {
                 let bounds = label.visual_bounding_rect();
-                assert!(bounds.left() >= row.left() && bounds.right() <= row.right());
+                assert!(
+                    bounds.left() >= row.left() && bounds.right() <= row.right(),
+                    "row={row:?} bounds={bounds:?} text={:?}",
+                    label.galley.job.text
+                );
             }
             for label in &labels[2..] {
                 assert!(
@@ -229,7 +233,7 @@ fn filename_clicks_load_reviews_and_space_stages_without_repeating() {
     repo.run(&["-c", "core.hooksPath=/dev/null", "commit", "-qm", "fixture"]);
     repo.write("file.rs", "new\n");
     let ctx = egui::Context::default();
-    crate::ui_theme::apply(&ctx);
+    crate::ui_theme::apply(&ctx, crate::ui_theme::Appearance::Light);
     let mut state = GitUi {
         workspace: Some(repo.0.clone()),
         snapshot: Some(snapshot(&repo.0).unwrap()),
@@ -355,7 +359,7 @@ fn double_click_moves_new_and_partial_files_between_the_correct_groups() {
         ("partial", Side::Staged, Group::Changes),
     ] {
         let ctx = egui::Context::default();
-        crate::ui_theme::apply(&ctx);
+        crate::ui_theme::apply(&ctx, crate::ui_theme::Appearance::Light);
         frame(&mut state, &ctx, 350.0);
         let id = egui::Id::new(("git_file_row", &state.workspace, Selection::new(path, side)));
         let pos = ctx.read_response(id).unwrap().rect.min + egui::vec2(40.0, 9.0);

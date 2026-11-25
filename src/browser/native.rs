@@ -195,6 +195,20 @@ impl NativeApp {
     fn accept(&mut self, ctx: &egui::Context, event: Event) {
         match event {
             Event::Frame(frame) => {
+                if self
+                    .frame
+                    .as_ref()
+                    .is_none_or(|old| old.dark_mode != frame.dark_mode)
+                {
+                    crate::ui_theme::apply(
+                        ctx,
+                        if frame.dark_mode {
+                            crate::ui_theme::Appearance::Dark
+                        } else {
+                            crate::ui_theme::Appearance::Light
+                        },
+                    );
+                }
                 let control_changed = self.control() != frame.control;
                 if frame.title
                     != self
@@ -323,7 +337,12 @@ impl eframe::App for NativeApp {
             egui::Panel::top("viewer_control").show(ui, |ui| {
                 ui.horizontal(|ui| {
                     ui.label("This editor is controlled remotely");
-                    if ui.button("Take control").clicked() {
+                    if ui
+                        .add(focus_addon_support::ui_theme::control_button(
+                            "Take control",
+                        ))
+                        .clicked()
+                    {
                         self.pending.push_back(Command::Claim);
                     }
                 });
@@ -354,13 +373,31 @@ impl eframe::App for NativeApp {
                 }
                 ui.add_enabled_ui(!self.close_pending, |ui| {
                     ui.horizontal(|ui| {
-                        if ui.button("Save all").clicked() {
+                        if crate::ui_theme::role_button(
+                            ui,
+                            "Save all",
+                            crate::ui_theme::ButtonRole::Primary,
+                        )
+                        .clicked()
+                        {
                             self.close(CloseAction::Save);
                         }
-                        if ui.button("Discard").clicked() {
+                        if crate::ui_theme::role_button(
+                            ui,
+                            "Discard",
+                            crate::ui_theme::ButtonRole::Destructive,
+                        )
+                        .clicked()
+                        {
                             self.close(CloseAction::Discard);
                         }
-                        if ui.button("Cancel").clicked() {
+                        if crate::ui_theme::role_button(
+                            ui,
+                            "Cancel",
+                            crate::ui_theme::ButtonRole::Quiet,
+                        )
+                        .clicked()
+                        {
                             self.close_confirmation = false;
                             self.close_error = None;
                         }
@@ -372,7 +409,10 @@ impl eframe::App for NativeApp {
             egui::Modal::new(egui::Id::new("native_session_failed")).show(&ctx, |ui| {
                 ui.heading("Editor session stopped");
                 ui.label(error);
-                if ui.button("Close").clicked() {
+                if ui
+                    .add(focus_addon_support::ui_theme::control_button("Close"))
+                    .clicked()
+                {
                     self.confirmed = true;
                     ctx.send_viewport_cmd(egui::ViewportCommand::Close);
                 }

@@ -119,9 +119,14 @@ impl EditorApp {
             );
             if self.bottom_tab == super::logs::Tab::Terminal {
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if theme::button(ui, Icon::Refresh, "", theme::colors(ui).accent, false)
-                        .on_hover_text("Restart terminal")
-                        .clicked()
+                    if theme::action_button(
+                        ui,
+                        Icon::Refresh,
+                        "",
+                        focus_addon_sdk::ButtonRole::Secondary,
+                    )
+                    .on_hover_text("Restart terminal")
+                    .clicked()
                     {
                         self.restart_terminal(ctx, cwd, runtime);
                     }

@@ -152,7 +152,7 @@ mod tests {
             .values
             .insert("draft".into(), "keep this".into());
         let ctx = egui::Context::default();
-        crate::ui_theme::apply(&ctx);
+        crate::ui_theme::apply(&ctx, crate::ui_theme::Appearance::Light);
         for width in [320.0, 390.0] {
             let _ = crate::test_frame(
                 &ctx,
@@ -506,7 +506,10 @@ impl Addons {
         let Some(addon) = addon else { return };
         if let Some(error) = &addon.error {
             ui.colored_label(theme::colors(ui).error, error);
-            if ui.button("Restart").clicked() {
+            if ui
+                .add(focus_addon_support::ui_theme::control_button("Restart"))
+                .clicked()
+            {
                 addon.error = None;
                 addon.process = None;
             }

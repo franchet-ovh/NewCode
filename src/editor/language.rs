@@ -78,7 +78,12 @@ impl EditorApp {
 
     pub(super) fn language_context_menu(&mut self, response: &egui::Response) {
         response.context_menu(|ui| {
-            if ui.button("Format Document").clicked() {
+            if ui
+                .add(focus_addon_support::ui_theme::control_button(
+                    "Format Document",
+                ))
+                .clicked()
+            {
                 let config = self.indent_config();
                 if let Some(provider) = &mut self.addons.language {
                     provider.format(config.tab_size, config.insert_spaces);
@@ -92,7 +97,10 @@ impl EditorApp {
                     ui.separator();
                     ui.label("Language provider");
                     for (id, name) in providers {
-                        if ui.button(name).clicked() {
+                        if ui
+                            .add(focus_addon_support::ui_theme::control_button(name))
+                            .clicked()
+                        {
                             if let Some(extension) = path.extension().and_then(|e| e.to_str()) {
                                 self.settings.lsp.providers.insert(extension.into(), id);
                             }
@@ -237,7 +245,7 @@ impl EditorApp {
 
     pub(super) fn problems_ui(&mut self, ui: &mut egui::Ui) {
         ui.add(
-            egui::TextEdit::singleline(&mut self.navigation.problems_query)
+            focus_addon_support::ui_theme::singleline(&mut self.navigation.problems_query)
                 .hint_text("Filter problems"),
         );
         let query = self.navigation.problems_query.to_lowercase();
@@ -291,9 +299,11 @@ impl EditorApp {
                 };
                 if ui
                     .add(
-                        egui::Button::new(egui::RichText::new(label).color(color))
-                            .frame(false)
-                            .truncate(),
+                        focus_addon_support::ui_theme::control_button(
+                            egui::RichText::new(label).color(color),
+                        )
+                        .frame(false)
+                        .truncate(),
                     )
                     .on_hover_text(&d.message)
                     .clicked()
@@ -340,7 +350,7 @@ mod tests {
         provider.update(&path, 2, vec![(path.clone(), "pr".into(), false)]);
         app.addons.language = Some(provider);
         let ctx = egui::Context::default();
-        theme::apply(&ctx);
+        theme::apply(&ctx, crate::ui_theme::Appearance::Light);
         (root, app, ctx)
     }
     fn key(key: egui::Key) -> egui::Event {

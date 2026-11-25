@@ -199,7 +199,7 @@ impl EditorApp {
             if !conflict.error.is_empty() { ui.colored_label(crate::ui_theme::colors(ui).error, &conflict.error); }
             ui.horizontal(|ui| {
                 for label in ["Overwrite", "Reload", "Cancel"] {
-                    if ui.button(label).clicked() { action = Some(label); }
+                    if ui.add(focus_addon_support::ui_theme::control_button(label)).clicked() { action = Some(label); }
                 }
             });
         });

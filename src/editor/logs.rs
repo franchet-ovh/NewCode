@@ -46,9 +46,9 @@ impl Logs {
             egui::ComboBox::from_id_salt("log_level").selected_text(format!("{} and above",self.level)).show_ui(ui,|ui|{
                 for level in [log::Level::Trace,log::Level::Debug,log::Level::Info,log::Level::Warn,log::Level::Error] {ui.selectable_value(&mut self.level,level,level.as_str());}
             }).response.on_hover_text("Filters captured records. Use --log-level debug at launch to capture Debug diagnostics.");
-            ui.add(egui::TextEdit::singleline(&mut self.query).hint_text("Search logs").desired_width(140.0));
+            ui.add(focus_addon_support::ui_theme::singleline(&mut self.query).hint_text("Search logs").desired_width(140.0));
             ui.checkbox(&mut self.follow,"Follow latest");
-            if ui.button("Clear").clicked(){ session::clear(self.source); }
+            if ui.add(focus_addon_support::ui_theme::control_button("Clear")).clicked(){ session::clear(self.source); }
         });
         let query = self.query.to_lowercase();
         let entries: Vec<_> = session::snapshot()
@@ -56,7 +56,12 @@ impl Logs {
             .filter(|entry| self.matches(entry, &query))
             .collect();
         ui.horizontal_wrapped(|ui| {
-            if ui.button("Copy visible logs").clicked() {
+            if ui
+                .add(focus_addon_support::ui_theme::control_button(
+                    "Copy visible logs",
+                ))
+                .clicked()
+            {
                 ui.ctx().copy_text(
                     entries
                         .iter()
@@ -72,6 +77,8 @@ impl Logs {
         }
         let row_height = ui.text_style_height(&egui::TextStyle::Monospace) + 4.0;
         let out = egui::ScrollArea::both()
+            .min_scrolled_height(0.0)
+            .max_height(ui.available_height().max(0.0))
             .id_salt(("logs", self.source))
             .stick_to_bottom(self.follow)
             .auto_shrink([false, false])

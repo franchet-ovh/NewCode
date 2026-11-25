@@ -60,7 +60,7 @@ impl GitUi {
                     let mut header = state.show_header(ui, |ui| {
                         let bulk = group != Group::Conflicts;
                         let action_width = if bulk {
-                            24.0 + ui.spacing().item_spacing.x
+                            ui.spacing().interact_size.y + ui.spacing().item_spacing.x
                         } else {
                             0.0
                         };
@@ -83,13 +83,11 @@ impl GitUi {
                             && ui
                                 .add_enabled(
                                     !busy,
-                                    egui::Button::new(if group.side().is_staged() {
-                                        "−"
-                                    } else {
-                                        "+"
-                                    })
+                                    focus_addon_support::ui_theme::control_button(
+                                        if group.side().is_staged() { "−" } else { "+" },
+                                    )
                                     .small()
-                                    .min_size(egui::vec2(24.0, 24.0)),
+                                    .min_size(egui::Vec2::splat(ui.spacing().interact_size.y)),
                                 )
                                 .on_hover_text(if group.side().is_staged() {
                                     "Unstage all staged changes"
@@ -165,7 +163,9 @@ impl GitUi {
                                     if ui
                                         .add_enabled(
                                             snapshot.root.join(&change.path).is_file(),
-                                            egui::Button::new("Open file"),
+                                            focus_addon_support::ui_theme::control_button(
+                                                "Open file",
+                                            ),
                                         )
                                         .clicked()
                                     {
@@ -175,11 +175,13 @@ impl GitUi {
                                     if ui
                                         .add_enabled(
                                             !busy,
-                                            egui::Button::new(if group.side().is_staged() {
-                                                "Unstage file"
-                                            } else {
-                                                "Stage file"
-                                            }),
+                                            focus_addon_support::ui_theme::control_button(
+                                                if group.side().is_staged() {
+                                                    "Unstage file"
+                                                } else {
+                                                    "Stage file"
+                                                },
+                                            ),
                                         )
                                         .clicked()
                                     {

@@ -146,18 +146,27 @@ impl DevContainer {
     }
 
     pub(crate) fn menu(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
-        if ui.button("Show logs").clicked() {
+        if ui
+            .add(focus_addon_support::ui_theme::control_button("Show logs"))
+            .clicked()
+        {
             ctx.data_mut(|data| data.insert_temp(egui::Id::new("show_dev_container_logs"), true));
             ui.close();
         }
         let mut action = None;
         match &self.state {
             State::Unavailable => {
-                ui.add_enabled(false, egui::Button::new("No Dev Container configuration"));
+                ui.add_enabled(
+                    false,
+                    focus_addon_support::ui_theme::control_button("No Dev Container configuration"),
+                );
             }
             State::Available(configuration) => {
                 if ui
-                    .button(format!("Open in {}", configuration.name))
+                    .add(focus_addon_support::ui_theme::control_button(format!(
+                        "Open in {}",
+                        configuration.name
+                    )))
                     .clicked()
                 {
                     action = Some((configuration.clone(), Action::Start(StartMode::Normal)));
@@ -166,15 +175,24 @@ impl DevContainer {
             State::Starting(configuration) => {
                 ui.add_enabled(
                     false,
-                    egui::Button::new(format!("Starting {}…", configuration.name)),
+                    focus_addon_support::ui_theme::control_button(format!(
+                        "Starting {}…",
+                        configuration.name
+                    )),
                 );
             }
             State::Ready(configuration, _) => {
                 ui.label(format!("Connected to {}", configuration.name));
-                if ui.button("Reconnect").clicked() {
+                if ui
+                    .add(focus_addon_support::ui_theme::control_button("Reconnect"))
+                    .clicked()
+                {
                     action = Some((configuration.clone(), Action::Start(StartMode::Normal)));
                 }
-                if ui.button("Stop").clicked() {
+                if ui
+                    .add(focus_addon_support::ui_theme::control_button("Stop"))
+                    .clicked()
+                {
                     action = Some((configuration.clone(), Action::Stop));
                 }
             }
@@ -186,7 +204,13 @@ impl DevContainer {
                     )
                     .wrap(),
                 );
-                if ui.button(format!("Retry {}", configuration.name)).clicked() {
+                if ui
+                    .add(focus_addon_support::ui_theme::control_button(format!(
+                        "Retry {}",
+                        configuration.name
+                    )))
+                    .clicked()
+                {
                     action = Some((configuration.clone(), Action::Start(StartMode::Normal)));
                 }
             }
@@ -199,7 +223,10 @@ impl DevContainer {
                 ("Rebuild", StartMode::Rebuild),
                 ("Rebuild without cache", StartMode::RebuildWithoutCache),
             ] {
-                if ui.button(label).clicked() {
+                if ui
+                    .add(focus_addon_support::ui_theme::control_button(label))
+                    .clicked()
+                {
                     action = Some((configuration.clone(), Action::Start(mode)));
                 }
             }

@@ -111,7 +111,9 @@ struct App {
     more: bool,
     query: String,
     detail: Detail,
+    drafts: BTreeMap<String, BTreeMap<String, Value>>,
     notice: String,
+    notice_error: bool,
     stored: Stored,
     refreshed: Option<Instant>,
     cooldown: Option<Instant>,
@@ -131,7 +133,9 @@ impl Default for App {
             more: false,
             query: String::new(),
             detail: Detail::None,
+            drafts: BTreeMap::new(),
             notice: String::new(),
+            notice_error: false,
             stored: Stored::default(),
             refreshed: None,
             cooldown: None,
@@ -179,6 +183,7 @@ impl App {
         fs::rename(temporary, path).map_err(|e| e.to_string())
     }
     fn reset(&mut self, context: Context, host: &mut impl Host) -> Result<(), String> {
+        self.drafts.clear();
         let api = std::mem::take(&mut self.api);
         *self = Self {
             context,
@@ -304,7 +309,27 @@ impl App {
         if action.generation != self.context.generation {
             return Ok(());
         }
+        let form = self.form_key();
+        let draft: BTreeMap<_, _> = action
+            .values
+            .iter()
+            .filter(|(key, _)| {
+                matches!(
+                    key.as_str(),
+                    "branch" | "base" | "reuse" | "title" | "body" | "delete"
+                )
+            })
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect();
+        if !draft.is_empty() {
+            self.drafts.insert(form.clone(), draft);
+        }
+        let completes_form = matches!(
+            action.id.as_str(),
+            "create_pr" | "branch" | "issue_assistant"
+        );
         self.notice.clear();
+        self.notice_error = false;
         match action.id.as_str() {
             "issues" | "pulls" => {
                 self.pulls = action.id == "pulls";
@@ -355,10 +380,14 @@ impl App {
             }
             _ => (),
         }
+        if completes_form {
+            self.drafts.remove(&form);
+        }
         Ok(())
     }
     fn report(&mut self, result: Result<(), String>) {
         if let Err(error) = result {
+            self.notice_error = true;
             if error.contains("rate limit") || error.contains("Rate limit") {
                 let seconds = error
                     .split("Retry after ")
@@ -407,7 +436,9 @@ fn run() -> Result<(), String> {
                     .map_err(|e| e.to_string())?;
                 reveal_detail = action.id.starts_with("item:")
                     || matches!(action.id.as_str(), "new_pr" | "create_pr");
-                connection.publish(&app.view(true))?;
+                if action.id != "filter" {
+                    connection.publish(&app.view(true))?;
+                }
                 let result = app.perform(&mut connection, action);
                 app.report(result);
             }

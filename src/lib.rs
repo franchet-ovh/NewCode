@@ -25,7 +25,6 @@ mod workspaces;
 use eframe::egui;
 
 pub fn editor_main() -> Result<(), Box<dyn std::error::Error>> {
-    platform::prepare_environment();
     let result = run();
     if result.is_err() {
         log::error!("Application terminated with an error");
@@ -49,10 +48,15 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
     let arguments = logging::Arguments::parse(std::env::args_os().skip(1))?;
+    if arguments.help {
+        println!("{}", logging::HELP);
+        return Ok(());
+    }
     if arguments.version {
         println!("focus-editor {}", env!("CARGO_PKG_VERSION"));
         return Ok(());
     }
+    platform::prepare_environment();
     if !cfg!(any(target_os = "linux", target_os = "macos")) {
         return Err("Focus Editor supports Linux and macOS".into());
     }
@@ -98,6 +102,5 @@ fn test_frame(
 
 /// Start the manually managed browser gateway.
 pub fn server_main() -> Result<(), Box<dyn std::error::Error>> {
-    platform::prepare_environment();
     server::run()
 }

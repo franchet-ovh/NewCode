@@ -288,7 +288,11 @@ mod tests {
                         .show(ui, |ui| {
                             let available = ui.available_width();
                             host.manager_sidebar(ui, &mut disabled);
-                            assert!(ui.min_rect().width() <= available + 1.0);
+                            assert!(
+                                ui.min_rect().width() <= available + 1.0,
+                                "available={available} used={:?}",
+                                ui.min_rect()
+                            );
                         });
                     egui::CentralPanel::default().show(ui, |ui| {
                         assert!(host.manager_central(ui, &mut disabled));
@@ -641,43 +645,74 @@ impl Addons {
         ui: &mut egui::Ui,
         enabled_settings: &mut BTreeMap<String, bool>,
     ) {
-        ui.heading("Addons");
+        // With an on-screen keyboard, controls and results must scroll together.
+        if ui.available_height() < 350.0 {
+            egui::ScrollArea::vertical()
+                .id_salt("addon_manager_compact")
+                .min_scrolled_height(0.0)
+                .auto_shrink([false, false])
+                .show(ui, |ui| self.manager_sidebar_content(ui, enabled_settings));
+        } else {
+            self.manager_sidebar_content(ui, enabled_settings);
+        }
+    }
+
+    fn manager_sidebar_content(
+        &mut self,
+        ui: &mut egui::Ui,
+        enabled_settings: &mut BTreeMap<String, bool>,
+    ) {
+        theme::panel_header(ui, "Addons");
         let mut action = None;
         ui.horizontal_wrapped(|ui| {
             ui.selectable_value(&mut self.manager.installed, true, "Installed");
-            ui.selectable_value(&mut self.manager.installed, false, "Available");
+            ui.selectable_value(&mut self.manager.installed, false, "Browse catalog");
         });
-        ui.add(
-            egui::TextEdit::singleline(&mut self.manager.query)
-                .hint_text("Search addons")
-                .desired_width(f32::INFINITY),
+        theme::text_field(
+            ui,
+            "addon_search",
+            "Find an addon",
+            &mut self.manager.query,
+            false,
+            "Search addons…",
+            "",
         );
         ui.add_enabled_ui(!self.manager_busy(), |ui| {
-            if ui.button("Rescan installed").clicked() {
-                action = Some(Action::Rescan);
-            }
-            if ui.button("Install local addon…").clicked() {
-                action = Some(Action::Local);
-            }
-            ui.label("Release tag");
-            ui.add(
-                egui::TextEdit::singleline(&mut self.manager.release).desired_width(f32::INFINITY),
-            );
-            if ui.button("Refresh / check updates").clicked() {
-                action = Some(Action::Fetch);
-            }
+            ui.horizontal_wrapped(|ui| {
+                if theme::role_button(ui, "Install local…", theme::ButtonRole::Secondary).clicked()
+                {
+                    action = Some(Action::Local);
+                }
+                if theme::role_button(ui, "Refresh", theme::ButtonRole::Secondary).clicked() {
+                    action = Some(Action::Fetch);
+                }
+            });
+            ui.collapsing("Options", |ui| {
+                theme::text_field(
+                    ui,
+                    "addon_release",
+                    "Release tag",
+                    &mut self.manager.release,
+                    false,
+                    "latest",
+                    "Choose a release, or use latest.",
+                );
+                if theme::role_button(ui, "Rescan installed", theme::ButtonRole::Quiet).clicked() {
+                    action = Some(Action::Rescan);
+                }
+            });
         });
         if self.manager_busy() {
             ui.spinner();
         }
         if !self.manager.progress.is_empty() {
-            ui.label(&self.manager.progress);
+            theme::text(ui, &self.manager.progress, focus_addon_sdk::TextRole::Muted);
         }
         if let Some(error) = &self.manager.error {
-            ui.colored_label(theme::colors(ui).error, error);
+            theme::text(ui, error, focus_addon_sdk::TextRole::Error);
         }
         if let Some(notice) = &self.notice {
-            ui.colored_label(theme::colors(ui).error, notice);
+            theme::text(ui, notice, focus_addon_sdk::TextRole::Error);
         }
         ui.separator();
         let query = self.manager.query.to_lowercase();
@@ -719,6 +754,7 @@ impl Addons {
         };
         egui::ScrollArea::vertical()
             .id_salt("addon_manager_list")
+            .min_scrolled_height(0.0)
             .show(ui, |ui| {
                 if rows.is_empty() {
                     ui.label(if self.manager.installed {
@@ -732,12 +768,13 @@ impl Addons {
                     });
                 }
                 for (id, name, detail) in rows {
-                    if ui
-                        .selectable_label(
-                            self.manager.selected.as_ref() == Some(&id),
-                            format!("{name}\n{detail}"),
-                        )
-                        .clicked()
+                    if theme::list_row(
+                        ui,
+                        &name,
+                        &detail,
+                        self.manager.selected.as_ref() == Some(&id),
+                    )
+                    .clicked()
                     {
                         self.manager.selected = Some(id);
                         self.manager.detail_visible = true;
@@ -757,84 +794,203 @@ impl Addons {
             return false;
         }
         let mut action = None;
+        let mut back = false;
         egui::ScrollArea::vertical()
             .id_salt("addon_manager_details")
             .show(ui, |ui| {
-                let Some(id) = self.manager.selected.clone() else {
-                    ui.heading("Manage addons");
-                    ui.label("Select an installed addon, or browse the packages published with an editor release.");
-                    ui.label("Install updates when you choose. Updating restarts only the affected addon.");
-                    return;
-                };
-                let installed = self.entries.iter().find(|a| a.manifest.id == id);
-                let remote = self.manager.catalog.as_ref()
-                    .and_then(|c| available(c).into_iter().find(|p| p.id == id));
-                ui.heading(installed.map(|a| a.manifest.name.as_str())
-                    .or_else(|| remote.as_ref().map(|p| p.name.as_str())).unwrap_or(&id));
-                ui.label(format!("ID: {id}"));
-                if let Some(addon) = installed {
-                    ui.label(&addon.manifest.description);
-                    ui.label(format!("Installed version: {} · {}", addon.manifest.version, state(addon)));
-                    if !addon.manifest.publisher.is_empty() {
-                        ui.label(format!("Publisher: {}", addon.manifest.publisher));
-                    }
-                    if let Some(receipt) = self.manager.receipts.get(&id) {
-                        ui.label(format!("Source: {} · release {}", receipt.source,
-                            receipt.release.as_deref().unwrap_or("local")));
-                    } else {
-                        ui.label("Source: local installation");
-                    }
-                    if let Some(error) = &addon.error {
-                        ui.colored_label(theme::colors(ui).error, error);
-                    }
-                    ui.add_enabled_ui(!self.manager_busy(), |ui| {
-                        ui.horizontal_wrapped(|ui| {
-                            let mut enabled = addon.enabled;
-                            if ui.checkbox(&mut enabled, "Enabled").changed() {
-                                action = Some(Action::Enable(id.clone(), enabled));
+                egui::Frame::new().inner_margin(20).show(ui, |ui| {
+                    let Some(id) = self.manager.selected.clone() else {
+                        theme::empty_state(
+                            ui,
+                            "Manage addons",
+                            "Select an installed addon, or browse the catalog to find a package.",
+                        );
+                        return;
+                    };
+                    let installed = self.entries.iter().find(|a| a.manifest.id == id);
+                    let remote = self
+                        .manager
+                        .catalog
+                        .as_ref()
+                        .and_then(|c| available(c).into_iter().find(|p| p.id == id));
+                    ui.horizontal_wrapped(|ui| {
+                        ui.heading(
+                            installed
+                                .map(|a| a.manifest.name.as_str())
+                                .or_else(|| remote.as_ref().map(|p| p.name.as_str()))
+                                .unwrap_or(&id),
+                        );
+                        back = theme::role_button(ui, "Back to editor", theme::ButtonRole::Quiet)
+                            .clicked();
+                    });
+                    theme::text(ui, &id, focus_addon_sdk::TextRole::Muted);
+                    ui.add_space(16.0);
+                    if let Some(addon) = installed {
+                        theme::card(ui, |ui| {
+                            let c = theme::colors(ui);
+                            theme::badge(
+                                ui,
+                                &state(addon),
+                                if addon.enabled { c.success } else { c.muted },
+                                if addon.enabled {
+                                    c.success_soft
+                                } else {
+                                    c.chrome
+                                },
+                            );
+                            ui.add(egui::Label::new(&addon.manifest.description).wrap());
+                            theme::text(
+                                ui,
+                                &format!(
+                                    "Version {} · {}",
+                                    addon.manifest.version, addon.manifest.publisher
+                                ),
+                                focus_addon_sdk::TextRole::Muted,
+                            );
+                            if let Some(receipt) = self.manager.receipts.get(&id) {
+                                theme::text(
+                                    ui,
+                                    &format!(
+                                        "Source: {} · release {}",
+                                        receipt.source,
+                                        receipt.release.as_deref().unwrap_or("local")
+                                    ),
+                                    focus_addon_sdk::TextRole::Muted,
+                                );
+                            } else {
+                                theme::text(
+                                    ui,
+                                    "Source: local installation",
+                                    focus_addon_sdk::TextRole::Muted,
+                                );
                             }
-                            if ui.add_enabled(enabled, egui::Button::new("Restart")).clicked() {
-                                action = Some(Action::Restart(id.clone()));
+                            if let Some(error) = &addon.error {
+                                theme::text(ui, error, focus_addon_sdk::TextRole::Error);
                             }
-                            if addon.manifest.credential.is_some() && ui.button("Credentials…").clicked() {
-                                action = Some(Action::Credentials(id.clone()));
+                            ui.add_enabled_ui(!self.manager_busy(), |ui| {
+                                ui.horizontal_wrapped(|ui| {
+                                    if theme::role_button(
+                                        ui,
+                                        if addon.enabled { "Disable" } else { "Enable" },
+                                        theme::ButtonRole::Secondary,
+                                    )
+                                    .clicked()
+                                    {
+                                        action = Some(Action::Enable(id.clone(), !addon.enabled));
+                                    }
+                                    if ui
+                                        .add_enabled_ui(addon.enabled, |ui| {
+                                            theme::role_button(
+                                                ui,
+                                                "Restart",
+                                                theme::ButtonRole::Secondary,
+                                            )
+                                        })
+                                        .inner
+                                        .clicked()
+                                    {
+                                        action = Some(Action::Restart(id.clone()));
+                                    }
+                                    if addon.manifest.credential.is_some()
+                                        && theme::role_button(
+                                            ui,
+                                            "Manage connection…",
+                                            theme::ButtonRole::Secondary,
+                                        )
+                                        .clicked()
+                                    {
+                                        action = Some(Action::Credentials(id.clone()));
+                                    }
+                                });
+                            });
+                        });
+                        ui.add_space(16.0);
+                    }
+                    if let (Some(catalog), Some(package)) = (&self.manager.catalog, remote) {
+                        theme::card(ui, |ui| {
+                            ui.strong("Available package");
+                            ui.add(egui::Label::new(&package.description).wrap());
+                            theme::text(
+                                ui,
+                                &format!(
+                                    "Version {} · release {} · {}",
+                                    package.version,
+                                    package
+                                        .source_release
+                                        .as_deref()
+                                        .unwrap_or(&catalog.release),
+                                    package.target
+                                ),
+                                focus_addon_sdk::TextRole::Muted,
+                            );
+                            if !package.publisher.is_empty() {
+                                ui.label(format!("Publisher: {}", package.publisher));
                             }
-                            if ui.add_enabled(!addon.working, egui::Button::new("Uninstall…")).clicked() {
-                                action = Some(Action::Remove(id.clone()));
+                            if let Some(requirement) = &package.editor_version_req {
+                                ui.label(format!("Supported editors: {requirement}"));
+                            }
+                            let reason = compatibility(catalog, &package);
+                            if let Some(reason) = &reason {
+                                theme::text(ui, reason, focus_addon_sdk::TextRole::Warning);
+                            }
+                            if ui
+                                .add_enabled_ui(reason.is_none() && !self.manager_busy(), |ui| {
+                                    theme::role_button(
+                                        ui,
+                                        if installed.is_some() {
+                                            "Update / install selected release"
+                                        } else {
+                                            "Install addon"
+                                        },
+                                        theme::ButtonRole::Primary,
+                                    )
+                                })
+                                .inner
+                                .clicked()
+                            {
+                                let release = package
+                                    .source_release
+                                    .clone()
+                                    .unwrap_or_else(|| catalog.release.clone());
+                                action = Some(Action::Install(package.clone(), release));
                             }
                         });
+                        ui.add_space(16.0);
+                    }
+                    if let Some(addon) = installed {
+                        ui.separator();
+                        ui.strong("Remove addon");
+                        theme::text(
+                            ui,
+                            "Uninstalling preserves workspace addon data and stored credentials.",
+                            focus_addon_sdk::TextRole::Muted,
+                        );
+                        if ui
+                            .add_enabled_ui(!self.manager_busy() && !addon.working, |ui| {
+                                theme::role_button(ui, "Uninstall…", theme::ButtonRole::Destructive)
+                            })
+                            .inner
+                            .clicked()
+                        {
+                            action = Some(Action::Remove(id.clone()));
+                        }
+                    }
+                    ui.collapsing("Storage locations", |ui| {
+                        if let Ok(root) = crate::app_paths::data_root() {
+                            ui.label(format!(
+                                "Installation: {}",
+                                root.join("addons").join(&id).display()
+                            ));
+                        }
+                        if let Ok(storage) = self.addon_storage(&id) {
+                            ui.label(format!("Data: {}", storage.display()));
+                        }
                     });
-                }
-                if let (Some(catalog), Some(package)) = (&self.manager.catalog, remote) {
-                    ui.separator();
-                    ui.label(format!("Available: {} · release {} · {}", package.version,
-                        package.source_release.as_deref().unwrap_or(&catalog.release), package.target));
-                    ui.label(&package.description);
-                    if !package.publisher.is_empty() {
-                        ui.label(format!("Publisher: {}", package.publisher));
-                    }
-                    if let Some(requirement) = &package.editor_version_req {
-                        ui.label(format!("Supported editors: {requirement}"));
-                    }
-                    let reason = compatibility(catalog, &package);
-                    if let Some(reason) = &reason {
-                        ui.colored_label(theme::colors(ui).warning, reason);
-                    }
-                    let can_install = reason.is_none() && !self.manager_busy();
-                    let label = if installed.is_some() { "Update / install selected release" } else { "Install" };
-                    if ui.add_enabled(can_install, egui::Button::new(label)).clicked() {
-                        let release = package.source_release.clone().unwrap_or_else(|| catalog.release.clone());
-                        action = Some(Action::Install(package, release));
-                    }
-                }
-                if let Ok(root) = crate::app_paths::data_root() {
-                    ui.separator();
-                    ui.label(format!("Installation: {}", root.join("addons").join(&id).display()));
-                    if let Ok(storage) = self.addon_storage(&id) {
-                        ui.label(format!("Data: {}", storage.display()));
-                    }
-                }
+                });
             });
+        if back {
+            self.manager.detail_visible = false;
+        }
         if let Some(action) = action {
             self.manager_action(action, ui.ctx(), enabled_settings);
         }
@@ -854,8 +1010,8 @@ impl Addons {
                 ui.label("Workspace addon data is preserved.");
                 ui.label("Credentials remain in the OS keyring. Use Credentials → Forget before uninstalling to remove a stored token.");
                 ui.horizontal(|ui| {
-                    confirm = ui.button("Uninstall").clicked();
-                    cancel = ui.button("Cancel").clicked();
+                    confirm = theme::role_button(ui, "Uninstall", theme::ButtonRole::Destructive).clicked();
+                    cancel = ui.add(focus_addon_support::ui_theme::control_button("Cancel")).clicked();
                 });
             });
         if cancel {

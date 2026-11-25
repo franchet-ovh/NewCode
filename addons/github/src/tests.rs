@@ -230,9 +230,8 @@ fn changed_pr_head_blocks_merge_and_cleanup_is_opt_in() {
         pull: true,
     };
     assert!(
-        app.view(false)
-            .detail
-            .iter()
+        all_widgets(&app.view(false).detail)
+            .into_iter()
             .any(|w| matches!(w, Widget::Checkbox{id,checked:false,..} if id == "delete"))
     );
     let mut host = Fake::from(vec![ok(pr("new", false))]);
@@ -464,4 +463,66 @@ fn switching_assistants_exposes_only_their_supported_options() {
             .any(|w| matches!(w, Widget::Select{id,value,options,..}
                 if id == "assistant_reasoning" && value.is_empty() && options.len() == 1))
     );
+}
+
+fn all_widgets(widgets: &[Widget]) -> Vec<&Widget> {
+    let mut result = Vec::new();
+    for widget in widgets {
+        result.push(widget);
+        if let Widget::Row { children, .. } = widget {
+            result.extend(all_widgets(children));
+        }
+    }
+    result
+}
+
+#[test]
+fn pr_drafts_survive_navigation_and_do_not_cross_repositories() {
+    let mut app = app();
+    app.detail = Detail::CreatePr {
+        head: "feature".into(),
+        title: "Generated".into(),
+        body: "Generated body".into(),
+    };
+    let mut host = Fake::default();
+    app.perform(
+        &mut host,
+        action(
+            "filter",
+            json!({"title":"My draft", "body":"Unfinished description", "query":""}),
+        ),
+    )
+    .unwrap();
+    app.detail = Detail::None;
+    app.detail = Detail::CreatePr {
+        head: "feature".into(),
+        title: "Generated".into(),
+        body: "Generated body".into(),
+    };
+    let view = app.view(false);
+    assert!(all_widgets(&view.detail).iter().any(|w| matches!(w, Widget::Input { id, value, .. } if id == "body" && value == "Unfinished description")));
+    app.repos[0].name = "other".into();
+    let view = app.view(false);
+    assert!(all_widgets(&view.detail).iter().any(
+        |w| matches!(w, Widget::Input { id, value, .. } if id == "title" && value == "Generated")
+    ));
+    assert!(
+        host.requests.is_empty(),
+        "Local filtering must not use GitHub API calls"
+    );
+}
+
+#[test]
+fn github_navigation_and_primary_actions_have_semantic_presentation() {
+    let mut app = app();
+    app.detail = Detail::Item {
+        value: json!({"number":75,"title":"UI upgrade","body":"Details"}),
+        pull: false,
+    };
+    app.items = vec![json!({"number":75,"title":"UI upgrade"})];
+    let view = app.view(false);
+    assert!(all_widgets(&view.sidebar).iter().any(
+        |w| matches!(w, Widget::Button { id, style, .. } if id == "item:75" && style.selected)
+    ));
+    assert!(all_widgets(&view.detail).iter().any(|w| matches!(w, Widget::Button { id, style, .. } if id == "branch" && style.role == focus_addon_sdk::ButtonRole::Primary)));
 }

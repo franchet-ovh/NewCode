@@ -17,7 +17,12 @@ impl Addons {
             .collect()
     }
     pub fn menu(&mut self, ui: &mut egui::Ui, _enabled: &mut BTreeMap<String, bool>) {
-        if ui.button("Manage addons…").clicked() {
+        if ui
+            .add(focus_addon_support::ui_theme::control_button(
+                "Manage addons…",
+            ))
+            .clicked()
+        {
             self.open_manager();
             ui.close();
         }
@@ -37,10 +42,13 @@ impl Addons {
         let Some(addon) = self.entries.iter_mut().find(|a| a.manifest.id == id) else {
             return;
         };
-        ui.heading(&addon.manifest.name);
+        theme::panel_header(ui, &addon.manifest.name);
         if let Some(error) = &addon.error {
-            ui.colored_label(theme::colors(ui).error, error);
-            if ui.button("Restart").clicked() {
+            theme::text(ui, error, focus_addon_sdk::TextRole::Error);
+            if ui
+                .add(focus_addon_support::ui_theme::control_button("Restart"))
+                .clicked()
+            {
                 addon.error = None;
             }
             return;
@@ -82,7 +90,12 @@ impl Addons {
         if show_header {
             ui.horizontal(|ui| {
                 ui.heading(&addon.view.title);
-                if ui.button("Back to editor").clicked() {
+                if ui
+                    .add(focus_addon_support::ui_theme::control_button(
+                        "Back to editor",
+                    ))
+                    .clicked()
+                {
                     self.detail = false;
                 }
             });
@@ -159,19 +172,9 @@ impl Addons {
             }
             let active = selected && self.active.as_ref() == Some(&addon.manifest.id);
             let response = if let Some(icon) = &addon.icon {
-                ui.add(
-                    egui::Button::image(
-                        egui::Image::new(icon).fit_to_exact_size(egui::vec2(24.0, 24.0)),
-                    )
-                    .selected(active)
-                    .min_size(egui::vec2(38.0, 38.0)),
-                )
+                theme::image_nav_button(ui, icon, active, &addon.manifest.name)
             } else {
-                ui.add(
-                    egui::Button::new("◇")
-                        .selected(active)
-                        .min_size(egui::vec2(38.0, 38.0)),
-                )
+                theme::nav_button(ui, theme::Icon::Addons, active, &addon.manifest.name)
             };
             if response.on_hover_text(&addon.manifest.name).clicked() {
                 chosen = Some(addon.manifest.id.clone());

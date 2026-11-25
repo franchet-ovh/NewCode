@@ -89,12 +89,11 @@ impl CodexUi {
                                         let reason = go_reason;
                                         let response = ui
                                             .add_enabled_ui(reason.is_none(), |ui| {
-                                                theme::button(
+                                                theme::action_button(
                                                     ui,
                                                     Icon::Send,
                                                     "Go",
-                                                    theme::colors(ui).accent,
-                                                    true,
+                                                    focus_addon_sdk::ButtonRole::Primary,
                                                 )
                                             })
                                             .inner
@@ -133,10 +132,15 @@ impl CodexUi {
                         ui.label(&pending_prompt);
                         if pending_method.contains("requestUserInput") {
                             ui.add(
-                                egui::TextEdit::multiline(&mut self.answer)
+                                focus_addon_support::ui_theme::multiline(&mut self.answer)
                                     .desired_width(ui.available_width()),
                             );
-                            if ui.button("Send response").clicked() {
+                            if ui
+                                .add(focus_addon_support::ui_theme::control_button(
+                                    "Send response",
+                                ))
+                                .clicked()
+                            {
                                 let answer = self.answer.clone();
                                 self.answer.clear();
                                 self.respond_user_input(
@@ -147,13 +151,24 @@ impl CodexUi {
                             }
                         } else {
                             ui.horizontal_wrapped(|ui| {
-                                if ui.button("Allow").clicked() {
+                                if ui
+                                    .add(focus_addon_support::ui_theme::control_button("Allow"))
+                                    .clicked()
+                                {
                                     self.respond_decision(index, "accept");
                                 }
-                                if ui.button("Allow this session").clicked() {
+                                if ui
+                                    .add(focus_addon_support::ui_theme::control_button(
+                                        "Allow this session",
+                                    ))
+                                    .clicked()
+                                {
                                     self.respond_decision(index, "acceptForSession");
                                 }
-                                if ui.button("Decline").clicked() {
+                                if ui
+                                    .add(focus_addon_support::ui_theme::control_button("Decline"))
+                                    .clicked()
+                                {
                                     self.respond_decision(index, "decline");
                                 }
                             });

@@ -21,7 +21,7 @@ fn folder_context_menu_opens_delete_confirmation_when_closed_or_open() {
     fs::write(folder.join("child.txt"), "keep").unwrap();
     for expanded in [false, true] {
         let ctx = egui::Context::default();
-        theme::apply(&ctx);
+        theme::apply(&ctx, crate::ui_theme::Appearance::Light);
         let mut app = test_app();
         let frame = |app: &mut EditorApp, events: Vec<egui::Event>| {
             let _ = crate::test_frame(
@@ -127,7 +127,7 @@ fn deletion_confirmation_cancels_and_preserves_symlink_targets() {
     app.open_files = vec![file.clone()];
     app.buffer = "unsaved".into();
     let ctx = egui::Context::default();
-    theme::apply(&ctx);
+    theme::apply(&ctx, crate::ui_theme::Appearance::Light);
     let frame = |app: &mut EditorApp, events: Vec<egui::Event>| {
         let _ = crate::test_frame(
             &ctx,
@@ -203,7 +203,7 @@ fn inline_creation_submits_cancels_and_never_overwrites() {
     ));
     fs::create_dir(&root).unwrap();
     let ctx = egui::Context::default();
-    theme::apply(&ctx);
+    theme::apply(&ctx, crate::ui_theme::Appearance::Light);
     let mut app = test_app();
     app.settings.workspace = Some(root.clone());
     app.active_file = None;

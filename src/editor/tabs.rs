@@ -201,7 +201,7 @@ impl EditorApp {
                                                     ui.add_enabled_ui(
                                                         self.close_confirmation.is_none(),
                                                         |ui| {
-                                                            if ui.button("Close file").clicked() {
+                                                            if ui.add(focus_addon_support::ui_theme::control_button("Close file")).clicked() {
                                                                 close_tab = Some(if is_diff {
                                                                     CloseTabs::Diff
                                                                 } else {
@@ -216,7 +216,7 @@ impl EditorApp {
                                                                             diff_tab.is_some(),
                                                                         )
                                                                         > 1,
-                                                                    egui::Button::new(
+                                                                    focus_addon_support::ui_theme::control_button(
                                                                         "Close others",
                                                                     ),
                                                                 )
@@ -229,7 +229,7 @@ impl EditorApp {
                                                                 });
                                                                 ui.close();
                                                             }
-                                                            if ui.button("Close all").clicked() {
+                                                            if ui.add(focus_addon_support::ui_theme::control_button("Close all")).clicked() {
                                                                 close_tab = Some(CloseTabs::All);
                                                                 ui.close();
                                                             }
@@ -288,7 +288,7 @@ impl EditorApp {
                             |ui| {
                                 ui.set_min_width(240.0);
                                 ui.add(
-                                    egui::TextEdit::singleline(&mut self.open_file_filter)
+                                    focus_addon_support::ui_theme::singleline(&mut self.open_file_filter)
                                         .hint_text("Find an open file…")
                                         .desired_width(f32::INFINITY),
                                 );

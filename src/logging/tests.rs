@@ -94,8 +94,8 @@ fn logger_records_current_session_to_both_sinks_and_redacts() {
 
 use super::*;
 #[test]
-fn browser_is_default_and_ui_flag_preserves_other_arguments() {
-    assert!(!Arguments::parse(Vec::<OsString>::new()).unwrap().ui);
+fn native_is_default_and_ui_flag_preserves_other_arguments() {
+    assert!(Arguments::parse(Vec::<OsString>::new()).unwrap().ui);
     for args in [
         vec![
             "--ui",
@@ -113,7 +113,7 @@ fn browser_is_default_and_ui_flag_preserves_other_arguments() {
         assert_eq!(parsed.level, Some(log::LevelFilter::Debug));
     }
     let positional = Arguments::parse(["--".into(), "--ui".into()]).unwrap();
-    assert!(!positional.ui);
+    assert!(positional.ui);
     assert_eq!(positional.workspace, Some("--ui".into()));
     assert!(
         Arguments::parse(["--ui".into(), "--version".into()])
@@ -254,5 +254,28 @@ fn server_flags_redirect_and_headless_requires_workspace() {
         Arguments::parse(["--headless".into(), "project".into()])
             .unwrap()
             .headless
+    );
+}
+
+#[test]
+fn explicit_window_modes_conflict_but_headless_overrides_native_default() {
+    let browser = Arguments::parse(["--browser".into(), "project".into()]).unwrap();
+    assert!(!browser.ui && !browser.headless);
+    let headless = Arguments::parse(["--headless".into(), "project".into()]).unwrap();
+    assert!(headless.headless && !headless.ui);
+    for args in [
+        ["--ui", "--browser"],
+        ["--headless", "--ui"],
+        ["--browser", "--headless"],
+    ] {
+        assert!(Arguments::parse(args.map(Into::into)).is_err());
+    }
+    for help in ["-h", "--help"] {
+        assert!(Arguments::parse([help.into()]).unwrap().help);
+    }
+    assert!(
+        !Arguments::parse(["--".into(), "--help".into()])
+            .unwrap()
+            .help
     );
 }

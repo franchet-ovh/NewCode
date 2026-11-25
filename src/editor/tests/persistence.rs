@@ -100,6 +100,11 @@ fn workspace_switch_restores_state_and_handles_unsaved_choices() {
             open_files: vec![file.clone()],
             active_file: Some(file.clone()),
             explorer_width: width,
+            appearance: if enabled {
+                crate::ui_theme::Appearance::Dark
+            } else {
+                crate::ui_theme::Appearance::Light
+            },
             addon_enabled: [("codex".into(), enabled)].into(),
             ..Default::default()
         };
@@ -118,6 +123,7 @@ fn workspace_switch_restores_state_and_handles_unsaved_choices() {
     app.resolve_workspace_switch(CloseChoice::Discard, &ctx);
     assert_eq!(app.open_files, [file_a.clone()]);
     assert_eq!(app.buffer, "a disk");
+    assert!(!ctx.global_style().visuals.dark_mode);
     assert!(!app.settings.addon_enabled["codex"]);
     app.request_workspace(a.join("."));
     assert!(app.pending_workspace.is_none());
@@ -145,6 +151,7 @@ fn workspace_switch_restores_state_and_handles_unsaved_choices() {
     assert_eq!(app.buffer, "b disk");
     assert!(app.settings.addon_enabled["codex"]);
     assert_eq!(app.settings.explorer_width, 360.0);
+    assert!(ctx.global_style().visuals.dark_mode);
     assert!(app.search_query.is_empty());
     app.buffer = "discarded b".into();
     app.mark_modified();
@@ -152,6 +159,7 @@ fn workspace_switch_restores_state_and_handles_unsaved_choices() {
     app.resolve_workspace_switch(CloseChoice::Discard, &ctx);
     assert_eq!(app.buffer, "edited a");
     assert_eq!(app.settings.explorer_width, 250.0);
+    assert!(!ctx.global_style().visuals.dark_mode);
     assert!(!app.settings.addon_enabled["codex"]);
     assert!(app.unsaved_files.is_empty());
     assert!(!app.dirty);

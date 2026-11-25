@@ -156,13 +156,12 @@ mod tests {
                     ui.visuals().window_corner_radius,
                     egui::CornerRadius::same(2)
                 );
-                ui.add(egui::TextEdit::singleline(&mut draft).id(id));
-                ui_theme::button(
+                ui.add(crate::ui_theme::singleline(&mut draft).id(id));
+                ui_theme::action_button(
                     ui,
                     ui_theme::Icon::Send,
                     "Send",
-                    ui_theme::colors(ui).accent,
-                    true,
+                    focus_addon_sdk::ButtonRole::Primary,
                 );
             });
             assert!(

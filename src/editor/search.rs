@@ -209,14 +209,19 @@ impl EditorApp {
         let mut run_search = false;
         ui.horizontal(|ui| {
             let response = ui.add(
-                egui::TextEdit::singleline(&mut self.search_query)
+                focus_addon_support::ui_theme::singleline(&mut self.search_query)
                     .hint_text("Search in project…")
-                    .desired_width((ui.available_width() - 36.0).max(40.0)),
+                    .desired_width(
+                        (ui.available_width()
+                            - ui.spacing().interact_size.y
+                            - ui.spacing().item_spacing.x)
+                            .max(40.0),
+                    ),
             );
             if response.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
                 run_search = true;
             }
-            if theme::button(ui, Icon::Search, "", theme::colors(ui).accent, false)
+            if theme::action_button(ui, Icon::Search, "", focus_addon_sdk::ButtonRole::Secondary)
                 .on_hover_text("Search project · Enter")
                 .clicked()
             {
@@ -273,7 +278,7 @@ impl EditorApp {
             ui.horizontal_wrapped(|ui| {
                 ui.label(egui::RichText::new("Find").strong());
                 let query = ui.add(
-                    egui::TextEdit::singleline(&mut self.find_query)
+                    focus_addon_support::ui_theme::singleline(&mut self.find_query)
                         .id(egui::Id::new("find_in_file_query"))
                         .hint_text("Search in this file")
                         .desired_width(210.0),
@@ -285,10 +290,18 @@ impl EditorApp {
                 if query.lost_focus() && ui.input(|input| input.key_pressed(egui::Key::Enter)) {
                     navigate = Some(ui.input(|input| input.modifiers.shift));
                 }
-                if ui.button("↑").on_hover_text("Previous match").clicked() {
+                if ui
+                    .add(focus_addon_support::ui_theme::control_button("↑"))
+                    .on_hover_text("Previous match")
+                    .clicked()
+                {
                     navigate = Some(true);
                 }
-                if ui.button("↓").on_hover_text("Next match").clicked() {
+                if ui
+                    .add(focus_addon_support::ui_theme::control_button("↓"))
+                    .on_hover_text("Next match")
+                    .clicked()
+                {
                     navigate = Some(false);
                 }
                 ui.label(format!(
@@ -296,7 +309,10 @@ impl EditorApp {
                     self.find_active.map(|index| index + 1).unwrap_or(0),
                     matches.len()
                 ));
-                close_find = ui.button("×").on_hover_text("Close find").clicked();
+                close_find = ui
+                    .add(focus_addon_support::ui_theme::control_button("×"))
+                    .on_hover_text("Close find")
+                    .clicked();
             });
             if query_changed || self.find_query_snapshot != self.find_query {
                 self.find_query_snapshot = self.find_query.clone();

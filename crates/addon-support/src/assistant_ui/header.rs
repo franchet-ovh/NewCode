@@ -42,21 +42,38 @@ pub fn show(ui: &mut egui::Ui, view: Header<'_>) -> Option<Action> {
         };
         theme::badge(ui, view.state, color, fill).on_hover_text(view.status);
         if view.connected {
-            if theme::button(ui, Icon::Stop, "", theme::colors(ui).muted, false)
+            if theme::action_button(ui, Icon::Stop, "", focus_addon_sdk::ButtonRole::Secondary)
                 .on_hover_text(format!("Stop {}", view.name))
                 .clicked()
             {
                 action = Some(Action::Stop);
             }
-        } else if theme::button(ui, Icon::Spark, "Start", theme::colors(ui).accent, true).clicked()
+        } else if theme::action_button(
+            ui,
+            Icon::Spark,
+            "Start",
+            focus_addon_sdk::ButtonRole::Primary,
+        )
+        .clicked()
         {
             action = Some(Action::Start);
         }
     });
     ui.add_enabled_ui(view.enabled, |ui| {
         ui.horizontal(|ui| {
-            let width = (ui.available_width() - 104.0).max(50.0);
-            if ui.small_button("+").on_hover_text("New session").clicked() {
+            let control = ui.spacing().interact_size.y;
+            let font = egui::TextStyle::Button.resolve(ui.style());
+            let color = theme::colors(ui).text;
+            let more_width = ui
+                .fonts_mut(|fonts| fonts.layout_no_wrap("…".into(), font, color).size().x)
+                + 2.0 * ui.spacing().button_padding.x;
+            let more_width = more_width.max(control);
+            let width = (ui.available_width()
+                - 2.0 * control
+                - more_width
+                - 3.0 * ui.spacing().item_spacing.x)
+                .max(1.0);
+            if theme::icon_button(ui, Icon::Plus, "New session").clicked() {
                 action = Some(Action::New);
             }
             let current = view
@@ -64,7 +81,7 @@ pub fn show(ui: &mut egui::Ui, view: Header<'_>) -> Option<Action> {
                 .iter()
                 .find(|s| Some(s.id.as_str()) == view.selected);
             ui.allocate_ui_with_layout(
-                egui::vec2(width, 28.0),
+                egui::vec2(width, ui.spacing().interact_size.y),
                 egui::Layout::top_down(egui::Align::Min),
                 |ui| {
                     egui::ComboBox::from_id_salt("assistant_session")
@@ -91,15 +108,15 @@ pub fn show(ui: &mut egui::Ui, view: Header<'_>) -> Option<Action> {
                         });
                 },
             );
-            if ui
-                .small_button("↻")
-                .on_hover_text("Refresh sessions and conversation")
-                .clicked()
+            if theme::icon_button(ui, Icon::Refresh, "Refresh sessions and conversation").clicked()
             {
                 action = Some(Action::Refresh);
             }
             if ui
-                .add_enabled(view.more, egui::Button::new("…").small())
+                .add_enabled(
+                    view.more,
+                    crate::ui_theme::control_button("…").min_size(egui::vec2(more_width, control)),
+                )
                 .on_hover_text("Load older sessions")
                 .clicked()
             {

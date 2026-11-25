@@ -41,6 +41,8 @@ class DevTools:
         self.errors = []
         self.dialogs = 0
         self.accept_dialogs = True
+        # Native windows and other test tabs must not steal this tab's logical focus.
+        self.send("Emulation.setFocusEmulationEnabled", {"enabled": True})
 
     def event(self, message):
         if message.get("method") == "Runtime.exceptionThrown":
@@ -141,7 +143,7 @@ def mobile_panels(dev, source, screenshot, addons):
         choose(0)
         if width == 390:
             # Tap the document and explicitly request the mobile keyboard bridge.
-            tap(140, 115)
+            tap(140, 160)
             bounds = dev.evaluate("(() => { const r = document.querySelector('#keyboard').getBoundingClientRect(); return {x:r.x+r.width/2,y:r.y+r.height/2}; })()")
             tap(bounds["x"], bounds["y"])
             assert dev.evaluate("document.activeElement.id === 'input'"), "Keyboard button did not focus text input"
@@ -198,7 +200,7 @@ def run(binary, browser, screenshot, addons):
             PATH=str(shims) + os.pathsep + os.environ.get("PATH", ""), BROWSER=str(external_opener), RUST_BACKTRACE="1",
             FOCUS_BROWSER_ARGS=str(arguments_file), FOCUS_EXTERNAL_LINK=str(root / "external-link"))
         app_log = (root / "app.log").open("w+")
-        app = subprocess.Popen([str(binary), "--foreground", str(workspace)], env=environment, stdout=subprocess.PIPE, stderr=app_log, text=True)
+        app = subprocess.Popen([str(binary), "--browser", "--foreground", str(workspace)], env=environment, stdout=subprocess.PIPE, stderr=app_log, text=True)
         try:
             ready = select.select([app.stdout], [], [], 20)[0]
             assert ready, "Editor did not print its browser URL"
@@ -219,6 +221,7 @@ def run(binary, browser, screenshot, addons):
             dev = DevTools(next(tab["webSocketDebuggerUrl"] for tab in tabs if tab["type"] == "page"))
             dev.send("Page.enable")
             dev.send("Runtime.enable")
+            dev.send("Page.bringToFront")
             wait_until(lambda: dev.evaluate("document.title === 'Focus Editor — workspace'"))
             assert dev.evaluate("document.querySelectorAll('header').length") == 0
             assert dev.evaluate("window.outerHeight - window.innerHeight < 90"), "Browser navigation controls are visible"
@@ -254,7 +257,7 @@ def run(binary, browser, screenshot, addons):
                     const response = await originalFetch(...args);
                     if (String(args[0]).endsWith('/api/frame') && response.status === 200) {
                         response.clone().json().then(frame => { window.smokeFrame = {
-                            dirty: frame.dirty, title: frame.title,
+                            dirty: frame.dirty, title: frame.title, dark: frame.dark_mode,
                             meshes: frame.meshes.length, scale: frame.pixels_per_point, size: frame.size
                         }; });
                     }
@@ -278,8 +281,8 @@ def run(binary, browser, screenshot, addons):
             assert dev.evaluate("location.origin") == origin
             print("External links use the system browser", flush=True)
 
-            dev.click(150, 127)  # First Explorer entry, below the project header.
-            dev.click(600, 102)
+            dev.click(150, 142)  # First Explorer entry, below the project header.
+            dev.click(600, 160)
             dev.shortcut("a")
             expected = "Browser edit: café 世界\n"
             dev.text(expected)
@@ -288,6 +291,25 @@ def run(binary, browser, screenshot, addons):
             wait_until(lambda: source.read_text() == expected)
             wait_until(lambda: dev.evaluate("window.smokeFrame?.dirty === false"))
             print("Unicode input and save passed", flush=True)
+            # Wait for the popup mesh before clicking an item in the canvas.
+            def choose_appearance(dark):
+                meshes = dev.evaluate("window.smokeFrame.meshes")
+                dev.click(1100, 24)
+                wait_until(lambda: dev.evaluate(f"window.smokeFrame?.meshes > {meshes}"))
+                dev.click(1080, 106 if dark else 64)
+                wait_until(lambda: dev.evaluate(f"window.smokeFrame?.dark === {str(dark).lower()}"))
+                dev.pump(.3)  # Let the menu close and all panels repaint in the new style.
+            choose_appearance(True)
+            assert dev.evaluate("document.documentElement.dataset.theme") == "dark"
+            dark_screenshot = screenshot.with_name(f"{screenshot.stem}-dark.png")
+            dark_screenshot.parent.mkdir(parents=True, exist_ok=True)
+            dark_screenshot.write_bytes(base64.b64decode(dev.send("Page.captureScreenshot", {"format": "png"})["data"]))
+            settings_file = next((root / "data/focus-editor/workspaces").glob("*/settings.toml"))
+            assert tomllib.loads(settings_file.read_text())["appearance"] == "dark"
+            choose_appearance(False)
+            assert source.read_text() == expected
+            print("Light/dark switching, browser chrome, and workspace appearance persistence passed", flush=True)
+            dev.click(600, 160)
 
             dev.send("Browser.grantPermissions", {"origin": origin, "permissions": ["clipboardReadWrite", "clipboardSanitizedWrite"]})
             dev.shortcut("a")
@@ -306,14 +328,14 @@ def run(binary, browser, screenshot, addons):
             previous_document = dev.evaluate("window.smokeDocument")
             dev.send("Page.reload", {"ignoreCache": True})
             wait_until(lambda: dev.evaluate(f"window.smokeDocument !== {json.dumps(previous_document)} && window.smokeFrame?.dirty && document.querySelector('#notice').hidden"))
-            dev.click(600, 102)
+            dev.click(600, 160)
             dev.shortcut("s")
             expected += " unsaved reload"
             wait_until(lambda: source.read_text() == expected)
             assert dev.dialogs >= 1, "Missing unsaved-change unload warning"
             print("Unsaved buffer and title survive reload", flush=True)
 
-            dev.click(600, 730)
+            dev.click(600, 780)
             marker = root / "terminal-marker"
             pid_file = root / "terminal.pid"
             dev.text(f"printf TERMINAL_OK > {marker}; printf $$ > {pid_file}")
@@ -344,7 +366,7 @@ def run(binary, browser, screenshot, addons):
             mobile_panels(dev, source, screenshot, addon_ids)
 
             # Ensure shutdown confirmation covers unsaved edits too.
-            dev.click(600, 102)
+            dev.click(600, 160)
             dev.text("unsaved on exit")
             wait_until(lambda: dev.evaluate("window.smokeFrame?.dirty"))
             dialogs = dev.dialogs

@@ -99,6 +99,7 @@ pub(crate) fn asset(path: &str) -> Option<(&'static str, &'static str)> {
     match path {
         "/" => Some(("text/html; charset=utf-8", include_str!("index.html"))),
         "/client.js" => Some(("text/javascript; charset=utf-8", include_str!("client.js"))),
+        "/controls.css" => Some(("text/css; charset=utf-8", include_str!("controls.css"))),
         "/browser.css" => Some(("text/css; charset=utf-8", include_str!("browser.css"))),
         _ => None,
     }

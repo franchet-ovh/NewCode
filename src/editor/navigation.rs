@@ -201,10 +201,10 @@ impl EditorApp {
                                         for symbol in chain {
                                             ui.colored_label(colors.faint, "›");
                                             let response = ui
-                                                .button(
+                                                .add(focus_addon_support::ui_theme::control_button(
                                                     egui::RichText::new(&symbol.name)
                                                         .color(colors.muted),
-                                                )
+                                                ))
                                                 .on_hover_text(format!(
                                                     "Go to {} · line {}",
                                                     symbol.name, symbol.line
@@ -359,14 +359,17 @@ fn folder_menu(
                 if entry.directory && entry.symlink {
                     ui.add_enabled(
                         false,
-                        egui::Button::new(format!("{} / (symlink)", entry.name)),
+                        focus_addon_support::ui_theme::control_button(format!(
+                            "{} / (symlink)",
+                            entry.name
+                        )),
                     );
                 } else if entry.directory {
                     ui.menu_button(format!("{} /", entry.name), |ui| {
                         folder_menu(ui, &entry.path, depth + 1, open, cache)
                     });
                 } else if ui
-                    .button(&entry.name)
+                    .add(focus_addon_support::ui_theme::control_button(&entry.name))
                     .on_hover_text(entry.path.display().to_string())
                     .clicked()
                 {
@@ -384,7 +387,7 @@ fn symbol_picker(nav: &mut Navigation, ui: &mut egui::Ui, output: &lsp::Output) 
     ui.set_width((ui.ctx().viewport_rect().width() - 40.0).clamp(160.0, 420.0));
     let enter = ui.input(|i| i.key_pressed(egui::Key::Enter));
     let query = ui.add(
-        egui::TextEdit::singleline(&mut nav.query)
+        focus_addon_support::ui_theme::singleline(&mut nav.query)
             .char_limit(256)
             .hint_text("Search symbols…")
             .desired_width(ui.available_width()),
@@ -405,7 +408,11 @@ fn symbol_picker(nav: &mut Navigation, ui: &mut egui::Ui, output: &lsp::Output) 
     }
     if !output.ready {
         ui.label(&output.status);
-        if nav.client.can_retry() && ui.button("Retry").clicked() {
+        if nav.client.can_retry()
+            && ui
+                .add(focus_addon_support::ui_theme::control_button("Retry"))
+                .clicked()
+        {
             nav.client.retry();
         }
         return None;
@@ -548,7 +555,7 @@ mod ui_tests {
     #[test]
     fn picker_filters_qualified_names_and_keyboard_selects_without_rebuilding_cache() {
         let ctx = egui::Context::default();
-        theme::apply(&ctx);
+        theme::apply(&ctx, crate::ui_theme::Appearance::Light);
         let mut nav = Navigation::default();
         let output = symbols();
         let mut target = None;
@@ -590,7 +597,7 @@ mod ui_tests {
     fn breadcrumb_row_is_bounded_on_compact_and_desktop_widths() {
         for width in [320.0, 900.0] {
             let ctx = egui::Context::default();
-            theme::apply(&ctx);
+            theme::apply(&ctx, crate::ui_theme::Appearance::Light);
             let mut app = super::super::tests::test_app();
             app.settings.lsp.enabled = false;
             app.active_file = Some(PathBuf::from(format!(
@@ -608,7 +615,12 @@ mod ui_tests {
                 .unwrap();
             assert!(rect.right() <= width, "{rect:?}");
             assert!(
-                rect.height() <= if width < 600.0 { 45.0 } else { 29.0 },
+                rect.height()
+                    <= if width < 600.0 {
+                        45.0
+                    } else {
+                        crate::ui_theme::Metrics::default().control_height
+                    },
                 "{rect:?}"
             );
             assert!(egui::TextEdit::load_state(&ctx, app.editor_id()).is_some());

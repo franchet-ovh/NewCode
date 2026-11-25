@@ -2,13 +2,13 @@
 
 ## Goal
 
-A fast, Linux-first Rust editor for project file management, source editing, Git review, an interactive shell, and Codex. Open the existing interface in a dedicated sandboxed Chromium app window, with `--ui` selecting the native desktop window. Keep the working layout compact and make common actions easy to identify.
+A fast, Linux-first Rust editor for project file management, source editing, Git review, an interactive shell, and Codex. Open the interface in a native desktop window by default (`--ui`); `--browser` selects a dedicated sandboxed Chromium app window. Keep the working layout compact and make common actions easy to identify.
 
 ## Window and visual design
 
 The left activity bar selects Explorer, Search, or Source Control. The center displays open files or a Source Control diff. An interactive shell occupies the bottom and an optional Codex/OpenCode assistant pane occupies the right. Pane sizes are adjustable and saved.
 
-Nord Light uses cool gray surfaces, muted blue accents, compact controls, square corners, and semantic Git colors, based on the Nord concept in `ui-mocks/index.html`. The terminal sits beneath the center editor column, and sidebars extend to the status bar. Bundled addons inherit resolved host appearance through the generic surface theme contract. Focus, selected tabs, status labels, vector icons, colored file markers, and steady input cursors remain visible. A bottom status bar reports file/save activity. New mockup capabilities and other theme presets are tracked in `TODO.md`.
+The approved design in `ui-mocks/ui-upgrade.html` uses shared semantic components throughout the editor and bundled addons: readable typography, 34px standard controls, rounded corners, labeled fields, grouped forms, selected navigation, cards, and status feedback. Appearance selects Nord Light or Nord Dark and is saved per workspace, defaulting to light. Compact screens retain touch-sized controls and panel navigation. Existing desktop pane placement and lifecycle behavior are preserved. Bundled addons inherit resolved appearance through the surface theme contract; declarative widgets carry optional semantic presentation metadata.
 
 ## Explorer and documents
 
@@ -68,7 +68,7 @@ OpenCode uses an owned localhost server and existing CLI configuration/authentic
 
 On Linux, launch in the background by default, preserving the calling directory, environment, workspace argument, and `--no-addon codex`. Provide `--foreground` for terminal diagnostics. Write current-session background output/errors to the local data directory under `focus-editor/logs/launch.log`; report failures to spawn or open the log in the terminal. Each launch opens an independent editor instance.
 
-Launch installed Chromium/Chrome in application mode unless `--ui` selects the native desktop window. Provide a resizable window without tabs, an address bar, or a redundant browser-session header. Give each instance a temporary private profile, disable extensions, synchronization, first-run prompts, and background browser operation, and keep the renderer sandbox enabled. Detect Linux executables and macOS app bundles; report missing browsers and startup/sandbox failures with an install/`--ui` diagnostic. Never retry unsandboxed or silently open a regular browser window.
+Launch the native desktop window by default; explicit `--browser` launches installed Chromium/Chrome in application mode. Provide a resizable window without tabs, an address bar, or a redundant browser-session header. Give each instance a temporary private profile, disable extensions, synchronization, first-run prompts, and background browser operation, and keep the renderer sandbox enabled. Detect Linux executables and macOS app bundles; report missing browsers and startup/sandbox failures with an install/`--ui` diagnostic. Never retry unsandboxed or silently open a regular browser window.
 
 Bind app sessions to a random loopback port, authenticate with a per-launch token, validate Host/Origin, and embed all browser assets in the executable. Exclude the private session URL from diagnostic logs; expose it only in foreground stdout for diagnostics. Route HTTP, HTTPS, and mailto links through an authenticated backend action to the system browser. Retain unsaved buffers and process state through reloads and connection loss while the app window remains alive. Closing the owned window warns about unsaved changes, then stops the backend, cleans up owned PTY/addon/browser processes, and deletes only the temporary browser profile. Continue backend events during short disconnections and suppress unchanged frames. Keep local file/folder dialogs and document browser-reserved shortcuts. Rust retains normal host access for editor operations.
 
@@ -119,3 +119,7 @@ data and credentials on uninstall unless data removal is explicitly selected.
 Release builds select their own tag; source builds allow latest or an explicit
 tag. Publish standalone packages for every manifest-discovered addon on both
 Linux architectures, an aggregate addons.json catalog, and verified checksums.
+
+## UI upgrade and launch options
+
+Both executables support `-h`/`--help` without a display, Chromium, log initialization, server configuration, or socket binding. Explicit `--ui`, `--browser`, and `--headless` editor modes are mutually exclusive; headless sessions still require a workspace. Preserve version and addon compatibility preflight commands. Browser assets share control tokens and styles. Keep the approved interactive preview as the sole UI concept reference.

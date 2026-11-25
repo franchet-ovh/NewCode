@@ -1,4 +1,6 @@
+pub use crate::controls::*;
 use egui::{self, Color32, FontId, Rect, Response, Sense, Stroke, Ui, Vec2};
+pub use focus_addon_sdk::ButtonRole;
 use std::path::Path;
 
 /// Host-owned appearance, also used by independently rendered addon surfaces.
@@ -47,6 +49,10 @@ pub struct Colors {
 #[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(default)]
 pub struct Metrics {
+    pub control_height: f32,
+    pub text_area_max_height: f32,
+    pub spacing: f32,
+    pub corner_radius: u8,
     pub activity_width: f32,
     pub tab_height: f32,
     pub toolbar_height: f32,
@@ -67,12 +73,16 @@ pub struct Metrics {
 impl Default for Metrics {
     fn default() -> Self {
         Self {
-            activity_width: 44.0,
+            control_height: 34.0,
+            text_area_max_height: 180.0,
+            spacing: 8.0,
+            corner_radius: 6,
+            activity_width: 52.0,
             tab_height: 37.0,
-            toolbar_height: 42.0,
+            toolbar_height: 48.0,
             status_height: 24.0,
             message_border_width: 3.0,
-            panel_header_height: 38.0,
+            panel_header_height: 46.0,
             project_row_height: 29.0,
             tree_row_height: 26.0,
             tree_indent: 16.0,
@@ -183,6 +193,7 @@ pub fn apply(ctx: &egui::Context) {
 
 #[derive(Clone, Copy)]
 pub enum Icon {
+    Plus,
     Folder,
     File,
     Search,
@@ -221,6 +232,10 @@ pub fn paint_icon(ui: &Ui, rect: Rect, icon: Icon, color: Color32) {
         );
     };
     match icon {
+        Icon::Plus => {
+            line(&[(10., 4.), (10., 16.)]);
+            line(&[(4., 10.), (16., 10.)]);
+        }
         Icon::Folder | Icon::NewFolder => {
             line(&[
                 (2., 16.),
@@ -334,7 +349,14 @@ pub fn icon(ui: &mut Ui, icon: Icon, color: Color32) {
     paint_icon(ui, rect, icon, color);
 }
 
-pub fn button(ui: &mut Ui, icon: Icon, label: &str, accent: Color32, primary: bool) -> Response {
+pub fn action_button(ui: &mut Ui, icon: Icon, label: &str, role: ButtonRole) -> Response {
+    let c = colors(ui);
+    let primary = role == ButtonRole::Primary;
+    let accent = match role {
+        ButtonRole::Destructive => c.error,
+        ButtonRole::Quiet => c.muted,
+        _ => c.accent,
+    };
     let galley = ui.painter().layout_no_wrap(
         label.into(),
         egui::TextStyle::Button.resolve(ui.style()),
@@ -354,7 +376,11 @@ pub fn button(ui: &mut Ui, icon: Icon, label: &str, accent: Color32, primary: bo
     } else if response.hovered() || response.has_focus() {
         colors(ui).hover
     } else {
-        colors(ui).raised
+        if role == ButtonRole::Quiet {
+            Color32::TRANSPARENT
+        } else {
+            c.raised
+        }
     };
     let foreground = if !enabled {
         colors(ui).muted
@@ -373,7 +399,11 @@ pub fn button(ui: &mut Ui, icon: Icon, label: &str, accent: Color32, primary: bo
             if response.has_focus() {
                 colors(ui).accent
             } else {
-                colors(ui).border
+                if role == ButtonRole::Quiet {
+                    Color32::TRANSPARENT
+                } else {
+                    colors(ui).border
+                }
             },
         ),
         egui::StrokeKind::Inside,
@@ -410,7 +440,43 @@ pub fn button(ui: &mut Ui, icon: Icon, label: &str, accent: Color32, primary: bo
     response
 }
 
+/// Icon actions retain a specific accessible name even when no text is painted.
+pub fn icon_button(ui: &mut Ui, icon: Icon, label: &str) -> Response {
+    let response = action_button(ui, icon, "", ButtonRole::Secondary);
+    response.widget_info(|| {
+        egui::WidgetInfo::labeled(egui::WidgetType::Button, ui.is_enabled(), label)
+    });
+    response.on_hover_text(label)
+}
+
 pub fn nav_button(ui: &mut Ui, icon: Icon, selected: bool, label: &str) -> Response {
+    navigation(ui, selected, label, |ui, rect, color| {
+        paint_icon(ui, rect, icon, color)
+    })
+}
+
+pub fn image_nav_button(
+    ui: &mut Ui,
+    image: &egui::TextureHandle,
+    selected: bool,
+    label: &str,
+) -> Response {
+    navigation(ui, selected, label, |ui, rect, _| {
+        ui.painter().image(
+            image.id(),
+            rect,
+            Rect::from_min_max(egui::Pos2::ZERO, egui::pos2(1.0, 1.0)),
+            Color32::WHITE,
+        );
+    })
+}
+
+fn navigation(
+    ui: &mut Ui,
+    selected: bool,
+    label: &str,
+    paint: impl FnOnce(&Ui, Rect, Color32),
+) -> Response {
     let width = metrics(ui).activity_width;
     let (rect, response) = ui.allocate_exact_size(Vec2::splat(width), Sense::click());
     let c = colors(ui);
@@ -436,10 +502,9 @@ pub fn nav_button(ui: &mut Ui, icon: Icon, selected: bool, label: &str) -> Respo
             c.accent,
         );
     }
-    paint_icon(
+    paint(
         ui,
         Rect::from_center_size(rect.center(), Vec2::splat(20.0)),
-        icon,
         c.activity_text,
     );
     response.widget_info(|| {
@@ -451,7 +516,7 @@ pub fn nav_button(ui: &mut Ui, icon: Icon, selected: bool, label: &str) -> Respo
 pub fn heading(ui: &mut Ui, symbol: Icon, text: &str, color: Color32) {
     ui.horizontal(|ui| {
         icon(ui, symbol, color);
-        ui.label(egui::RichText::new(text).size(12.0).strong().color(color));
+        ui.label(egui::RichText::new(text).heading().strong().color(color));
     });
 }
 
@@ -563,7 +628,7 @@ mod tests {
                     egui::CentralPanel::default().show(root, |ui| {
                         let response = ui
                             .add_enabled_ui(enabled, |ui| {
-                                button(ui, Icon::Save, "Save", colors(ui).accent, true)
+                                action_button(ui, Icon::Save, "Save", ButtonRole::Primary)
                             })
                             .inner;
                         button_id = response.id;

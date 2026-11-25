@@ -21,7 +21,57 @@ pub struct Action {
     pub selected: [Option<usize>; 3],
 }
 
+/// Space for the frame and both control rows at the host's current density.
+pub(super) fn chrome_height(ui: &egui::Ui) -> f32 {
+    let control =
+        ui.spacing().interact_size.y.max(
+            ui.text_style_height(&egui::TextStyle::Button) + 2.0 * ui.spacing().button_padding.y,
+        );
+    18.0 + 2.0 * ui.spacing().item_spacing.y + control + control.max(28.0)
+}
+
 pub fn show(
+    ui: &mut egui::Ui,
+    id: egui::Id,
+    input: &mut String,
+    input_height: f32,
+    can_send: bool,
+    busy: bool,
+    can_interrupt: bool,
+    selectors: [Selector; 3],
+) -> Action {
+    if ui.available_height() < chrome_height(ui) {
+        return egui::ScrollArea::vertical()
+            .id_salt(id.with("compact_composer"))
+            .min_scrolled_height(0.0)
+            .auto_shrink([false, false])
+            .show(ui, |ui| {
+                content(
+                    ui,
+                    id,
+                    input,
+                    input_height,
+                    can_send,
+                    busy,
+                    can_interrupt,
+                    selectors,
+                )
+            })
+            .inner;
+    }
+    content(
+        ui,
+        id,
+        input,
+        input_height,
+        can_send,
+        busy,
+        can_interrupt,
+        selectors,
+    )
+}
+
+fn content(
     ui: &mut egui::Ui,
     id: egui::Id,
     input: &mut String,
@@ -55,7 +105,7 @@ pub fn show(
                 .auto_shrink([false, false])
                 .show(ui, |ui| {
                     ui.add(
-                        egui::TextEdit::multiline(input)
+                        crate::ui_theme::multiline(input)
                             .id(id)
                             .lock_focus(true)
                             .hint_text("Message assistant…")
@@ -75,7 +125,12 @@ pub fn show(
             ui.horizontal(|ui| {
                 action.send |= ui
                     .add_enabled_ui(can_send, |ui| {
-                        theme::button(ui, Icon::Send, "Send", theme::colors(ui).accent, true)
+                        theme::action_button(
+                            ui,
+                            Icon::Send,
+                            "Send",
+                            focus_addon_sdk::ButtonRole::Primary,
+                        )
                     })
                     .inner
                     .on_hover_text("Ctrl+Enter to send")
@@ -83,12 +138,11 @@ pub fn show(
                 if busy {
                     action.interrupt = ui
                         .add_enabled_ui(can_interrupt, |ui| {
-                            theme::button(
+                            theme::action_button(
                                 ui,
                                 Icon::Stop,
                                 "Interrupt",
-                                theme::colors(ui).warning,
-                                false,
+                                focus_addon_sdk::ButtonRole::Secondary,
                             )
                         })
                         .inner
@@ -100,7 +154,7 @@ pub fn show(
                     ((ui.available_width() - 2.0 * ui.spacing().item_spacing.x) / 3.0).max(1.0);
                 for (index, selector) in selectors.into_iter().enumerate() {
                     ui.allocate_ui_with_layout(
-                        egui::vec2(width, 28.0),
+                        egui::vec2(width, ui.spacing().interact_size.y.max(28.0)),
                         egui::Layout::top_down(egui::Align::Min),
                         |ui| {
                             ui.add_enabled_ui(

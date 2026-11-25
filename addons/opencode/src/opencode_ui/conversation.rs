@@ -18,7 +18,10 @@ impl OpenCodeUi {
             .show(ui, |ui| {
                 if self.history_before.is_some()
                     && ui
-                        .add_enabled(!self.locked(), egui::Button::new("Load earlier messages"))
+                        .add_enabled(
+                            !self.locked(),
+                            focus_addon_support::ui_theme::control_button("Load earlier messages"),
+                        )
                         .clicked()
                 {
                     self.older_messages();
@@ -120,12 +123,11 @@ impl OpenCodeUi {
                             if index + 1 == self.messages.len() && go_ready {
                                 go = ui
                                     .add_enabled_ui(can_send, |ui| {
-                                        theme::button(
+                                        theme::action_button(
                                             ui,
                                             theme::Icon::Send,
                                             "Go",
-                                            theme::colors(ui).accent,
-                                            true,
+                                            focus_addon_sdk::ButtonRole::Primary,
                                         )
                                     })
                                     .inner

@@ -10,7 +10,7 @@ use std::{collections::HashMap, path::PathBuf, sync::mpsc, time::Instant};
 #[test]
 fn commit_focus_survives_refresh_and_failure() {
     let ctx = egui::Context::default();
-    theme::apply(&ctx);
+    theme::apply(&ctx, crate::ui_theme::Appearance::Light);
     let workspace = PathBuf::from("/tmp/focus-git-focus-test");
     let make_snapshot = || Snapshot {
         root: workspace.clone(),
