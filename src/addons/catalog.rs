@@ -338,6 +338,8 @@ mod tests {
 
     #[test]
     fn discovery_selects_highest_compatible_version_and_retains_download_tag() {
+        let compatible_requirement = format!("={}", env!("CARGO_PKG_VERSION"));
+        let incompatible_requirement = format!(">{}", env!("CARGO_PKG_VERSION"));
         let tags = [
             "addon_github_0.4.9",
             "addon_codex_2.0.0",
@@ -357,14 +359,15 @@ mod tests {
             Ok(catalog_for(
                 tag,
                 if tag.ends_with("0.4.11") {
-                    ">=99.0.0"
+                    &incompatible_requirement
                 } else {
-                    ">=0.4.8, <0.5.0"
+                    &compatible_requirement
                 },
             ))
         })
         .unwrap();
         let github = catalog.packages.iter().find(|p| p.id == "github").unwrap();
+        assert!(compatible(github));
         assert_eq!(github.version, "0.4.10");
         assert_eq!(
             github.source_release.as_deref(),
@@ -389,7 +392,11 @@ mod tests {
                 tag.to_owned(),
             )]
         };
-        let catalog = select_packages(releases(), |_| Ok(catalog_for(tag, ">=99.0.0"))).unwrap();
+        let incompatible_requirement = format!(">{}", env!("CARGO_PKG_VERSION"));
+        let catalog = select_packages(releases(), |_| {
+            Ok(catalog_for(tag, &incompatible_requirement))
+        })
+        .unwrap();
         assert!(!compatible(&catalog.packages[0]));
         assert!(select_packages(releases(), |_| Err("download failed".into())).is_err());
         assert!(
