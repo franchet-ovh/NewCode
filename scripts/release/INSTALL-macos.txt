@@ -1,4 +1,8 @@
-Focus Editor for Apple Silicon (macOS 11 or newer)
+Focus Editor for Intel and Apple Silicon (macOS 11 or newer)
+
+Choose macos-amd64 for an Intel Mac or macos-arm64 for an Apple Silicon Mac.
+Verify the download with: shasum -a 256 -c SHA256SUMS-macos
+Keep both DMGs beside the checksum file to verify both downloads together.
 
 Drag Focus Editor.app to Applications, then open it from Applications.
 The editor opens a native desktop window by default; --ui selects it explicitly.

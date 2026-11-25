@@ -12,6 +12,8 @@ import tempfile
 from prepare_version import validate_versions
 from addon_release import TARGETS, RELEASE_TARGETS, safe_tag
 
+MACOS_TARGETS = ("x86_64-apple-darwin", "aarch64-apple-darwin")
+
 
 def asset_name(tag, target):
     # Git tags may contain slashes; asset names must be single safe filenames.
@@ -30,6 +32,7 @@ def verify_binary(binary, target, name="focus-editor", expected_version=None):
     architecture = {
         "x86_64-unknown-linux-gnu": "x86-64",
         "aarch64-unknown-linux-gnu": "aarch64",
+        "x86_64-apple-darwin": "x86_64",
         "aarch64-apple-darwin": "arm64",
     }[target]
     if architecture not in description:
@@ -42,8 +45,8 @@ def verify_binary(binary, target, name="focus-editor", expected_version=None):
         if "not found" in libraries:
             raise RuntimeError("Unresolved Linux shared libraries")
     else:
-        if run("lipo", "-archs", str(binary)) != "arm64":
-            raise RuntimeError("Expected a native arm64 Mach-O executable")
+        if run("lipo", "-archs", str(binary)) != architecture:
+            raise RuntimeError(f"Expected a native {architecture} Mach-O executable")
         libraries = run("otool", "-L", str(binary))
         print(libraries)
         # No runner-local Homebrew or build-directory dependencies may ship.
@@ -87,7 +90,7 @@ def package_macos(binary, output, stage):
     shutil.copy2(binary.with_name("focus-editor-server"), contents / "MacOS/focus-editor-server")
     shutil.copy2("LICENSE", contents / "Resources/LICENSE")
     shutil.copy2("THIRD_PARTY_NOTICES.txt", contents / "Resources/THIRD_PARTY_NOTICES.txt")
-    # Rust's macOS target supports 11.0 and later; keep bundle and binary aligned.
+    # Keep the bundle's minimum OS aligned with the release build environment.
     with (contents / "Info.plist").open("wb") as stream:
         plistlib.dump({
             "CFBundleIdentifier": "io.github.nfranchet.focus-editor",
@@ -98,7 +101,7 @@ def package_macos(binary, output, stage):
             "CFBundleInfoDictionaryVersion": "6.0",
             "CFBundleShortVersionString": version.split("-", 1)[0].split("+", 1)[0],
             "CFBundleVersion": version.split("-", 1)[0].split("+", 1)[0],
-            "LSMinimumSystemVersion": "11.0",
+            "LSMinimumSystemVersion": os.environ.get("MACOSX_DEPLOYMENT_TARGET", "11.0"),
             "NSHighResolutionCapable": True,
         }, stream)
     run("plutil", "-lint", str(contents / "Info.plist"))
@@ -106,7 +109,7 @@ def package_macos(binary, output, stage):
     run("codesign", "--force", "--sign", "-", str(app))
     run("codesign", "--verify", "--deep", "--strict", "--verbose=2", str(app))
     os.symlink("/Applications", stage / "Applications")
-    shutil.copy2("scripts/release/INSTALL-macos.txt", stage / "INSTALL.txt")
+    shutil.copy2(Path(__file__).with_name("INSTALL-macos.txt"), stage / "INSTALL.txt")
     shutil.copy2("LICENSE", stage / "LICENSE")
     shutil.copy2("THIRD_PARTY_NOTICES.txt", stage / "THIRD_PARTY_NOTICES.txt")
     run("hdiutil", "create", "-volname", "Focus Editor", "-srcfolder", str(stage),

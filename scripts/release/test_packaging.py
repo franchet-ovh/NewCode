@@ -12,7 +12,7 @@ import unittest
 from unittest import mock
 import fcntl
 
-from package import RELEASE_TARGETS, asset_name, package_linux
+from package import MACOS_TARGETS, RELEASE_TARGETS, asset_name, package_linux, verify_binary
 import importlib.util
 
 spec = importlib.util.spec_from_file_location("install_addons", Path(__file__).with_name("install-addons.py"))
@@ -21,6 +21,61 @@ spec.loader.exec_module(installer)
 
 
 class PackagingTests(unittest.TestCase):
+    def test_macos_binaries_require_the_selected_native_architecture(self):
+        for target, architecture in zip(MACOS_TARGETS, ("x86_64", "arm64")):
+            with self.subTest(target=target):
+                description = f"Mach-O 64-bit executable {architecture}"
+                libraries = "binary:\n\t/usr/lib/libSystem.B.dylib (compatibility version 1.0.0)"
+                with mock.patch("package.run", side_effect=[description, architecture, libraries, "focus-editor 1.2.3"]):
+                    verify_binary(Path("binary"), target, expected_version="1.2.3")
+                for invalid in ("arm64" if architecture == "x86_64" else "x86_64", "x86_64 arm64"):
+                    with mock.patch("package.run", side_effect=[description, invalid]):
+                        with self.assertRaisesRegex(RuntimeError, "native"):
+                            verify_binary(Path("binary"), target)
+                with mock.patch("package.run", return_value="Mach-O executable wrong-cpu"):
+                    with self.assertRaisesRegex(RuntimeError, "architecture"):
+                        verify_binary(Path("binary"), target)
+                for dependency in ("/opt/homebrew/lib/foreign.dylib", "/usr/local/lib/foreign.dylib"):
+                    with mock.patch("package.run", side_effect=[description, architecture, f"binary:\n\t{dependency}"]):
+                        with self.assertRaisesRegex(RuntimeError, "Unbundled"):
+                            verify_binary(Path("binary"), target)
+
+    def test_macos_checksums_require_both_architectures_and_use_a_separate_manifest(self):
+        script = Path(__file__).with_name("checksums.py").resolve()
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            names = [asset_name("v1.2.3", target) for target in MACOS_TARGETS]
+            self.assertEqual(set(names), {"focus-editor-v1.2.3-macos-amd64.dmg", "focus-editor-v1.2.3-macos-arm64.dmg"})
+            for name in names:
+                (root / name).write_bytes(name.encode())
+
+            def generate():
+                return subprocess.run([sys.executable, str(script), str(root), "v1.2.3", "--platform", "macos"],
+                                      capture_output=True, text=True)
+
+            self.assertEqual(generate().returncode, 0)
+            manifest = (root / "SHA256SUMS-macos").read_text()
+            self.assertFalse((root / "SHA256SUMS").exists())
+            for name in names:
+                digest = hashlib.sha256((root / name).read_bytes()).hexdigest()
+                self.assertIn(f"{digest}  {name}\n", manifest)
+            self.assertEqual(generate().returncode, 0)
+            for index, name in enumerate(names):
+                asset = root / name
+                data = asset.read_bytes()
+                asset.unlink()
+                self.assertNotEqual(generate().returncode, 0)
+                asset.write_bytes(b"")
+                self.assertNotEqual(generate().returncode, 0)
+                asset.unlink()
+                asset.symlink_to(root / names[1 - index])
+                self.assertNotEqual(generate().returncode, 0)
+                asset.unlink()
+                asset.write_bytes(data)
+            (root / asset_name("v1.2.3", RELEASE_TARGETS[0])).write_bytes(b"unexpected Linux archive")
+            self.assertNotEqual(generate().returncode, 0)
+            self.assertEqual((root / "SHA256SUMS-macos").read_text(), manifest)
+
     def test_linux_archive_keeps_executable_permissions_and_excludes_other_data(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
