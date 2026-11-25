@@ -85,6 +85,7 @@ jobs:
           echo "$RESULTS" >> "$GITHUB_STEP_SUMMARY"
           echo "$RESULTS" | jq -e 'all(.[]; .result == "success" or .result == "skipped")'
   publish-addons:
+    name: Release addon ${{ matrix.addon }}
     needs: [changes, summary]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.changes.outputs.addons != '[]'
     permissions:

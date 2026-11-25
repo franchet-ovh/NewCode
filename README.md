@@ -36,7 +36,20 @@ Automatic releases currently publish Linux binaries only. macOS arm64 builds and
 
 Finder launches retain the inherited PATH and add `~/.local/bin`, `~/.opencode/bin`, `/opt/homebrew/bin`, and `/usr/local/bin` for external tools. Git, Docker, Codex, and OpenCode are separate installations; authenticate assistants with their CLI first. Run `focus-editor --version` (or the app's executable path with `--version`) to check the version without opening a window.
 
-To publish: merge the workflow and packaging scripts into the default branch, bump the Cargo package version as appropriate, create a tag containing those changes, then publish a release for that tag. Saving a draft or pushing a tag alone does not build downloads. Both Linux native builds and packaging checks must pass before any assets are uploaded. Rerun failed jobs from GitHub Actions to retry; matching assets are replaced. Release tags containing filename-unsafe characters such as `/` use `-` in download names. The bundle and executable version come from Cargo metadata; release filenames use the tag.
+To publish an editor release, use Python 3.11+ and an authenticated GitHub CLI (`gh auth login`):
+
+```sh
+python3 scripts/release/release_editor.py
+python3 scripts/release/release_editor.py --patch
+python3 scripts/release/release_editor.py --version 0.5.0
+python3 scripts/release/release_editor.py --with-addon
+```
+
+By default, the helper publishes the current Cargo package version from remote `main` as `v<x.y.z>`. That version must not already be released or reserved by a draft. Use `--patch`, `--minor`, or `--major` to calculate a newer version from the highest source or released/reserved editor version, or `--version x.y.z` to choose one explicitly. These flags are mutually exclusive. Editor and addon release versions are independent; addon tags and prereleases do not influence editor bumps. `--repo owner/repo` selects another repository.
+
+The helper reads one immutable `main` revision for the source version and new tag target, then publishes a GitHub release with generated notes. The existing release workflow commits the selected editor version to `main` and builds that version commit. Local files and versions are untouched. `--with-addon` subsequently calls `release_addon.py --all --minor`, forwarding the same repository; each addon receives its own minor bump regardless of the editor bump. Neither helper waits for builds or asset uploads. If addon dispatch fails, the editor release remains created; inspect the output and retry remaining addons with `release_addon.py`, rather than recreating the editor release.
+
+Merge the workflow and packaging scripts into the default branch before releasing. Saving a draft or pushing a tag alone does not build downloads. Both Linux native builds and packaging checks must pass before any assets are uploaded. Rerun failed jobs from GitHub Actions to retry; matching assets are replaced. Release tags containing filename-unsafe characters such as `/` use `-` in download names. The bundle and executable version come from Cargo metadata; release filenames use the tag.
 
 Editor releases retain the existing release-version GitHub App and environment setup for committing the editor version to main. Asset upload uses GitHub's built-in token with `contents: write`. Editor release preparation leaves addon versions unchanged. Editor builds validate both native Linux architectures, runtime dependencies, package contents, and checksums.
 

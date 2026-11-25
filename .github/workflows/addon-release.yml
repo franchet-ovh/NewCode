@@ -1,4 +1,5 @@
 name: Independent addon release
+run-name: Release addon ${{ inputs.addon }}
 on:
   workflow_call:
     inputs:
@@ -30,6 +31,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   prepare:
+    name: Prepare ${{ inputs.addon }}
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     permissions:
@@ -54,6 +56,7 @@ jobs:
           SOURCE_SHA: ${{ steps.source.outputs.sha }}
         run: python3 scripts/release/publish_addon.py reserve --addon "$ADDON" --source-sha "$SOURCE_SHA" --version "$VERSION"
   build:
+    name: Build ${{ inputs.addon }} (${{ matrix.target }})
     needs: prepare
     if: needs.prepare.outputs.done != 'true'
     runs-on: ${{ matrix.runner }}
@@ -94,6 +97,7 @@ jobs:
           if-no-files-found: error
           overwrite: true
   publish:
+    name: Publish ${{ inputs.addon }}
     needs: [prepare, build]
     runs-on: ubuntu-24.04
     permissions:
