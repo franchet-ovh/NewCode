@@ -1,6 +1,6 @@
 # Focus Editor
 
-A compact Rust editor for Linux and Apple Silicon macOS. Opens in a native desktop window by default; use `--browser` for a dedicated Chromium app window. Browse projects, edit source files, review Git changes, and work with a shell, Codex, and OpenCode.
+A compact Rust editor for Linux and macOS on Intel and Apple Silicon. Opens in a native desktop window by default; use `--browser` for a dedicated Chromium app window. Browse projects, edit source files, review Git changes, and work with a shell, Codex, and OpenCode.
 
 Licensed under the [Apache License 2.0](LICENSE).
 
@@ -32,7 +32,13 @@ Editor archives contain only the editor/server and installation/legal files. The
 
 HTTPS requests from the editor and bundled Rust addons trust the system certificate store. On Linux, install your distribution's `ca-certificates` package and add any corporate proxy CA to that store. Restart the editor after updating certificates. To select a PEM CA bundle explicitly, launch with `SSL_CERT_FILE=/path/to/ca-bundle.pem focus-editor`. `SSL_CERT_FILE` and `SSL_CERT_DIR` override the native certificate locations, so the selected bundle or directories must include all the roots you need, including the proxy CA. External tools such as Git, Codex, and OpenCode manage their own TLS settings.
 
-Automatic releases currently publish Linux binaries only. macOS arm64 builds and DMGs are skipped. macOS remains available to build from source; its app packaging script remains available for manual use.
+Automatic releases publish Linux binaries only. To add macOS downloads to an existing published editor release or prerelease, open **Actions → Release macOS binaries → Run workflow**, select `main`, and enter its tag (for example `v0.5.0`). This separate workflow runs only when manually dispatched. It builds and tests the tagged source on native Intel and Apple Silicon runners, stamps the selected version in the build checkouts, and attaches both verified DMGs only after both builds succeed:
+
+- `focus-editor-<tag>-macos-amd64.dmg` (Intel)
+- `focus-editor-<tag>-macos-arm64.dmg` (Apple Silicon)
+- `SHA256SUMS-macos`
+
+The separate macOS checksum file preserves the Linux `SHA256SUMS`. Download both DMGs and `SHA256SUMS-macos` into one directory and run `shasum -a 256 -c SHA256SUMS-macos`. Builds are also retained as workflow artifacts for seven days; rerunning replaces matching release assets. Each image contains `Focus Editor.app` with the editor and server, installation notes, and legal files. macOS 11 or newer is required. Drag the app into Applications. The app is ad-hoc signed and is not notarized; see the included [macOS installation notes](scripts/release/INSTALL-macos.txt) for first-launch instructions. macOS addons currently need to be built from source.
 
 Finder launches retain the inherited PATH and add `~/.local/bin`, `~/.opencode/bin`, `/opt/homebrew/bin`, and `/usr/local/bin` for external tools. Git, Docker, Codex, and OpenCode are separate installations; authenticate assistants with their CLI first. Run `focus-editor --version` (or the app's executable path with `--version`) to check the version without opening a window.
 

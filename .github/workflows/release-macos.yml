@@ -1,0 +1,164 @@
+name: Release macOS binaries
+run-name: Release macOS binaries for ${{ inputs.tag }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing published editor release tag (for example v0.5.0)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-macos-${{ inputs.tag }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  CARGO_TERM_COLOR: always
+  RELEASE_TAG: ${{ inputs.tag }}
+  GH_REPO: ${{ github.repository }}
+  MACOSX_DEPLOYMENT_TARGET: '11.0'
+
+jobs:
+  prepare:
+    name: Resolve published editor release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      sha: ${{ steps.source.outputs.sha }}
+    steps:
+      - name: Check out workflow tooling
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Validate editor tag and published release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PYTHONPATH: scripts/release
+        run: |
+          python3 -c 'import os; from prepare_version import release_version; release_version(os.environ["RELEASE_TAG"])'
+          test "$(gh release view "$RELEASE_TAG" --json isDraft --jq '.isDraft')" = false
+      - name: Check out tagged source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          ref: refs/tags/${{ inputs.tag }}
+          path: source
+          persist-credentials: false
+      - name: Record immutable source revision
+        id: source
+        run: echo "sha=$(git -C source rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build ${{ matrix.platform }}
+    needs: prepare
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: bash
+        working-directory: source
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-amd64
+            runner: macos-15-intel
+            target: x86_64-apple-darwin
+          - platform: macos-arm64
+            runner: macos-15
+            target: aarch64-apple-darwin
+    env:
+      TARGET: ${{ matrix.target }}
+    steps:
+      # Use this workflow's packager even when the release tag predates Intel support.
+      - name: Check out workflow tooling
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          ref: ${{ github.sha }}
+          path: release-tools
+          persist-credentials: false
+      - name: Check out release source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          ref: ${{ needs.prepare.outputs.sha }}
+          path: source
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.13'
+      - name: Stamp release version in the build checkout
+        # Editor tags can precede the automatic workflow's version commit to main.
+        run: python3 "$GITHUB_WORKSPACE/release-tools/scripts/release/prepare_version.py" "$RELEASE_TAG"
+      - name: Install stable Rust and verify native target
+        run: |
+          export PATH="$HOME/.cargo/bin:$PATH"
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+          rustup toolchain install stable --profile minimal --component rustfmt
+          rustup default stable
+          host=$(rustc -vV | sed -n 's/^host: //p')
+          if [ "$host" != "$TARGET" ]; then
+            echo "Native tests require $TARGET, but this runner provides $host" >&2
+            exit 1
+          fi
+          rustup target add "$TARGET"
+      - name: Install pinned Zig toolchain for Ghostty
+        run: |
+          python3 "$GITHUB_WORKSPACE/release-tools/scripts/install-zig.py" "$RUNNER_TEMP/focus-zig"
+          echo "$RUNNER_TEMP/focus-zig" >> "$GITHUB_PATH"
+      - uses: Swatinem/rust-cache@2201cc584a476d1b508be977bbe4b7d1c7a52e9c # v2.9.3
+        with:
+          shared-key: macos-${{ matrix.target }}-editor-release
+          workspaces: source -> target
+      - name: Check and build editor and server
+        run: |
+          cargo fmt --check
+          cargo test --locked --target "$TARGET"
+          cargo build --locked --release --bins --target "$TARGET"
+      - name: Package and verify native DMG
+        run: python3 "$GITHUB_WORKSPACE/release-tools/scripts/release/package.py" "$TARGET" "$RELEASE_TAG"
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: release-${{ matrix.platform }}
+          path: source/dist/*
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+          overwrite: true
+
+  publish:
+    name: Attach verified macOS downloads
+    needs: [prepare, build]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Check out workflow tooling
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          pattern: release-macos-*
+          path: dist
+          merge-multiple: true
+      - name: Validate both downloads and generate macOS checksums
+        run: |
+          python3 scripts/release/checksums.py dist "$RELEASE_TAG" --platform macos
+          cd dist
+          sha256sum --check SHA256SUMS-macos
+      - name: Upload to the existing published release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          test "$(gh release view "$RELEASE_TAG" --json isDraft --jq '.isDraft')" = false
+          gh release upload "$RELEASE_TAG" dist/* --clobber

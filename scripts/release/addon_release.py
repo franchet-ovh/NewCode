@@ -8,6 +8,7 @@ import tomllib
 
 TARGETS = {"x86_64-unknown-linux-gnu": ("linux-amd64", ".tar.gz"),
            "aarch64-unknown-linux-gnu": ("linux-arm64", ".tar.gz"),
+           "x86_64-apple-darwin": ("macos-amd64", ".dmg"),
            "aarch64-apple-darwin": ("macos-arm64", ".dmg")}
 RELEASE_TARGETS = ("x86_64-unknown-linux-gnu", "aarch64-unknown-linux-gnu")
 
