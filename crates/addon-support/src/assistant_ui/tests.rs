@@ -60,7 +60,11 @@ fn long_drafts_scroll_to_both_ends_without_moving_controls_or_losing_text() {
         let ctx = egui::Context::default();
         theme::apply(&ctx);
         ctx.style_mut_of(egui::Theme::Light, |style| {
-            style.scroll_animation = egui::style::ScrollAnimation::none()
+            style.scroll_animation = egui::style::ScrollAnimation::none();
+            let metrics = theme::Metrics::default();
+            style.spacing.interact_size = egui::Vec2::splat(metrics.control_height);
+            style.spacing.item_spacing = egui::Vec2::splat(metrics.spacing);
+            style.spacing.button_padding = egui::vec2(10.0, 7.0);
         });
         let mut input = (0..400).map(|i| format!("draft {i}\n")).collect::<String>();
         let original = input.clone();
@@ -131,7 +135,11 @@ fn long_drafts_scroll_to_both_ends_without_moving_controls_or_losing_text() {
                 .unwrap()
                 .offset
                 .y
-                < 1.0
+                <= f32::from(theme::FIELD_MARGIN.top),
+            "The first line must be visible; only field padding may remain scrolled: {:?}",
+            egui::scroll_area::State::load(&ctx, scroll_id)
+                .unwrap()
+                .offset
         );
         frame(&ctx, size, vec![key(egui::Key::Enter)], &mut draw);
         drop(draw);

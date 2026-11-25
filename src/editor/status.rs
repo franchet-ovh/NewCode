@@ -233,7 +233,12 @@ impl EditorApp {
                                     for item in &items {
                                         if let Some(selected) = item.action {
                                             if ui
-                                                .add(egui::Button::new(&item.text).wrap())
+                                                .add(
+                                                    focus_addon_support::ui_theme::control_button(
+                                                        &item.text,
+                                                    )
+                                                    .wrap(),
+                                                )
                                                 .on_hover_text(&item.details)
                                                 .clicked()
                                             {
@@ -370,7 +375,7 @@ mod tests {
     fn status_fits_viewports_and_overflow_opens_logs_and_git() {
         for width in [320.0, 600.0, 900.0, 1440.0] {
             let ctx = egui::Context::default();
-            theme::apply(&ctx);
+            theme::apply(&ctx, crate::ui_theme::Appearance::Light);
             let mut app = super::super::tests::test_app();
             app.status = "Saved /very/long/path/".repeat(30);
             let mut frame = |events| {

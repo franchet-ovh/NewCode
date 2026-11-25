@@ -4,19 +4,20 @@ Extract the archive and put focus-editor on your PATH, for example:
   mkdir -p ~/.local/bin
   install -m 755 focus-editor focus-editor-server ~/.local/bin/
   focus-editor ~/projects/my-project
-  focus-editor --ui ~/projects/my-project
+  focus-editor --browser ~/projects/my-project
 
-The default opens a dedicated Chromium app window, without tabs or an address
-bar. Install Chromium or Google Chrome with WebGL 2 and working sandbox support.
+The default opens a native desktop window without requiring Chromium.
+Use --ui to select it explicitly. Use --browser for a dedicated app window;
+that mode requires Chromium or Google Chrome with WebGL 2 and sandbox support.
 Each launch uses a temporary private profile with extensions and sync disabled;
-the renderer sandbox stays enabled. Use --ui for the native desktop window. Both modes
+the renderer sandbox stays enabled in browser mode. Both modes
 use the same editor, terminals, Git, and addons; no Node.js or Electron is needed.
 Closing the app window warns about unsaved documents, stops the backend, and
 removes its temporary profile. Reloads and connection loss retain the session
 while the window is alive. External links open in the system browser.
 
 Addons are distributed separately. Open Addons below Source Control and choose
-Refresh / check updates to find compatible versions, then Install. The manager
+Refresh to find compatible versions, then Install. The manager
 also installs a local addon.toml or addon .tar.gz and provides update, enable,
 restart, credential, and uninstall controls. Each addon declares supported editor
 versions, protocol, and platform. Updates preserve addon data and credentials.
@@ -41,7 +42,8 @@ App mode prints its private session URL only in the foreground for diagnostics.
 Keep the full URL private. If Chromium cannot start, inspect --foreground output
 or use --ui. The launcher never retries with the browser sandbox disabled.
 Browser-reserved shortcuts can take precedence; use editor menus or --ui.
-Use --version to display the application version without opening a window.
+Use --version to display the version, or --help to list editor options without
+opening a window. focus-editor-server --help lists server options without starting it.
 See the project README for features and troubleshooting.
 
 Shared remote server:

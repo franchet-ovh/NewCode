@@ -8,10 +8,34 @@ use tiny_http::{Header, Method, Request, Response, Server};
 
 pub(crate) fn run() -> Result<(), Box<dyn std::error::Error>> {
     let args = config::Arguments::parse(std::env::args_os().skip(1))?;
+    if args.help {
+        println!(
+            "Focus Editor Server — authenticated browser gateway
+
+Usage: focus-editor-server [OPTIONS]
+
+Options:
+  --bind IP          Bind address (default: 0.0.0.0)
+  --port PORT        Listening port (default: 8999)
+  --config PATH      Server TOML configuration; credentials must be configured
+  --log-level LEVEL  trace, debug, info, warn, error, or off
+  -V, --version      Print version
+  -h, --help         Print this help
+
+The server runs in the foreground and needs no desktop or Chromium.
+Default configuration: the OS config directory / focus-editor/server.toml
+
+Examples:
+  focus-editor-server
+  focus-editor-server --bind 127.0.0.1 --port 8999 --config ./server.toml"
+        );
+        return Ok(());
+    }
     if args.version {
         println!("focus-editor-server {}", env!("CARGO_PKG_VERSION"));
         return Ok(());
     }
+    crate::platform::prepare_environment();
     let config = Arc::new(config::Config::load(&args)?);
     let server = Arc::new(Server::http(config.address).map_err(std::io::Error::other)?);
     let _discovery = discovery::Discovery::start()?;
@@ -190,7 +214,7 @@ fn handle(
             "/" => Some(("text/html; charset=utf-8", include_str!("hub.html"))),
             "/hub.js" => Some(("text/javascript; charset=utf-8", include_str!("hub.js"))),
             "/hub.css" => Some(("text/css; charset=utf-8", include_str!("hub.css"))),
-            "/client.js" | "/browser.css" => browser::asset(request.url()),
+            "/client.js" | "/browser.css" | "/controls.css" => browser::asset(request.url()),
             path if editor_path(path).is_some_and(|(_, action)| action.is_empty()) => {
                 browser::asset("/")
             }

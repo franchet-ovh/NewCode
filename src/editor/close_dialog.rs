@@ -96,13 +96,23 @@ impl EditorApp {
                 "Save changes to {} before closing?",
                 path.display()
             ));
-            ui.horizontal(|ui| {
+            ui.horizontal_wrapped(|ui| {
                 for (label, action) in [
                     ("Save", CloseChoice::Save),
                     ("Discard", CloseChoice::Discard),
                     ("Cancel", CloseChoice::Cancel),
                 ] {
-                    if ui.button(label).clicked() {
+                    if crate::ui_theme::role_button(
+                        ui,
+                        label,
+                        match action {
+                            CloseChoice::Save => crate::ui_theme::ButtonRole::Primary,
+                            CloseChoice::Discard => crate::ui_theme::ButtonRole::Destructive,
+                            CloseChoice::Cancel => crate::ui_theme::ButtonRole::Quiet,
+                        },
+                    )
+                    .clicked()
+                    {
                         choice = Some(action);
                     }
                 }

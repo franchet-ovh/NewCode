@@ -105,13 +105,23 @@ impl EditorApp {
             ui.set_max_width((ctx.viewport_rect().width() - 40.0).min(420.0));
             ui.heading("Unsaved changes");
             ui.label("Save changes before switching workspaces?");
-            ui.horizontal(|ui| {
+            ui.horizontal_wrapped(|ui| {
                 for (label, action) in [
                     ("Save All", CloseChoice::Save),
                     ("Discard", CloseChoice::Discard),
                     ("Cancel", CloseChoice::Cancel),
                 ] {
-                    if ui.button(label).clicked() {
+                    if crate::ui_theme::role_button(
+                        ui,
+                        label,
+                        match action {
+                            CloseChoice::Save => crate::ui_theme::ButtonRole::Primary,
+                            CloseChoice::Discard => crate::ui_theme::ButtonRole::Destructive,
+                            CloseChoice::Cancel => crate::ui_theme::ButtonRole::Quiet,
+                        },
+                    )
+                    .clicked()
+                    {
                         choice = Some(action);
                     }
                 }
@@ -218,7 +228,7 @@ impl EditorApp {
         *self.editor_layout_cache.lock().unwrap() = Default::default();
         // Clear panel sizes, scroll offsets, and focus belonging to the old workspace.
         ctx.memory_mut(|memory| *memory = Default::default());
-        crate::ui_theme::apply_theme(ctx, &crate::ui_theme::nord_light());
+        crate::ui_theme::apply(ctx, self.settings.appearance);
         let cwd = self.settings.workspace.clone();
         self.restart_terminal(ctx, cwd.as_deref(), None);
         self.status = format!("Workspace: {}", path.display());

@@ -32,10 +32,10 @@ fn frame(ctx: &egui::Context, width: f32, show: impl FnMut(&mut egui::Ui)) -> eg
 }
 
 #[test]
-fn toolbar_centers_title_and_keeps_actions_on_the_right() {
+fn toolbar_bounds_title_and_keeps_actions_on_the_right() {
     for width in [900.0, 1440.0] {
         let ctx = egui::Context::default();
-        theme::apply(&ctx);
+        theme::apply(&ctx, crate::ui_theme::Appearance::Light);
         let mut app = test_app();
         app.settings.workspace = Some(format!("/projects/{}", "long-project-".repeat(16)).into());
         let output = frame(&ctx, width, |root| app.toolbar(root));
@@ -58,10 +58,7 @@ fn toolbar_centers_title_and_keeps_actions_on_the_right() {
             .unwrap()
             .visual_bounding_rect();
         assert!(workspace.right() < title.left());
-        assert!(
-            (title.center().x - width * 0.5).abs() <= 2.0,
-            "title is not centered: {title:?}"
-        );
+        assert!(title.width() > 0.0, "Workspace title must remain visible");
         assert!(title.right() < dev.left());
         assert!(
             dev.right() < addons.left()
@@ -74,7 +71,7 @@ fn toolbar_centers_title_and_keeps_actions_on_the_right() {
         );
         for control in [workspace, dev, addons, edit, save] {
             assert!(
-                (control.center().y - 21.0).abs() <= 2.0,
+                (control.center().y - theme::Metrics::default().toolbar_height / 2.0).abs() <= 2.0,
                 "misaligned control: {control:?}"
             );
         }
@@ -92,7 +89,7 @@ fn explorer_rows_keep_filename_columns_and_depth_independent_of_name_length() {
     std::fs::write(nested.join("child.rs"), "").unwrap();
     for width in [150.0, 232.0, 500.0] {
         let ctx = egui::Context::default();
-        theme::apply(&ctx);
+        theme::apply(&ctx, crate::ui_theme::Appearance::Light);
         let mut app = test_app();
         let output = frame(&ctx, width, |root| {
             egui::CentralPanel::default().show(root, |ui| {
@@ -145,7 +142,7 @@ fn source_frame(ctx: &egui::Context, app: &mut EditorApp) -> egui::FullOutput {
 #[test]
 fn source_layout_is_rebuilt_when_display_scale_changes() {
     let ctx = egui::Context::default();
-    theme::apply(&ctx);
+    theme::apply(&ctx, crate::ui_theme::Appearance::Light);
     let mut app = test_app();
     for scale in [1.0, 2.0, 1.0] {
         ctx.set_pixels_per_point(scale);
@@ -163,7 +160,7 @@ fn source_layout_is_rebuilt_when_display_scale_changes() {
 #[test]
 fn editor_gutter_stays_fixed_and_aligned_when_source_scrolls() {
     let ctx = egui::Context::default();
-    theme::apply(&ctx);
+    theme::apply(&ctx, crate::ui_theme::Appearance::Light);
     ctx.style_mut_of(egui::Theme::Light, |style| {
         style.scroll_animation = egui::style::ScrollAnimation::none()
     });
@@ -227,7 +224,7 @@ fn editor_gutter_stays_fixed_and_aligned_when_source_scrolls() {
 #[test]
 fn tabs_are_contiguous_and_meet_the_minimum_width() {
     let ctx = egui::Context::default();
-    theme::apply(&ctx);
+    theme::apply(&ctx, crate::ui_theme::Appearance::Light);
     let mut app = test_app();
     let files: Vec<std::path::PathBuf> = ["a.rs", "b.rs"].into_iter().map(Into::into).collect();
     app.open_files = files.clone();

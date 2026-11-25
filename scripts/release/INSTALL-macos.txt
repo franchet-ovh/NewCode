@@ -1,10 +1,10 @@
 Focus Editor for Apple Silicon (macOS 11 or newer)
 
 Drag Focus Editor.app to Applications, then open it from Applications.
-The editor opens a dedicated app window using installed Chromium or Google
-Chrome (WebGL 2 required), without tabs or an address bar. It uses a temporary
-private browser profile and keeps the renderer sandbox enabled. For the native
-desktop window, run its executable with --ui. No Node.js or Electron is needed.
+The editor opens a native desktop window by default; --ui selects it explicitly.
+Use --browser for a dedicated Chromium or Google Chrome window (WebGL 2 required),
+with a temporary private profile and the renderer sandbox enabled.
+No Node.js or Electron is needed.
 Closing the window warns about unsaved documents, stops the backend, and removes
 the temporary profile. Reloads and connection loss retain the session
 while the window is alive. External links open in the normal system browser.
@@ -27,12 +27,13 @@ and /usr/local/bin after the inherited PATH.
 
 For terminal diagnostics or to open a workspace directly:
   /Applications/Focus\ Editor.app/Contents/MacOS/focus-editor ~/projects/my-project
-  /Applications/Focus\ Editor.app/Contents/MacOS/focus-editor --ui ~/projects/my-project
+  /Applications/Focus\ Editor.app/Contents/MacOS/focus-editor --browser ~/projects/my-project
 The macOS application stays attached when launched from a terminal.
 App mode prints a private session URL there for diagnostics. If Chromium cannot
 start, inspect the error or use --ui; the launcher never retries unsandboxed.
 Browser-reserved shortcuts can take precedence; use editor menus or --ui.
-Use --version to display the application version without opening a window.
+Use --version to display the version, or --help to list editor options without
+opening a window. focus-editor-server --help lists server options without starting it.
 See the project README for features and troubleshooting.
 
 Shared remote server (or use /Applications/Focus\ Editor.app/Contents/MacOS/focus-editor-server):

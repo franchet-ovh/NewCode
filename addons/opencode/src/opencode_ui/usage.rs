@@ -60,7 +60,10 @@ impl OpenCodeUi {
                     }
                 }
                 if ui
-                    .add_enabled(self.online, egui::Button::new("Refresh usage"))
+                    .add_enabled(
+                        self.online,
+                        focus_addon_support::ui_theme::control_button("Refresh usage"),
+                    )
                     .clicked()
                 {
                     self.refresh();

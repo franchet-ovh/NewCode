@@ -153,7 +153,9 @@ impl EditorApp {
                     if ui
                         .add_sized(
                             [76.0, 44.0],
-                            egui::Button::new(egui::RichText::new("☰ Panels").size(14.0)),
+                            focus_addon_support::ui_theme::control_button(
+                                egui::RichText::new("☰ Panels").size(14.0),
+                            ),
                         )
                         .clicked()
                     {
@@ -170,7 +172,8 @@ impl EditorApp {
                     if ui
                         .add_enabled(
                             self.document_active(),
-                            egui::Button::new("Save").min_size(egui::vec2(48.0, 44.0)),
+                            focus_addon_support::ui_theme::control_button("Save")
+                                .min_size(egui::vec2(48.0, 44.0)),
                         )
                         .clicked()
                     {
@@ -178,7 +181,10 @@ impl EditorApp {
                     }
                     ui.menu_button("More", |ui| {
                         ui.set_max_width((ctx.viewport_rect().width() - 32.0).min(300.0));
-                        if ui.button("Workspace…").clicked() {
+                        if ui
+                            .add(focus_addon_support::ui_theme::control_button("Workspace…"))
+                            .clicked()
+                        {
                             self.choose_workspace(&ctx);
                             ui.close();
                         }
@@ -211,7 +217,9 @@ impl EditorApp {
                                 if ui
                                     .add_sized(
                                         [ui.available_width(), 44.0],
-                                        egui::Button::new("← Back to addons"),
+                                        focus_addon_support::ui_theme::control_button(
+                                            "← Back to addons",
+                                        ),
                                     )
                                     .clicked()
                                 {
@@ -231,7 +239,9 @@ impl EditorApp {
                                 if ui
                                     .add_sized(
                                         [ui.available_width(), 44.0],
-                                        egui::Button::new("← Back to addon"),
+                                        focus_addon_support::ui_theme::control_button(
+                                            "← Back to addon",
+                                        ),
                                     )
                                     .clicked()
                                 {
@@ -297,7 +307,12 @@ impl EditorApp {
                         [width - 76.0, 44.0],
                         egui::Label::new(egui::RichText::new("Panels").strong()),
                     );
-                    close = ui.add_sized([44.0, 44.0], egui::Button::new("×")).clicked();
+                    close = ui
+                        .add_sized(
+                            [44.0, 44.0],
+                            focus_addon_support::ui_theme::control_button("×"),
+                        )
+                        .clicked();
                 });
                 ui.separator();
                 egui::ScrollArea::vertical()
@@ -328,8 +343,10 @@ impl EditorApp {
                             if ui
                                 .add_sized(
                                     [ui.available_width(), 44.0],
-                                    egui::Button::new(egui::RichText::new(name).size(14.0))
-                                        .selected(self.mobile.panel.as_ref() == Some(&panel)),
+                                    focus_addon_support::ui_theme::control_button(
+                                        egui::RichText::new(name).size(14.0),
+                                    )
+                                    .selected(self.mobile.panel.as_ref() == Some(&panel)),
                                 )
                                 .clicked()
                             {

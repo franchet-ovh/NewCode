@@ -95,7 +95,7 @@ impl EditorApp {
                     theme::colors(ui).accent,
                 );
                 ui.add(
-                    egui::TextEdit::singleline(&mut entry.name)
+                    focus_addon_support::ui_theme::singleline(&mut entry.name)
                         .id(id)
                         .hint_text(if entry.is_dir {
                             "Folder name…"

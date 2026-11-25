@@ -26,7 +26,7 @@ struct Harness {
 impl Harness {
     fn new() -> Self {
         let ctx = egui::Context::default();
-        ui_theme::apply(&ctx);
+        ui_theme::apply(&ctx, crate::ui_theme::Appearance::Light);
         let mut app = test_app();
         let capture = Capture::default();
         let mut terminal = Terminal::spawn("exec /bin/cat", None, ctx.clone()).unwrap();

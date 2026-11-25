@@ -12,7 +12,7 @@ impl Harness {
         let project = Project::new();
         let app = project.app();
         let ctx = egui::Context::default();
-        crate::ui_theme::apply(&ctx);
+        crate::ui_theme::apply(&ctx, crate::ui_theme::Appearance::Light);
         Self {
             project,
             app,

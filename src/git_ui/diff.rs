@@ -163,11 +163,13 @@ impl GitUi {
                                         actions_enabled
                                             && view.stale.is_none()
                                             && view.hunk_actions,
-                                        egui::Button::new(if hunk.staged {
-                                            "Unstage hunk"
-                                        } else {
-                                            "Stage hunk"
-                                        })
+                                        focus_addon_support::ui_theme::control_button(
+                                            if hunk.staged {
+                                                "Unstage hunk"
+                                            } else {
+                                                "Stage hunk"
+                                            },
+                                        )
                                         .min_size(egui::vec2(125.0, 24.0)),
                                     )
                                     .clicked()

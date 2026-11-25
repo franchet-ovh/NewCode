@@ -38,9 +38,11 @@ pub fn body(ui: &egui::Ui, input: &str) -> (egui::Rect, egui::Rect, f32) {
             .size()
             .y
     });
-    let input_height =
-        (height.max(row * 3.0) + 8.0).min(120.0_f32.min(rect.height() * 0.30).max(row + 8.0));
-    let footer_height = (input_height + 80.0).min(rect.height());
+    let chrome = composer::chrome_height(ui);
+    let input_height = (height.max(row * 3.0) + 8.0)
+        .min(120.0_f32.min(rect.height() * 0.30).max(row + 8.0))
+        .min((rect.height() - chrome).max(0.0));
+    let footer_height = (input_height + chrome).min(rect.height());
     let top = (rect.bottom() - footer_height).max(rect.top());
     (
         egui::Rect::from_min_max(rect.min, egui::pos2(rect.right(), top)),

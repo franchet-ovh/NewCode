@@ -29,7 +29,7 @@ fn every_mobile_panel_fits_portrait_landscape_and_keyboard_height() {
         egui::vec2(899.0, 640.0),
     ] {
         let ctx = egui::Context::default();
-        crate::ui_theme::apply(&ctx);
+        crate::ui_theme::apply(&ctx, crate::ui_theme::Appearance::Light);
         let mut app = test_app();
         for panel in [
             MobilePanel::Editor,
@@ -58,7 +58,7 @@ fn every_mobile_panel_fits_portrait_landscape_and_keyboard_height() {
 #[test]
 fn switching_panels_and_resizing_preserves_unsaved_text_and_desktop_sizes() {
     let ctx = egui::Context::default();
-    crate::ui_theme::apply(&ctx);
+    crate::ui_theme::apply(&ctx, crate::ui_theme::Appearance::Light);
     let mut app = test_app();
     let buffer = app.buffer.clone();
     let sizes = (
@@ -118,7 +118,7 @@ fn click(app: &mut super::EditorApp, ctx: &egui::Context, pos: egui::Pos2) {
 #[test]
 fn drawer_opens_selects_a_panel_and_dismisses_without_changing_documents() {
     let ctx = egui::Context::default();
-    crate::ui_theme::apply(&ctx);
+    crate::ui_theme::apply(&ctx, crate::ui_theme::Appearance::Light);
     let mut app = test_app();
     let buffer = app.buffer.clone();
     frame(&mut app, &ctx, egui::vec2(390.0, 844.0), vec![]);
@@ -139,7 +139,7 @@ fn drawer_opens_selects_a_panel_and_dismisses_without_changing_documents() {
 #[test]
 fn missing_addon_returns_to_editor_and_hidden_terminal_loses_focus() {
     let ctx = egui::Context::default();
-    crate::ui_theme::apply(&ctx);
+    crate::ui_theme::apply(&ctx, crate::ui_theme::Appearance::Light);
     let mut app = test_app();
     app.mobile.panel = Some(MobilePanel::RightAddon("removed".into()));
     let id = crate::editor::terminal_input::terminal_id();
@@ -164,7 +164,7 @@ fn opening_files_and_search_results_navigates_to_editor_without_losing_drafts() 
     let path = directory.path().join("new-file.txt");
     std::fs::write(&path, "first line\nsecond line\n").unwrap();
     let ctx = egui::Context::default();
-    crate::ui_theme::apply(&ctx);
+    crate::ui_theme::apply(&ctx, crate::ui_theme::Appearance::Light);
     let mut app = test_app();
     let original = app.active_file.clone().unwrap();
     let draft = app.buffer.clone();
@@ -182,7 +182,7 @@ fn opening_files_and_search_results_navigates_to_editor_without_losing_drafts() 
 #[test]
 fn empty_workspace_and_drawer_fit_short_screens_and_escape_closes_drawer() {
     let ctx = egui::Context::default();
-    crate::ui_theme::apply(&ctx);
+    crate::ui_theme::apply(&ctx, crate::ui_theme::Appearance::Light);
     let mut app = test_app();
     app.active_file = None;
     app.open_files.clear();
@@ -220,7 +220,7 @@ fn empty_workspace_and_drawer_fit_short_screens_and_escape_closes_drawer() {
 #[test]
 fn hidden_terminal_keeps_processing_output_without_being_restarted() {
     let ctx = egui::Context::default();
-    crate::ui_theme::apply(&ctx);
+    crate::ui_theme::apply(&ctx, crate::ui_theme::Appearance::Light);
     let mut app = test_app();
     let mut terminal =
         crate::terminal::Terminal::spawn("exec /bin/cat", None, ctx.clone()).unwrap();
@@ -272,7 +272,7 @@ fn source_control_opens_an_editor_diff_tab_and_returns_to_changes() {
     }
     std::fs::write(workspace.join("mobile-change.txt"), "new content\n").unwrap();
     let ctx = egui::Context::default();
-    crate::ui_theme::apply(&ctx);
+    crate::ui_theme::apply(&ctx, crate::ui_theme::Appearance::Light);
     let mut app = test_app();
     let draft = app.buffer.clone();
     app.settings.workspace = Some(workspace.to_path_buf());
@@ -313,7 +313,7 @@ fn source_control_opens_an_editor_diff_tab_and_returns_to_changes() {
 #[test]
 fn touch_scrolling_the_short_drawer_does_not_activate_a_panel() {
     let ctx = egui::Context::default();
-    crate::ui_theme::apply(&ctx);
+    crate::ui_theme::apply(&ctx, crate::ui_theme::Appearance::Light);
     let mut app = test_app();
     let size = egui::vec2(844.0, 342.0);
     frame(&mut app, &ctx, size, vec![]);
@@ -355,7 +355,7 @@ fn touch_scrolling_the_short_drawer_does_not_activate_a_panel() {
 #[test]
 fn addon_rows_are_visible_and_selectable_in_the_phone_drawer() {
     let ctx = egui::Context::default();
-    crate::ui_theme::apply(&ctx);
+    crate::ui_theme::apply(&ctx, crate::ui_theme::Appearance::Light);
     let mut app = test_app();
     app.mobile.drawer_open = true;
     let entries = vec![

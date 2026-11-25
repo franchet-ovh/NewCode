@@ -262,7 +262,10 @@ impl EditorApp {
     }
 
     pub(super) fn file_menu(&mut self, ui: &mut egui::Ui, path: &Path) {
-        if ui.button("Rename…").clicked() {
+        if ui
+            .add(focus_addon_support::ui_theme::control_button("Rename…"))
+            .clicked()
+        {
             self.rename_target = Some(path.to_path_buf());
             self.rename_text = path
                 .file_name()
@@ -271,7 +274,10 @@ impl EditorApp {
                 .to_string();
             ui.close();
         }
-        if ui.button("Move to…").clicked() {
+        if ui
+            .add(focus_addon_support::ui_theme::control_button("Move to…"))
+            .clicked()
+        {
             crate::file_picker::request(
                 ui.ctx(),
                 crate::file_picker::Purpose::Move(path.to_path_buf()),
@@ -279,7 +285,9 @@ impl EditorApp {
             );
             ui.close();
         }
-        let delete = ui.button(egui::RichText::new("Delete…").color(theme::colors(ui).error));
+        let delete = ui.add(focus_addon_support::ui_theme::control_button(
+            egui::RichText::new("Delete…").color(theme::colors(ui).error),
+        ));
         ui.interact(
             delete.rect,
             egui::Id::new(("explorer_delete_action", path)),
@@ -374,12 +382,11 @@ impl EditorApp {
                 theme::empty_art(ui, Icon::Folder, theme::colors(ui).accent);
                 ui.strong("Your project starts here");
                 ui.label("Choose a workspace to browse its files.");
-                if theme::button(
+                if theme::action_button(
                     ui,
                     Icon::Folder,
                     "Open workspace",
-                    theme::colors(ui).accent,
-                    true,
+                    focus_addon_sdk::ButtonRole::Primary,
                 )
                 .clicked()
                 {
@@ -395,11 +402,14 @@ impl EditorApp {
                 .default_width((ctx.viewport_rect().width() - 40.0).min(300.0))
                 .show(ctx, |ui| {
                     ui.add(
-                        egui::TextEdit::singleline(&mut self.rename_text)
+                        focus_addon_support::ui_theme::singleline(&mut self.rename_text)
                             .desired_width(ui.available_width()),
                     );
                     ui.horizontal(|ui| {
-                        if ui.button("Rename").clicked() {
+                        if ui
+                            .add(focus_addon_support::ui_theme::control_button("Rename"))
+                            .clicked()
+                        {
                             let dest = path.with_file_name(&self.rename_text);
                             self.status = match fs::rename(&path, &dest) {
                                 Ok(()) => {
@@ -410,7 +420,10 @@ impl EditorApp {
                             };
                             self.rename_target = None;
                         }
-                        if ui.button("Cancel").clicked() {
+                        if ui
+                            .add(focus_addon_support::ui_theme::control_button("Cancel"))
+                            .clicked()
+                        {
                             self.rename_target = None;
                         }
                     });

@@ -65,7 +65,7 @@ impl EditorApp {
             .collapsible(false).resizable(false).anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
             .show(ctx, |ui| {
                 ui.label("A Git addon operation needs to change the worktree. Save unsaved files before continuing.");
-                ui.horizontal(|ui| { save = ui.button("Save all and continue").clicked(); cancel = ui.button("Cancel").clicked(); });
+                ui.horizontal(|ui| { save = ui.add(focus_addon_support::ui_theme::control_button("Save all and continue")).clicked(); cancel = ui.add(focus_addon_support::ui_theme::control_button("Cancel")).clicked(); });
             });
         if cancel {
             self.addons.confirm_checkout(false, ctx);

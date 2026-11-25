@@ -131,7 +131,10 @@ pub(crate) fn show(ctx: &egui::Context) {
         });
         ui.label("Files on the editor host");
         ui.horizontal(|ui| {
-            if ui.button("Up").clicked() {
+            if ui
+                .add(focus_addon_support::ui_theme::control_button("Up"))
+                .clicked()
+            {
                 if let Some(parent) = picker.directory.parent() {
                     picker.location = parent.display().to_string();
                     picker.directory = parent.to_path_buf();
@@ -143,7 +146,9 @@ pub(crate) fn show(ctx: &egui::Context) {
                 response.request_focus();
                 picker.focus_location = false;
             }
-            if ui.button("Go").clicked()
+            if ui
+                .add(focus_addon_support::ui_theme::control_button("Go"))
+                .clicked()
                 || response.lost_focus() && ui.input(|input| input.key_pressed(egui::Key::Enter))
             {
                 let path = PathBuf::from(&picker.location);
@@ -213,7 +218,11 @@ pub(crate) fn show(ctx: &egui::Context) {
             } else {
                 "Open"
             };
-            if ui.button(label).clicked() || submit {
+            if ui
+                .add(focus_addon_support::ui_theme::control_button(label))
+                .clicked()
+                || submit
+            {
                 if picker.location != picker.directory.display().to_string() {
                     let directory = PathBuf::from(&picker.location);
                     if directory.is_dir() {
@@ -243,7 +252,10 @@ pub(crate) fn show(ctx: &egui::Context) {
                     Ok(path) => selected = Some(path),
                 }
             }
-            if ui.button("Cancel").clicked() {
+            if ui
+                .add(focus_addon_support::ui_theme::control_button("Cancel"))
+                .clicked()
+            {
                 closed = true;
             }
         });

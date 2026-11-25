@@ -7,6 +7,7 @@ pub(super) struct Arguments {
     pub config: Option<std::path::PathBuf>,
     pub level: Option<log::LevelFilter>,
     pub version: bool,
+    pub help: bool,
 }
 impl Arguments {
     pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Self, String> {
@@ -14,6 +15,10 @@ impl Arguments {
         let mut args = args.into_iter();
         while let Some(arg) = args.next() {
             let text = arg.to_string_lossy();
+            if matches!(text.as_ref(), "--help" | "-h") {
+                result.help = true;
+                continue;
+            }
             if matches!(text.as_ref(), "--version" | "-V") {
                 result.version = true;
                 continue;

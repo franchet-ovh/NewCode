@@ -113,7 +113,7 @@ fn repository() -> tempfile::TempDir {
 fn reusable_diff_tab_preserves_dirty_document_and_keyboard_close_targets_diff() {
     let repo = repository();
     let ctx = egui::Context::default();
-    crate::ui_theme::apply(&ctx);
+    crate::ui_theme::apply(&ctx, crate::ui_theme::Appearance::Light);
     let mut app = test_app();
     let draft = app.buffer.clone();
     let file = app.active_file.clone().unwrap();
@@ -186,7 +186,7 @@ fn reusable_diff_tab_preserves_dirty_document_and_keyboard_close_targets_diff() 
 fn diff_without_files_and_bulk_closing_respect_unsaved_confirmation() {
     let repo = repository();
     let ctx = egui::Context::default();
-    crate::ui_theme::apply(&ctx);
+    crate::ui_theme::apply(&ctx, crate::ui_theme::Appearance::Light);
     let mut app = test_app();
     app.open_files.clear();
     app.active_file = None;

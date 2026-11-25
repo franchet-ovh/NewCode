@@ -1,6 +1,6 @@
 # Focus Editor
 
-A compact Rust editor for Linux and Apple Silicon macOS. Opens in a dedicated Chromium app window; use `--ui` for the native desktop window. Browse projects, edit source files, review Git changes, and work with a shell, Codex, and OpenCode.
+A compact Rust editor for Linux and Apple Silicon macOS. Opens in a native desktop window by default; use `--browser` for a dedicated Chromium app window. Browse projects, edit source files, review Git changes, and work with a shell, Codex, and OpenCode.
 
 Licensed under the [Apache License 2.0](LICENSE).
 
@@ -26,7 +26,7 @@ Publishing a GitHub release (including a prerelease) builds the tagged source an
 - `focus-editor-<tag>-linux-arm64.tar.gz`
 - `SHA256SUMS`
 
-Linux binaries are built on Ubuntu 24.04 and require glibc 2.39 or newer. The default app window requires installed Chromium or Google Chrome with WebGL 2 and a working browser sandbox. Native mode (`--ui`) requires an X11 or Wayland desktop and working OpenGL/EGL libraries. Both modes use the same dynamically linked executable; run `ldd focus-editor` to identify missing runtime libraries. A desktop portal provides native file dialogs. Extract the archive and install both executables with `install -m 755 focus-editor focus-editor-server ~/.local/bin/` after creating that directory.
+Linux binaries are built on Ubuntu 24.04 and require glibc 2.39 or newer. The default native window requires an X11 or Wayland desktop and working OpenGL/EGL libraries. Explicit browser mode (`--browser`) requires installed Chromium or Google Chrome with WebGL 2 and a working browser sandbox. Both modes use the same dynamically linked executable; run `ldd focus-editor` to identify missing runtime libraries. A desktop portal provides native file dialogs. Extract the archive and install both executables with `install -m 755 focus-editor focus-editor-server ~/.local/bin/` after creating that directory.
 
 Editor archives contain only the editor/server and installation/legal files. The source installer (`scripts/install.sh`) also installs only editor/server binaries. Open **Addons** in the activity bar to install independently released addons. Each addon release provides its own Linux amd64/arm64 archives, per-platform catalogs, combined `addons.json`, and `SHA256SUMS`. Installing or updating an addon preserves its data.
 
@@ -117,7 +117,7 @@ cargo run --release
 
 The first build downloads the pinned Ghostty source and Zig packages. Subsequent builds reuse Cargo's build directory. For a network-free build, prefetch the pinned source and Zig packages and supply `GHOSTTY_SOURCE_DIR` and `GHOSTTY_ZIG_SYSTEM_DIR` as described by `libghostty-vt-sys`. `cargo --offline` alone does not prevent its native build script from fetching missing sources. Release binaries link the VT engine statically; users do not need Zig or the Ghostty application installed.
 
-By default, the editor opens a dedicated, resizable Chromium app window with no tabs or address bar. It uses a private temporary browser profile, with extensions and synchronization disabled, and keeps Chromium's renderer sandbox enabled. Your personal browser profile is separate. The editor interface renders in a WebGL 2 canvas connected to a private localhost server; files, Git, terminals, Dev Containers, and addons run in the Rust process with normal host access. Browser assets are embedded in the executable, with no Node.js, Electron, web build step, or external asset downloads. Local file/folder selection uses desktop dialogs; remote controllers use an in-editor host filesystem picker.
+By default, the editor opens a native desktop window without requiring Chromium. Use `--ui` to select it explicitly. With `--browser`, the editor opens a dedicated, resizable Chromium app window with no tabs or address bar. It uses a private temporary browser profile, with extensions and synchronization disabled, and keeps Chromium's renderer sandbox enabled. Your personal browser profile is separate. The editor interface renders in a WebGL 2 canvas connected to a private localhost server; files, Git, terminals, Dev Containers, and addons run in the Rust process with normal host access. Browser assets are embedded in the executable, with no Node.js, Electron, web build step, or external asset downloads. Local file/folder selection uses desktop dialogs; remote controllers use an in-editor host filesystem picker.
 
 On Linux, the launcher searches `PATH` for `chromium`, `chromium-browser`, `google-chrome`, and `google-chrome-stable`. On macOS it also checks Chrome and Chromium app bundles in `/Applications` and `~/Applications`. If no compatible browser is installed, install one or use `--ui`. Browser startup or sandbox failures are reported in diagnostics; the launcher never retries without the sandbox. External links open in your normal system browser.
 
@@ -125,9 +125,12 @@ Choose either presentation:
 
 ```sh
 focus-editor ~/projects/my-app
-focus-editor --ui ~/projects/my-app
+focus-editor --browser ~/projects/my-app
 # From source, use the native desktop window:
-cargo run --release -- --ui ~/projects/my-app
+cargo run --release -- ~/projects/my-app
+# List available options without starting the editor or server:
+focus-editor --help
+focus-editor-server --help
 ```
 
 On Linux, both modes open in the background and immediately release the terminal. macOS uses the normal application lifecycle. Each launch opens a separate instance. App windows and native windows use **Focus Editor — workspace-name** as their title. Relative workspace paths are resolved for display: launching with `.` shows the actual folder name in the title and toolbar, with the full resolved path in the toolbar tooltip.
@@ -175,8 +178,8 @@ Keep the editor attached to the terminal for debugging:
 cargo run --release -- --foreground
 # Or, for an installed executable:
 focus-editor --foreground
-# The same debugging option works with the native window:
-focus-editor --ui --foreground
+# The same debugging option works with the browser window:
+focus-editor --browser --foreground
 ```
 
 App-window mode prints its complete session URL in the foreground for diagnostics, including a private `#` fragment needed to connect. Treat the complete URL as a session credential; it is excluded from application diagnostic logs. If Chromium cannot start, inspect the foreground error or use `--ui`.
@@ -378,7 +381,7 @@ Git's periodic checks cover known modified/staged paths and repository metadata.
 - The optional right pane contains Codex and/or OpenCode. Its header keeps status visible alongside horizontally scrollable session controls; **Usage / status** has its own section below.
 - Drag the dividers to resize the sidebar, terminal, and assistant pane. Their sizes are saved.
 
-Nord Light follows the Nord concept in `ui-mocks/index.html`: cool gray panels, a light activity rail, muted blue accents, square corners, and compact controls. Source Control keeps semantic status colors and text labels. The accent-colored bottom status bar shows file and save feedback. Bundled addon panels receive the editor’s resolved theme automatically, including custom widget colors and spacing. The terminal uses the widget’s supported light palette; native window decorations follow the operating system. Saved panel sizes are retained. See [UI follow-ups](TODO.md) for additional mockup features and future theme selection.
+The UI follows the approved [interactive design](ui-mocks/ui-upgrade.html). Shared buttons, labeled fields, multiline editors, navigation rows, cards, notices, and dialogs use semantic theme roles throughout the editor and bundled addons. Controls have comfortable spacing, rounded corners, visible focus states, and distinct primary and destructive actions. **Appearance** selects Nord Light (default) or Nord Dark and saves the choice per workspace. Switching appearance preserves drafts, tabs, and running processes. GitHub offers selected Issues/PR navigation, live filtering of loaded items, grouped forms, and in-memory drafts scoped to repository and form. Addon management retains release selection, updates, local installation, restart, credentials, and uninstall. Bundled surface addons receive the resolved host theme. The terminal selects the supported light/dark emulator palette; native decorations remain managed by the operating system.
 
 ## Explorer and editing
 
@@ -535,7 +538,7 @@ Switching tabs continues processing both backends. Stream reconnects reload auth
 The editor and executable addons compile as separate Cargo projects:
 
 - `src/editor/mod.rs` owns application state and coordinates the window. Its sibling modules separate layout/sidebar routing, document lifecycle and preview state, tab rendering, clipboard and close-dialog actions, document path changes, text rendering, Explorer, inline creation, confirmed deletion, search/Find, shell rendering, and persistence.
-- `src/browser/` hosts the default local browser session, embeds its browser client, and transports shared egui meshes, textures, input, and platform commands. Its launcher owns the sandboxed app window and temporary profile; its renderer preserves state during reloads and short disconnections. `--ui` uses a native eframe viewer of the same authoritative session. `src/server/` implements the separate authenticated server, automatic registration, and workspace launcher.
+- `src/browser/` hosts the shared editor session, embeds its browser client, and transports shared egui meshes, textures, input, and platform commands. Its launcher owns the sandboxed app window and temporary profile; its renderer preserves state during reloads and short disconnections. Native mode (the default, or `--ui`) uses a native eframe viewer of the same authoritative session. `src/server/` implements the separate authenticated server, automatic registration, and workspace launcher.
 - `crates/addon-support/src/assistant_ui/` shares assistant headers, cards, Markdown rendering/cache, and bounded scrolling composers; provider modules adapt their own catalogs and protocol actions to these controls.
 - `addons/codex/src/codex_ui/mod.rs` owns Codex panel state and connection lifecycle. Its sibling modules separate the header, transcript, composer, catalog helpers, usage, outgoing requests, incoming responses/events, message updates, indexed reasoning sections, and completed-plan/Go state.
 - `src/git_ui/mod.rs` owns Source Control state. Its sibling modules separate repository access/status parsing, numeric diff statistics and new-file line counting (`stats`), independent status/operation/review requests (`actions`), shared grouping and eligibility rules (`model`), fixed panel controls (`panel`), compact change rows (`file_list`), comparison rendering (`diff`, `diff_rows`), byte-preserving patch parsing (`patch_model`), retained reviews (`review`), file/index validation (`fingerprint`), hunk application (`patch`), and presentation helpers. Git tests live in `src/git_ui/tests.rs` and `src/git_ui/tests/`.

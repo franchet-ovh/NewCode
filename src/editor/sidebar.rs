@@ -38,7 +38,9 @@ impl EditorApp {
             ui.painter().text(
                 rect.left_center() + egui::vec2(13.0, 0.0),
                 egui::Align2::LEFT_CENTER,
-                if self.sidebar_mode == SidebarMode::Explorer {
+                if ui.available_width() < 240.0 && self.sidebar_mode == SidebarMode::Explorer {
+                    ""
+                } else if self.sidebar_mode == SidebarMode::Explorer {
                     "EXPLORER"
                 } else {
                     "SEARCH"
@@ -48,7 +50,13 @@ impl EditorApp {
             );
             if self.sidebar_mode == SidebarMode::Explorer {
                 let actions = egui::Rect::from_min_max(
-                    egui::pos2(rect.right() - 86.0, rect.top()),
+                    egui::pos2(
+                        rect.right()
+                            - (3.0 * ui.spacing().interact_size.y
+                                + 2.0 * ui.spacing().item_spacing.x
+                                + 8.0),
+                        rect.top(),
+                    ),
                     rect.max - egui::vec2(8.0, 0.0),
                 );
                 ui.scope_builder(
@@ -56,21 +64,36 @@ impl EditorApp {
                         .max_rect(actions)
                         .layout(egui::Layout::right_to_left(egui::Align::Center)),
                     |ui| {
-                        if theme::button(ui, Icon::Refresh, "", colors.accent, false)
-                            .on_hover_text("Reload Explorer")
-                            .clicked()
+                        if theme::action_button(
+                            ui,
+                            Icon::Refresh,
+                            "",
+                            focus_addon_sdk::ButtonRole::Secondary,
+                        )
+                        .on_hover_text("Reload Explorer")
+                        .clicked()
                         {
                             self.explorer_cache.clear();
                         }
-                        if theme::button(ui, Icon::NewFolder, "", colors.accent, false)
-                            .on_hover_text("New folder")
-                            .clicked()
+                        if theme::action_button(
+                            ui,
+                            Icon::NewFolder,
+                            "",
+                            focus_addon_sdk::ButtonRole::Secondary,
+                        )
+                        .on_hover_text("New folder")
+                        .clicked()
                         {
                             self.create_entry(true);
                         }
-                        if theme::button(ui, Icon::NewFile, "", colors.accent, false)
-                            .on_hover_text("New file")
-                            .clicked()
+                        if theme::action_button(
+                            ui,
+                            Icon::NewFile,
+                            "",
+                            focus_addon_sdk::ButtonRole::Secondary,
+                        )
+                        .on_hover_text("New file")
+                        .clicked()
                         {
                             self.create_entry(false);
                         }

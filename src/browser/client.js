@@ -228,6 +228,7 @@ async function pasteText() {
 }
 
 function platform(frame) {
+  document.documentElement.dataset.theme = frame.dark_mode ? "dark" : "light";
   dirty = frame.dirty;
   if (frame.title) document.title = frame.title;
   setControl(frame.control);

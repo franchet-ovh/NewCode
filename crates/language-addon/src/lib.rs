@@ -37,8 +37,9 @@ fn status(out: &Output, start: &Start, text: &str, failed: bool) {
                 generation: start.generation,
                 title: format!("{} language support", start.language),
                 sidebar: vec![
-                    Widget::Text { text: text.into() },
+                    Widget::text(text),
                     Widget::Button {
+                        style: Default::default(),
                         id: "retry".into(),
                         label: "Retry".into(),
                         enabled: true,
@@ -86,11 +87,20 @@ pub fn run(language: &'static str, version: &str) {
                         json!({"protocol":1,"language":language::VERSION}),
                     ),
                 );
-                send(&out, Message::notification("view.update", View {
-                    generation, title: format!("{language} language support"),
-                    sidebar: vec![Widget::Text { text: "Open a matching file to start language support. Missing server dependencies are installed automatically.".into() }],
-                    ..Default::default()
-                }));
+                send(
+                    &out,
+                    Message::notification(
+                        "view.update",
+                        View {
+                            generation,
+                            title: format!("{language} language support"),
+                            sidebar: vec![Widget::muted(
+                                "Open a matching file to start language support. Missing server dependencies are installed automatically.",
+                            )],
+                            ..Default::default()
+                        },
+                    ),
+                );
             }
             Some("lsp.start") => {
                 if let Ok(start) =

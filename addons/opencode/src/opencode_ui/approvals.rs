@@ -44,7 +44,12 @@ impl OpenCodeUi {
                                         ("Always allow", "always"),
                                         ("Deny", "reject"),
                                     ] {
-                                        if ui.button(label).clicked() {
+                                        if ui
+                                            .add(focus_addon_support::ui_theme::control_button(
+                                                label,
+                                            ))
+                                            .clicked()
+                                        {
                                             action = Some((
                                                 false,
                                                 id.to_owned(),
@@ -100,7 +105,7 @@ impl OpenCodeUi {
                                         }
                                         if question["custom"] != false {
                                             ui.add(
-                                                egui::TextEdit::singleline(
+                                                focus_addon_support::ui_theme::singleline(
                                                     &mut answers.custom[index],
                                                 )
                                                 .hint_text("Your answer…")
@@ -116,7 +121,12 @@ impl OpenCodeUi {
                                 );
                                 ui.horizontal(|ui| {
                                     if ui
-                                        .add_enabled(complete, egui::Button::new("Submit answer"))
+                                        .add_enabled(
+                                            complete,
+                                            focus_addon_support::ui_theme::control_button(
+                                                "Submit answer",
+                                            ),
+                                        )
                                         .clicked()
                                     {
                                         let values: Vec<Vec<String>> = answers
@@ -145,7 +155,12 @@ impl OpenCodeUi {
                                             Some(json!({"answers":values})),
                                         ));
                                     }
-                                    if ui.button("Dismiss").clicked() {
+                                    if ui
+                                        .add(focus_addon_support::ui_theme::control_button(
+                                            "Dismiss",
+                                        ))
+                                        .clicked()
+                                    {
                                         action = Some((
                                             true,
                                             id.to_owned(),

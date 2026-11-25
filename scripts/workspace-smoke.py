@@ -85,7 +85,7 @@ def run(binary, browser):
                 offset=dev.evaluate("(() => {const r=document.querySelector('#view').getBoundingClientRect(); return [r.x,r.y]})()")
                 dev.click(x+offset[0],y+offset[1])
             def edit(text):
-                click(150,127); click(600,102); dev.shortcut("a"); dev.text(text)
+                click(150,142); click(600,160); dev.shortcut("a"); dev.text(text)
                 wait_until(lambda:view("w.smokeFrame?.dirty"))
             claim(); edit("unsaved across server restart ✓")
             assert (a / "example.txt").read_text() == "original\n"

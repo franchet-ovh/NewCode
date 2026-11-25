@@ -161,7 +161,7 @@ def run(binary, browser):
             for workspace in [app_workspace, native_workspace]:
                 workspace.mkdir()
                 (workspace / "example.txt").write_text("original\n")
-            app = launch([str(binary), "--foreground", str(app_workspace)], dict(environment, PATH=str(bin_dir) + os.pathsep + os.environ["PATH"]))
+            app = launch([str(binary), "--browser", "--foreground", str(app_workspace)], dict(environment, PATH=str(bin_dir) + os.pathsep + os.environ["PATH"]))
             native = launch([str(binary), "--ui", "--foreground", str(native_workspace)])
             records = wait_until(lambda: (records if len(records := catalog()) == 2 else None))
             app_id = next(record["id"] for record in records if record["mode"] == "app")
@@ -177,8 +177,8 @@ def run(binary, browser):
                 wait_until(lambda: minimize_window("Focus Editor — " + native_workspace.name))
             local.send("Page.bringToFront")
             wait_until(lambda: local.evaluate("document.hasFocus()"))
-            local.click(150, 127)
-            local.click(600, 102)
+            local.click(150, 142)
+            local.click(600, 160)
             local.shortcut("a")
             local.text("Unsaved local buffer ✓")
             wait_until(lambda: local.evaluate("window.smokeFrame?.dirty"))
@@ -189,7 +189,7 @@ def run(binary, browser):
             def choose(identity):
                 wait_until(lambda: dev.evaluate(f"Boolean(document.querySelector('[data-id=\"{identity}\"]'))"))
                 dev.evaluate(f"document.querySelector('[data-id=\"{identity}\"] .editor-select').click()")
-                wait_until(lambda: view("w.smokeFrame?.meshes.length > 0 && w.document.querySelector('#notice').hidden"))
+                wait_until(lambda: view(f"w.location.pathname === '/editors/{identity}/' && w.smokeFrame?.meshes.length > 0 && w.document.querySelector('#notice').hidden"))
             def click(x, y):
                 offset = dev.evaluate("(() => {const r=document.querySelector('#view').getBoundingClientRect(); return [r.x,r.y]})()")
                 dev.click(x + offset[0], y + offset[1])
@@ -203,7 +203,7 @@ def run(binary, browser):
             assert view("w.sidebarSmokeIdentity") == 'preserved'
             dev.send("Emulation.setDeviceMetricsOverride", {"width":390,"height":844,"deviceScaleFactor":1,"mobile":True})
             dev.evaluate("document.querySelector('#sidebar-toggle').click()")
-            assert dev.evaluate("document.querySelector('#view').clientWidth") >= 340
+            assert dev.evaluate("document.querySelector('#view').clientWidth >= innerWidth - document.querySelector('#sidebar-rail').offsetWidth - 1")
             assert dev.evaluate("!document.querySelector('#sidebar-backdrop').hidden")
             dev.evaluate("document.querySelector('#sidebar-backdrop').click()")
             assert dev.evaluate("document.querySelector('#sidebar-toggle').getAttribute('aria-expanded')") == 'false'
@@ -216,7 +216,7 @@ def run(binary, browser):
             wait_until(lambda: view("w.smokeFrame?.control.owned"))
             wait_until(lambda: local.evaluate("window.smokeFrame?.control.owned === false"))
             # Save the pre-existing unsaved buffer from the remote view.
-            click(600, 102)
+            click(600, 160)
             dev.shortcut("s")
             wait_until(lambda: (app_workspace / "example.txt").read_text() == "Unsaved local buffer ✓")
             dev.shortcut("a")
@@ -249,8 +249,8 @@ def run(binary, browser):
             minimized = minimize_window("Focus Editor — " + native_workspace.name)
             view("w.document.querySelector('#claim').click()")
             wait_until(lambda: view("w.smokeFrame?.control.owned"))
-            click(150, 127)
-            click(600, 102)
+            click(150, 142)
+            click(600, 160)
             dev.shortcut("a")
             dev.text("Native session edited remotely ✓")
             dev.shortcut("s")
@@ -277,7 +277,7 @@ def run(binary, browser):
             choose(app_id)
             view("w.document.querySelector('#claim').click()")
             wait_until(lambda: view("w.smokeFrame?.control.owned"))
-            click(600, 102)
+            click(600, 160)
             dev.key("End", "End", 2)
             dev.text(" gateway survives")
             wait_until(lambda: view("w.smokeFrame?.dirty"))
@@ -288,7 +288,7 @@ def run(binary, browser):
             assert app.poll() is None and native.poll() is None
             local.evaluate("document.querySelector('#claim').click()")
             wait_until(lambda: local.evaluate("window.smokeFrame?.control.owned"))
-            local.click(600, 102)
+            local.click(600, 160)
             local.shortcut("s")
             wait_until(lambda: (app_workspace / "example.txt").read_text() == "Edited remotely over HTTP 世界 gateway survives")
             server, origin = start_server()

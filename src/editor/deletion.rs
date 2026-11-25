@@ -115,19 +115,13 @@ impl EditorApp {
             }
             ui.add_space(8.0);
             ui.horizontal(|ui| {
-                let response = ui.button("Cancel");
+                let response = ui.add(focus_addon_support::ui_theme::control_button("Cancel"));
                 if deletion.needs_focus {
                     response.request_focus();
                     deletion.needs_focus = false;
                 }
                 cancel = response.clicked();
-                let response = ui
-                    .add(
-                        egui::Button::new(
-                            egui::RichText::new("Delete").color(theme::colors(ui).on_accent),
-                        )
-                        .fill(theme::colors(ui).error),
-                    )
+                let response = theme::role_button(ui, "Delete", theme::ButtonRole::Destructive)
                     .on_hover_text("Permanently delete this entry");
                 // Require an explicit pointer click for the destructive action.
                 confirm = response.clicked()

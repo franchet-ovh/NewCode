@@ -13,7 +13,7 @@ struct Harness {
 impl Harness {
     fn new(text: &str) -> Self {
         let ctx = egui::Context::default();
-        crate::ui_theme::apply(&ctx);
+        crate::ui_theme::apply(&ctx, crate::ui_theme::Appearance::Light);
         let mut app = test_app();
         app.buffer = text.into();
         app.dirty = false;
@@ -230,7 +230,7 @@ fn settings_dialog_renders_with_and_without_workspace() {
     for width in [390.0, 900.0] {
         let mut app = test_app();
         let ctx = egui::Context::default();
-        crate::ui_theme::apply(&ctx);
+        crate::ui_theme::apply(&ctx, crate::ui_theme::Appearance::Light);
         app.indentation.open = true;
         for workspace in [None, Some(std::path::PathBuf::from("/tmp"))] {
             app.settings.workspace = workspace;
@@ -252,5 +252,23 @@ fn settings_dialog_renders_with_and_without_workspace() {
                 .unwrap();
             assert!(rect.width() <= width, "dialog overflows {width}: {rect:?}");
         }
+    }
+}
+
+#[test]
+fn select_all_replaces_entire_source_with_themed_controls() {
+    for appearance in [
+        crate::ui_theme::Appearance::Light,
+        crate::ui_theme::Appearance::Dark,
+    ] {
+        let mut h = Harness::new("original\n");
+        crate::ui_theme::apply(&h.ctx, appearance);
+        h.frame(vec![key(Key::A, Modifiers::COMMAND)]);
+        assert_eq!(
+            h.cursor().sorted_cursors().map(|cursor| cursor.index.0),
+            [0, 9]
+        );
+        h.frame(vec![Event::Text("Browser edit: café 世界\n".into())]);
+        assert_eq!(h.app.buffer, "Browser edit: café 世界\n");
     }
 }

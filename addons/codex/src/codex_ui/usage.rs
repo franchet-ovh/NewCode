@@ -131,7 +131,10 @@ impl CodexUi {
                 ));
             }
             if ui
-                .add_enabled(self.server.is_some(), egui::Button::new("Refresh usage"))
+                .add_enabled(
+                    self.server.is_some(),
+                    focus_addon_support::ui_theme::control_button("Refresh usage"),
+                )
                 .clicked()
             {
                 self.refresh_usage();

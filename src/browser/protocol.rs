@@ -162,6 +162,8 @@ pub(super) struct Frame {
     pub title: Option<String>,
     pub paste: bool,
     pub dirty: bool,
+    #[serde(default)]
+    pub dark_mode: bool,
     pub pixels_per_point: f32,
     pub size: [f32; 2],
     pub revision: u64,
@@ -241,6 +243,7 @@ impl Frame {
             title: None,
             paste: false,
             dirty: false,
+            dark_mode: ctx.global_style().visuals.dark_mode,
             pixels_per_point: output.pixels_per_point,
             size: [ctx.viewport_rect().width(), ctx.viewport_rect().height()],
             revision: 0,
@@ -310,6 +313,29 @@ mod tests {
         let frame = Frame::new(&ctx, output, &mut textures, false);
         assert_eq!(frame.free, ["m7"]);
         assert!(textures.0.is_empty());
+    }
+
+    #[test]
+    fn frames_carry_appearance_for_native_and_browser_chrome() {
+        let ctx = egui::Context::default();
+        let mut textures = Textures::default();
+        for appearance in [
+            crate::ui_theme::Appearance::Light,
+            crate::ui_theme::Appearance::Dark,
+        ] {
+            crate::ui_theme::apply(&ctx, appearance);
+            let output = ctx.run_ui(egui::RawInput::default(), |ui| {
+                ui.label("Themed frame");
+            });
+            let frame = Frame::new(&ctx, output, &mut textures, false);
+            assert_eq!(
+                frame.dark_mode,
+                appearance == crate::ui_theme::Appearance::Dark
+            );
+            let decoded: Frame =
+                serde_json::from_value(serde_json::to_value(&frame).unwrap()).unwrap();
+            assert_eq!(decoded.dark_mode, frame.dark_mode);
+        }
     }
 
     #[test]

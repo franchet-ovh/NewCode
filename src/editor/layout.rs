@@ -48,18 +48,19 @@ impl EditorApp {
             .frame(egui::Frame::new().fill(colors.chrome).inner_margin(0))
             .show(root, |ui| {
                 let rect = ui.available_rect_before_wrap();
-                let side_width = 300.0_f32.min(rect.width() * 0.36);
+                let left_width = 140.0;
+                let right_width = (rect.width() - left_width).min(560.0);
                 let left = egui::Rect::from_min_max(
                     rect.min + egui::vec2(10.0, 0.0),
-                    egui::pos2(rect.left() + side_width, rect.bottom()),
+                    egui::pos2(rect.left() + left_width, rect.bottom()),
                 );
                 let right = egui::Rect::from_min_max(
-                    egui::pos2(rect.right() - side_width, rect.top()),
+                    egui::pos2(rect.right() - right_width, rect.top()),
                     rect.max - egui::vec2(10.0, 0.0),
                 );
                 let center = egui::Rect::from_min_max(
-                    egui::pos2(rect.left() + side_width, rect.top()),
-                    egui::pos2(rect.right() - side_width, rect.bottom()),
+                    egui::pos2(rect.left() + left_width, rect.top()),
+                    egui::pos2(rect.right() - right_width, rect.bottom()),
                 );
                 ui.scope_builder(
                     egui::UiBuilder::new()
@@ -67,8 +68,13 @@ impl EditorApp {
                         .max_rect(left)
                         .layout(egui::Layout::left_to_right(egui::Align::Center)),
                     |ui| {
-                        if theme::button(ui, Icon::Folder, "Workspace", colors.accent, false)
-                            .clicked()
+                        if theme::action_button(
+                            ui,
+                            Icon::Folder,
+                            "Workspace",
+                            focus_addon_sdk::ButtonRole::Secondary,
+                        )
+                        .clicked()
                         {
                             self.choose_workspace(ui.ctx());
                         }
@@ -123,7 +129,7 @@ impl EditorApp {
         let ctx = &context;
         if ui
             .add_enabled_ui(self.document_active(), |ui| {
-                theme::button(ui, Icon::Save, "Save", theme::colors(ui).accent, true)
+                theme::action_button(ui, Icon::Save, "Save", focus_addon_sdk::ButtonRole::Primary)
             })
             .inner
             .on_hover_text("Save file · Ctrl+S")
@@ -135,12 +141,11 @@ impl EditorApp {
         ui.menu_button("Edit", |ui| {
             if ui
                 .add_enabled_ui(self.document_active(), |ui| {
-                    theme::button(
+                    theme::action_button(
                         ui,
                         Icon::Save,
                         "Save   Ctrl+S",
-                        theme::colors(ui).accent,
-                        false,
+                        focus_addon_sdk::ButtonRole::Secondary,
                     )
                 })
                 .inner
@@ -151,12 +156,11 @@ impl EditorApp {
             }
             if ui
                 .add_enabled_ui(self.document_active(), |ui| {
-                    theme::button(
+                    theme::action_button(
                         ui,
                         Icon::Copy,
                         "Copy   Ctrl+C",
-                        theme::colors(ui).accent,
-                        false,
+                        focus_addon_sdk::ButtonRole::Secondary,
                     )
                 })
                 .inner
@@ -167,12 +171,11 @@ impl EditorApp {
             }
             if ui
                 .add_enabled_ui(self.document_active(), |ui| {
-                    theme::button(
+                    theme::action_button(
                         ui,
                         Icon::Paste,
                         "Paste   Ctrl+V",
-                        theme::colors(ui).accent,
-                        false,
+                        focus_addon_sdk::ButtonRole::Secondary,
                     )
                 })
                 .inner
@@ -184,12 +187,11 @@ impl EditorApp {
             ui.separator();
             if ui
                 .add_enabled_ui(self.document_active(), |ui| {
-                    theme::button(
+                    theme::action_button(
                         ui,
                         Icon::Search,
                         "Find in File   Ctrl+F",
-                        theme::colors(ui).accent,
-                        false,
+                        focus_addon_sdk::ButtonRole::Secondary,
                     )
                 })
                 .inner
@@ -204,12 +206,27 @@ impl EditorApp {
             if ui
                 .add_enabled(
                     self.document_active(),
-                    egui::Button::new("Select All   Ctrl+A"),
+                    focus_addon_support::ui_theme::control_button("Select All   Ctrl+A"),
                 )
                 .clicked()
             {
                 self.select_all(ctx);
                 ui.close();
+            }
+        });
+        ui.menu_button("Appearance", |ui| {
+            for (value, label) in [
+                (theme::Appearance::Light, "Nord Light"),
+                (theme::Appearance::Dark, "Nord Dark"),
+            ] {
+                if ui
+                    .selectable_value(&mut self.settings.appearance, value, label)
+                    .changed()
+                {
+                    theme::apply(ctx, self.settings.appearance);
+                    self.save_settings();
+                    ui.close();
+                }
             }
         });
         ui.menu_button("Addons", |ui| {

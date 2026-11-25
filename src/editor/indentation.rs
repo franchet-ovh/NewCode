@@ -197,7 +197,12 @@ impl EditorApp {
         true
     }
     pub(super) fn indentation_menu(&mut self, ui: &mut egui::Ui) {
-        if ui.button("Indentation Settings…").clicked() {
+        if ui
+            .add(focus_addon_support::ui_theme::control_button(
+                "Indentation Settings…",
+            ))
+            .clicked()
+        {
             self.indentation.open = true;
             ui.close();
         }
@@ -206,7 +211,10 @@ impl EditorApp {
             ("Convert Indentation to Tabs", false),
         ] {
             if ui
-                .add_enabled(self.document_active(), egui::Button::new(label))
+                .add_enabled(
+                    self.document_active(),
+                    focus_addon_support::ui_theme::control_button(label),
+                )
                 .clicked()
             {
                 self.apply_indent_action(ui.ctx(), Action::Convert { spaces }, None);
@@ -354,7 +362,12 @@ impl EditorApp {
                             inherited.smart_tabs,
                         );
                     });
-                if ui.button("Reset to inherited").clicked() {
+                if ui
+                    .add(focus_addon_support::ui_theme::control_button(
+                        "Reset to inherited",
+                    ))
+                    .clicked()
+                {
                     *overrides = Overrides::default();
                     changed = true;
                 }
@@ -512,7 +525,7 @@ fn widget(
     layouter: &mut dyn FnMut(&egui::Ui, &dyn egui::TextBuffer, f32) -> std::sync::Arc<egui::Galley>,
 ) -> egui::text_edit::TextEditOutput {
     let id = app.editor_id();
-    egui::TextEdit::multiline(&mut app.buffer)
+    focus_addon_support::ui_theme::multiline(&mut app.buffer)
         .id(id)
         .font(egui::TextStyle::Monospace)
         .desired_width(width)

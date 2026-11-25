@@ -4,23 +4,71 @@ pub(crate) mod process;
 pub(crate) mod redaction;
 pub(crate) mod session;
 
-#[derive(Clone, Default, Debug)]
+#[derive(Clone, Debug)]
 pub(crate) struct Arguments {
     pub(crate) version: bool,
+    pub(crate) help: bool,
     pub(crate) ui: bool,
     pub(crate) headless: bool,
     pub(crate) level: Option<log::LevelFilter>,
     pub(crate) workspace: Option<PathBuf>,
     pub(crate) disabled_addons: Vec<String>,
 }
+impl Default for Arguments {
+    fn default() -> Self {
+        Self {
+            version: false,
+            help: false,
+            ui: true,
+            headless: false,
+            level: None,
+            workspace: None,
+            disabled_addons: Vec::new(),
+        }
+    }
+}
+
+pub(crate) const HELP: &str = "Focus Editor — native desktop editor
+
+Usage: focus-editor [OPTIONS] [WORKSPACE]
+
+Options:
+  --ui                     Native desktop window (default)
+  --browser                Chromium/Chrome app window (requires installed browser)
+  --headless               Workspace session without a local window; requires WORKSPACE
+  --foreground             Stay attached to the launching terminal
+  --no-addon ID            Suppress an addon for this launch; repeatable
+  --log-level LEVEL        trace, debug, info, warn, error, or off
+  -V, --version            Print version
+  -h, --help               Print this help
+  --                       Treat following arguments as workspace paths
+
+Window modes are mutually exclusive. Native mode requires a desktop display.
+For remote browser access, run focus-editor-server.
+
+Examples:
+  focus-editor ./my-project
+  focus-editor --browser ./my-project
+  focus-editor --ui --foreground --log-level debug ./my-project";
+
 impl Arguments {
     pub(crate) fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Self, String> {
         let mut result = Self::default();
         let mut args = args.into_iter();
         let mut positional = false;
+        let mut mode: Option<OsString> = None;
         while let Some(arg) = args.next() {
-            if !positional && arg == "--headless" {
-                result.headless = true;
+            if !positional && (arg == "--help" || arg == "-h") {
+                result.help = true;
+                continue;
+            }
+            if !positional && (arg == "--ui" || arg == "--browser" || arg == "--headless") {
+                if mode.as_ref().is_some_and(|old| old != &arg) {
+                    return Err("Choose only one of --ui, --browser, or --headless".into());
+                }
+                result.ui = arg == "--ui";
+                result.headless = arg == "--headless";
+                mode = Some(arg);
                 continue;
             }
             if !positional
@@ -33,10 +81,6 @@ impl Arguments {
                     "Server mode moved to focus-editor-server; run focus-editor-server instead"
                         .into(),
                 );
-            }
-            if !positional && arg == "--ui" {
-                result.ui = true;
-                continue;
             }
             if !positional && (arg == "--version" || arg == "-V") {
                 result.version = true;
@@ -81,8 +125,8 @@ impl Arguments {
                 result.workspace = Some(arg.into());
             }
         }
-        if result.headless && (result.ui || result.workspace.is_none()) {
-            return Err("--headless requires a workspace and cannot be combined with --ui".into());
+        if !result.help && !result.version && result.headless && result.workspace.is_none() {
+            return Err("--headless requires a workspace".into());
         }
         Ok(result)
     }
