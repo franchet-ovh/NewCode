@@ -46,6 +46,20 @@ fn startup_prefers_plan_then_first_available_mode() {
 fn long_messages_fit_narrow_panel() {
     let ctx = egui::Context::default();
     theme::apply(&ctx);
+    ctx.style_mut_of(egui::Theme::Light, |style| {
+        style.spacing.interact_size = egui::Vec2::splat(34.0);
+        style.spacing.item_spacing = egui::Vec2::splat(8.0);
+        style.spacing.button_padding = egui::vec2(10.0, 7.0);
+        for (kind, size) in [
+            (egui::TextStyle::Body, 14.0),
+            (egui::TextStyle::Button, 12.0),
+            (egui::TextStyle::Small, 11.0),
+        ] {
+            style
+                .text_styles
+                .insert(kind, egui::FontId::proportional(size));
+        }
+    });
     let mut codex = CodexUi::default();
     codex.model = "long-model-name-".repeat(20);
     codex.messages.push(Message::new(
@@ -70,31 +84,38 @@ fn long_messages_fit_narrow_panel() {
                 let _ = crate::test_frame(
                     &ctx,
                     egui::RawInput {
-                        screen_rect: Some(egui::Rect::from_min_size(egui::Pos2::ZERO, size)),
+                        screen_rect: Some(egui::Rect::from_min_size(
+                            egui::pos2(1188.0, 150.0),
+                            size,
+                        )),
                         ..Default::default()
                     },
-                    |root| {
-                        egui::CentralPanel::default().show(root, |ui| {
-                            codex.show(ui, None, &ctx);
-                            assert!(
-                                ui.min_rect().right() <= ui.clip_rect().right() + 1.0,
-                                "Codex content exceeds panel: {:?}",
-                                ui.min_rect()
-                            );
-                            let composer_id = ui
-                                .make_persistent_id("assistant_composer_area")
-                                .with("codex_composer");
-                            let composer = ctx
-                                .data(|data| {
-                                    data.get_temp::<egui::Rect>(composer_id.with("viewport"))
-                                })
-                                .unwrap();
-                            assert!(
-                                composer.bottom() <= ui.clip_rect().bottom() + 1.0,
-                                "Composer hidden below panel: {:?}",
-                                composer
-                            );
-                        });
+                    |ui| {
+                        codex.show(ui, None, &ctx);
+                        assert!(
+                            ui.min_rect().right() <= ui.clip_rect().right() + 1.0,
+                            "Codex content exceeds panel: {:?}",
+                            ui.min_rect()
+                        );
+                        let composer_id = ui
+                            .make_persistent_id("assistant_composer_area")
+                            .with("codex_composer");
+                        let composer = ctx
+                            .data(|data| data.get_temp::<egui::Rect>(composer_id.with("viewport")))
+                            .unwrap();
+                        assert!(
+                            composer.bottom() <= ui.clip_rect().bottom() + 1.0,
+                            "Composer hidden below panel: {:?}",
+                            composer
+                        );
+                        let footer = ctx
+                            .data(|data| data.get_temp::<egui::Rect>(composer_id.with("footer")))
+                            .unwrap();
+                        assert!(
+                            footer.bottom() <= ui.clip_rect().bottom() + 1.0,
+                            "Footer {footer:?} clipped by {:?}",
+                            ui.clip_rect()
+                        );
                     },
                 );
             }

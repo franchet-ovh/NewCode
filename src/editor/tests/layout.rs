@@ -105,3 +105,53 @@ fn native_title_tracks_workspace_changes_without_redundant_commands() {
         assert_eq!(titles, expected.into_iter().collect::<Vec<_>>());
     }
 }
+
+#[test]
+fn status_bar_reserves_its_full_height_and_keeps_text_visible() {
+    for appearance in [theme::Appearance::Light, theme::Appearance::Dark] {
+        let ctx = egui::Context::default();
+        theme::apply(&ctx, appearance);
+        let mut app = test_app();
+        for size in [
+            egui::vec2(1440.0, 759.0),
+            egui::vec2(900.0, 600.0),
+            egui::vec2(390.0, 300.0),
+        ] {
+            for _ in 0..3 {
+                let output = crate::test_frame(
+                    &ctx,
+                    egui::RawInput {
+                        screen_rect: Some(egui::Rect::from_min_size(egui::Pos2::ZERO, size)),
+                        ..Default::default()
+                    },
+                    |root| {
+                        app.toolbar(root);
+                        app.status_bar(root);
+                        assert!(
+                            root.available_rect_before_wrap().bottom()
+                                <= size.y - theme::metrics(root).status_height + 1.0,
+                            "Status bar did not reserve its full height: {:?}",
+                            root.available_rect_before_wrap()
+                        );
+                    },
+                );
+                let mut found = false;
+                for shape in &output.shapes {
+                    if let egui::Shape::Text(text) = &shape.shape {
+                        if text.galley.job.text == "More" {
+                            found = true;
+                            let rect = text.visual_bounding_rect();
+                            assert!(
+                                shape.clip_rect.expand(1.0).contains_rect(rect),
+                                "Status text {rect:?} clipped by {:?}",
+                                shape.clip_rect
+                            );
+                            assert!(rect.bottom() <= size.y);
+                        }
+                    }
+                }
+                assert!(found, "Missing status overflow control");
+            }
+        }
+    }
+}
