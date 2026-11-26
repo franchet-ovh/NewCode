@@ -10,28 +10,47 @@ from unittest.mock import patch
 import tomllib
 
 import release_addon as cli
-from addon_index import load, record
+from addon_index import encode, entry, planned, record
 
 ROOT = Path(__file__).resolve().parents[2]
 SHA = 'a' * 40
 
 
 class ReleaseAddonTests(unittest.TestCase):
+    def setUp(self):
+        # Remote release state is a fixture, not the repository's evolving history.
+        self.sources = {}
+        self.index = {'schema': 1, 'addons': []}
+        for addon in ('codex', 'github', 'lsp-python', 'lsp-rust', 'opencode'):
+            path = f'addons/{addon}'
+            self.sources[f'{path}/addon.toml'] = (
+                f'id="{addon}"\nname="{addon}"\nversion="0.4.8"\n'
+                'editor_version_req=">=0.4.8, <0.5.0"\nprotocol=1\n'
+                f'executable="focus-addon-{addon}"\nicon="icon.png"\n')
+            self.sources[f'{path}/Cargo.toml'] = (
+                f'[package]\nname="focus-addon-{addon}"\nversion="0.4.8"\n')
+            self.sources[f'{path}/Cargo.lock'] = (
+                f'version=4\n[[package]]\nname="focus-addon-{addon}"\nversion="0.4.8"\n')
+            self.index['addons'].append({'id': addon, 'path': path, 'versions': [{
+                'version': '0.5.5', 'release': f'addon_{addon}_0.5.5',
+                'status': 'reserved', 'packages': [],
+            }]})
+
     def invoke(self, args, answers=(), interactive=False, bad_file=None, failure=None, index=None):
         blobs = []
         calls = []
-        registry = copy.deepcopy(load(ROOT) if index is None else index)
+        registry = copy.deepcopy(self.index if index is None else index)
 
         def read(repo, sha, path):
             self.assertEqual(sha, SHA)
-            return bad_file[1] if bad_file and path == bad_file[0] else (ROOT / path).read_text()
+            return bad_file[1] if bad_file and path == bad_file[0] else self.sources[path]
 
         def api(repo, endpoint, data=None):
             calls.append((endpoint, data))
             if failure == endpoint:
                 raise RuntimeError('simulated failure')
             if endpoint.startswith('git/trees/'):
-                return {'tree': [{'path': str(p.relative_to(ROOT)), 'type': 'blob'} for p in ROOT.glob('addons/*/addon.toml')]}
+                return {'tree': [{'path': path, 'type': 'blob'} for path in self.sources if path.endswith('/addon.toml')]}
             if endpoint == 'git/blobs':
                 blobs.append(base64.b64decode(data['content']).decode())
                 return {'sha': str(len(blobs))}
@@ -108,9 +127,8 @@ class ReleaseAddonTests(unittest.TestCase):
         self.assertFalse(any(data is not None for _, data in calls))
 
     def test_new_release_supersedes_failed_plan_without_reusing_its_version(self):
-        index = load(ROOT)
-        source = tomllib.loads((ROOT/'addons/github/addon.toml').read_text())
-        from addon_index import entry, planned
+        index = copy.deepcopy(self.index)
+        source = tomllib.loads(self.sources['addons/github/addon.toml'])
         source['version'] = '0.6.0'
         entry(index, 'github')['versions'].append(planned(source))
         code, _, err, calls, blobs, _ = self.invoke(['--addon', 'github', '--patch'], index=index)
@@ -118,6 +136,25 @@ class ReleaseAddonTests(unittest.TestCase):
         updated = json.loads(self.files(calls, blobs)['addons.json'])
         self.assertEqual(record(updated, 'github', '0.6.0')['status'], 'reserved')
         self.assertEqual(record(updated, 'github', '0.6.1')['status'], 'planned')
+
+    def test_bumps_use_each_addons_highest_source_published_or_reserved_version(self):
+        entry(self.index, 'github')['versions'].append({
+            'version': '1.9.9', 'release': 'addon_github_1.9.9',
+            'status': 'published', 'protocol': 1,
+            'editor_version_req': '>=0.4.8, <0.5.0', 'packages': [{
+                'id': 'github', 'name': 'GitHub', 'version': '1.9.9', 'protocol': 1,
+                'editor_version_req': '>=0.4.8, <0.5.0', 'target': 'x86_64-unknown-linux-gnu',
+                'archive': 'github.tar.gz', 'size': 10, 'sha256': 'a' * 64,
+            }],
+        })
+        for name in ('addon.toml', 'Cargo.toml', 'Cargo.lock'):
+            path = f'addons/lsp-rust/{name}'
+            self.sources[path] = self.sources[path].replace('version="0.4.8"', 'version="2.4.0"')
+        code, _, err, calls, blobs, _ = self.invoke(['--all', '--patch'])
+        self.assertEqual((code, err), (0, ''))
+        files = self.files(calls, blobs)
+        for addon, expected in [('github', '1.9.10'), ('codex', '0.5.6'), ('lsp-rust', '2.4.1')]:
+            self.assertEqual(tomllib.loads(files[f'addons/{addon}/addon.toml'])['version'], expected)
 
     def test_interactive_default_patch_custom_and_cancellation(self):
         for answers, expected in [([''], '0.5.6'), (['2'], '0.6.0'), (['3'], '1.0.0'), (['4', '0.1.0', '0.7.0'], '0.7.0')]:
