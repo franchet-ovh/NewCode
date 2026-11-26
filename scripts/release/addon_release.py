@@ -62,6 +62,30 @@ def require_editor_compatibility(manifest):
     return requirement
 
 
+def editor_compatibility(manifest, lower='', upper=''):
+    """Override either end of the release's >=lower, <upper editor range."""
+    requirement = require_editor_compatibility(manifest)
+    if not lower and not upper:
+        return requirement
+    bounds = {}
+    for part in requirement.split(','):
+        match = re.fullmatch(r'\s*(>=|<)\s*(\d+\.\d+\.\d+)\s*', part)
+        if not match or match[1] in bounds:
+            raise ValueError('Editing editor compatibility requires a >=x.y.z, <x.y.z range')
+        bounds[match[1]] = match[2]
+    if set(bounds) != {'>=', '<'}:
+        raise ValueError('Editing editor compatibility requires a >=x.y.z, <x.y.z range')
+    lower, upper = lower or bounds['>='], upper or bounds['<']
+    from prepare_version import release_version
+    for value in (lower, upper):
+        release_version(value)
+        if not re.fullmatch(r'\d+\.\d+\.\d+', value):
+            raise ValueError('Editor bounds require stable x.y.z versions')
+    if tuple(map(int, lower.split('.'))) >= tuple(map(int, upper.split('.'))):
+        raise ValueError('Editor --from must be less than --to')
+    return f'>={lower}, <{upper}'
+
+
 def package_addons(binary_directory, destination, tag, target, root=Path("."), selected=None):
     destination.mkdir(parents=True, exist_ok=True)
     packages = []

@@ -8,7 +8,7 @@ from pathlib import Path
 import re
 import subprocess
 import tomllib
-from addon_release import manifests, package_addons, RELEASE_TARGETS, index_name, digest, archive_name, require_editor_compatibility
+from addon_release import manifests, package_addons, RELEASE_TARGETS, index_name, digest, archive_name, editor_compatibility
 from prepare_version import replace_version, release_version
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -65,8 +65,9 @@ def definition(addon):
     raise ValueError(f'Unknown addon: {addon}')
 
 
-def stamp(addon, tag):
-    path, _ = definition(addon)
+def stamp(addon, tag, lower='', upper=''):
+    path, manifest = definition(addon)
+    requirement = editor_compatibility(manifest, lower, upper)
     prefix = f'addon_{addon}_'
     if not tag.startswith(prefix):
         raise ValueError('Tag does not match addon')
@@ -88,6 +89,11 @@ def stamp(addon, tag):
     if matches != 1:
         raise ValueError('Expected one local package in addon lockfile')
     changes = {path: replace_version(path.read_text(), version), project: ''.join(sections), lock: '[[package]]'.join(blocks)}
+    if lower or upper:
+        changes[path], count = re.subn(r'(?m)^editor_version_req\s*=.*$',
+                                      'editor_version_req = ' + json.dumps(requirement), changes[path])
+        if count != 1:
+            raise ValueError('Expected one editor_version_req in addon manifest')
     for text in changes.values():
         tomllib.loads(text)
     for file, text in changes.items():
@@ -117,9 +123,9 @@ def fingerprint(addon, sha):
     return hashlib.sha256(tree).hexdigest()
 
 
-def reserve(addon, sha, explicit):
+def reserve(addon, sha, explicit, lower='', upper=''):
     _, manifest = definition(addon)
-    require_editor_compatibility(manifest)
+    requirement = editor_compatibility(manifest, lower, upper)
     prefix = f'addon_{addon}_'
     pages = release_pages(os.environ['GH_REPO'])
     releases = [r for page in pages for r in page if r['tag_name'].startswith(prefix)
@@ -127,11 +133,16 @@ def reserve(addon, sha, explicit):
     releases.sort(key=lambda r: stable(r['tag_name'][len(prefix):]), reverse=True)
     marker = f'Addon source: {sha}'
     content = f'Addon inputs: {fingerprint(addon, sha)}'
+    compatibility = f'Editor compatibility override: {requirement}' if lower or upper else ''
+    if compatibility:
+        content += ':' + hashlib.sha256(requirement.encode()).hexdigest()
     if not explicit:
         latest = next((r for r in releases if not r['draft']), None)
         if latest and content in (latest.get('body') or '').splitlines():
             return latest['tag_name'], True
     matching = [r for r in releases if marker in (r.get('body') or '').splitlines()
+                and (compatibility in (r.get('body') or '').splitlines() if compatibility else
+                     not any(line.startswith('Editor compatibility override:') for line in (r.get('body') or '').splitlines()))
                 and (not explicit or r['tag_name'] == prefix + explicit)]
     if matching:
         release = matching[0]
@@ -139,7 +150,7 @@ def reserve(addon, sha, explicit):
     versions = [r['tag_name'][len(prefix):] for r in releases
                 if re.fullmatch(r'\d+\.\d+\.\d+', r['tag_name'][len(prefix):])]
     tag = prefix + next_version(manifest['version'], versions, explicit)
-    body = marker + '\n' + content + '\n\nIndependent addon release. See addons.json for supported editor versions.\n'
+    body = marker + '\n' + content + ('\n' + compatibility if compatibility else '') + '\n\nIndependent addon release. See addons.json for supported editor versions.\n'
     # gh creates the immutable source tag; draft assets are invisible to discovery.
     gh('release', 'create', tag, '--target', sha, '--draft', '--title', tag, '--notes', body, '--latest=false')
     return tag, False
@@ -179,16 +190,18 @@ def main():
     parser.add_argument('--source-sha')
     parser.add_argument('--version', default='')
     parser.add_argument('--target')
+    parser.add_argument('--from', dest='editor_from', default='')
+    parser.add_argument('--to', dest='editor_to', default='')
     args = parser.parse_args()
     definition(args.addon)
     if args.command == 'reserve':
         if not re.fullmatch(r'[0-9a-f]{40}', args.source_sha or ''):
             raise ValueError('Expected a full source commit SHA')
-        tag, done = reserve(args.addon, args.source_sha, args.version)
+        tag, done = reserve(args.addon, args.source_sha, args.version, args.editor_from, args.editor_to)
         with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
             output.write(f'tag={tag}\ndone={str(done).lower()}\n')
     else:
-        stamp(args.addon, args.tag)
+        stamp(args.addon, args.tag, args.editor_from, args.editor_to)
         if args.command == 'package':
             from package import verify_binary
             _, manifest = definition(args.addon)

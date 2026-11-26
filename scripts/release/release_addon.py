@@ -9,7 +9,7 @@ import sys
 import tomllib
 
 from publish_addon import next_version, stable, release_pages as github_release_pages
-from addon_release import require_editor_compatibility
+from addon_release import editor_compatibility
 
 DEFAULT_REPO = 'franchet-ovh/NewCode'
 WORKFLOW = 'addon-release.yml'
@@ -45,12 +45,12 @@ def discover(repo):
     return sha, addons
 
 
-def source_version(repo, sha, addon, path):
+def source_version(repo, sha, addon, path, lower='', upper=''):
     manifest = tomllib.loads(gh('api', f'repos/{repo}/contents/{path}?ref={sha}',
                                '-H', 'Accept: application/vnd.github.raw+json'))
     if manifest['id'] != addon:
         raise ValueError('Addon manifest ID does not match its directory')
-    require_editor_compatibility(manifest)
+    editor_compatibility(manifest, lower, upper)
     stable(manifest['version'])
     return manifest['version']
 
@@ -253,6 +253,8 @@ def run(argv=None):
         version.add_argument(f'--{bump}', action='store_const', dest='bump', const=bump,
                              help=f'Automatically apply a SemVer {bump} bump to each selected addon')
     parser.add_argument('--repo', default=DEFAULT_REPO, help=f'GitHub owner/repo (default: {DEFAULT_REPO})')
+    parser.add_argument('--from', dest='editor_from', default='', help='Set inclusive minimum supported editor version (x.y.z)')
+    parser.add_argument('--to', dest='editor_to', default='', help='Set exclusive maximum supported editor version (x.y.z)')
     args = parser.parse_args(argv)
     if not re.fullmatch(r'[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+', args.repo):
         parser.error('--repo must be owner/repo')
@@ -260,6 +262,9 @@ def run(argv=None):
         parser.error('Noninteractive use requires --addon or --all, and --version, --major, --minor, or --patch')
     if args.version:
         stable(args.version)
+    for bound in (args.editor_from, args.editor_to):
+        if bound:
+            stable(bound)
     if not shutil.which('gh'):
         raise RuntimeError('GitHub CLI (gh) is required; install it and run gh auth login')
     gh('auth', 'status')
@@ -278,7 +283,7 @@ def run(argv=None):
     pages = None
     releases = []
     for addon in selected:
-        current = source_version(args.repo, sha, addon, addons[addon])
+        current = source_version(args.repo, sha, addon, addons[addon], args.editor_from, args.editor_to)
         if pages is None:
             pages = release_pages(args.repo)
         versions = release_versions(args.repo, addon, pages)
@@ -291,12 +296,21 @@ def run(argv=None):
             version = select_version(current, versions)
         releases.append((addon, version))
     inputs = workflow_inputs(args.repo, sha)
+    compatibility_inputs = {name: value for name, value in [('from', args.editor_from), ('to', args.editor_to)] if value}
+    for name, value in compatibility_inputs.items():
+        if name not in inputs:
+            raise ValueError(f'The workflow on main does not support {name}; merge the updated {WORKFLOW} before releasing. No workflows were dispatched.')
+        validate_choices(inputs, name, [value])
     pin_source = 'source-sha' in inputs
     validate_choices(inputs, 'addon', selected)
     validate_choices(inputs, 'version', [version for _, version in releases])
     if pin_source:
         validate_choices(inputs, 'source-sha', [sha])
     print(f'\nRepository: {args.repo}\nSource: main at {sha}')
+    if args.editor_from:
+        print(f'Minimum editor override: >={args.editor_from}')
+    if args.editor_to:
+        print(f'Maximum editor override: <{args.editor_to}')
     if not pin_source:
         print('The workflow does not accept source-sha; releases will build main at dispatch time.')
     for addon, version in releases:
@@ -310,6 +324,8 @@ def run(argv=None):
                        '-f', f'addon={addon}', '-f', f'version={version}']
             if pin_source:
                 command += ['-f', f'source-sha={sha}']
+            for name, value in compatibility_inputs.items():
+                command += ['-f', f'{name}={value}']
             gh(*command)
         except (RuntimeError, OSError) as error:
             remaining = ', '.join(a for a, _ in releases[index + 1:]) or 'none'

@@ -12,6 +12,12 @@ on:
       version:
         type: string
         default: ''
+      from:
+        type: string
+        default: ''
+      to:
+        type: string
+        default: ''
   workflow_dispatch:
     inputs:
       addon:
@@ -23,6 +29,12 @@ on:
         type: string
       version:
         description: Optional explicit x.y.z; otherwise increment patch
+        type: string
+      from:
+        description: Optional inclusive minimum editor version (x.y.z)
+        type: string
+      to:
+        description: Optional exclusive maximum editor version (x.y.z)
         type: string
 permissions:
   contents: read
@@ -52,9 +64,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           ADDON: ${{ inputs.addon }}
+          EDITOR_FROM: ${{ inputs.from }}
+          EDITOR_TO: ${{ inputs.to }}
           VERSION: ${{ inputs.version }}
           SOURCE_SHA: ${{ steps.source.outputs.sha }}
-        run: python3 scripts/release/publish_addon.py reserve --addon "$ADDON" --source-sha "$SOURCE_SHA" --version "$VERSION"
+        run: python3 scripts/release/publish_addon.py reserve --addon "$ADDON" --from "$EDITOR_FROM" --to "$EDITOR_TO" --source-sha "$SOURCE_SHA" --version "$VERSION"
   build:
     name: Build ${{ inputs.addon }} (${{ matrix.target }})
     needs: prepare
@@ -77,8 +91,10 @@ jobs:
       - name: Stamp selected addon
         env:
           ADDON: ${{ inputs.addon }}
+          EDITOR_FROM: ${{ inputs.from }}
+          EDITOR_TO: ${{ inputs.to }}
           TAG: ${{ needs.prepare.outputs.tag }}
-        run: python3 scripts/release/publish_addon.py stamp --addon "$ADDON" --tag "$TAG"
+        run: python3 scripts/release/publish_addon.py stamp --addon "$ADDON" --from "$EDITOR_FROM" --to "$EDITOR_TO" --tag "$TAG"
       - uses: ./.github/actions/linux-checks
         with:
           component: ${{ inputs.addon }}
@@ -87,9 +103,11 @@ jobs:
       - name: Package selected addon
         env:
           ADDON: ${{ inputs.addon }}
+          EDITOR_FROM: ${{ inputs.from }}
+          EDITOR_TO: ${{ inputs.to }}
           TAG: ${{ needs.prepare.outputs.tag }}
           TARGET: ${{ matrix.target }}
-        run: python3 scripts/release/publish_addon.py package --addon "$ADDON" --tag "$TAG" --target "$TARGET"
+        run: python3 scripts/release/publish_addon.py package --addon "$ADDON" --from "$EDITOR_FROM" --to "$EDITOR_TO" --tag "$TAG" --target "$TARGET"
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
           name: addon-${{ inputs.addon }}-${{ matrix.target }}
@@ -117,5 +135,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           ADDON: ${{ inputs.addon }}
+          EDITOR_FROM: ${{ inputs.from }}
+          EDITOR_TO: ${{ inputs.to }}
           TAG: ${{ needs.prepare.outputs.tag }}
-        run: python3 scripts/release/publish_addon.py publish --addon "$ADDON" --tag "$TAG"
+        run: python3 scripts/release/publish_addon.py publish --addon "$ADDON" --from "$EDITOR_FROM" --to "$EDITOR_TO" --tag "$TAG"
