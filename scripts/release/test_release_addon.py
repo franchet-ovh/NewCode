@@ -65,6 +65,35 @@ class ReleaseAddonTests(unittest.TestCase):
     def assert_no_dispatch(self, gh):
         self.assertFalse(any(call.args[:2] == ('workflow', 'run') for call in gh.call_args_list))
 
+    def test_editor_bounds_are_forwarded_independently(self):
+        workflow = (Path(__file__).resolve().parents[2] / '.github/workflows/addon-release.yml').read_text()
+        for flags, expected in [
+            (['--to', '0.6.0'], ['to=0.6.0']),
+            (['--from', '0.4.9'], ['from=0.4.9']),
+            (['--from', '0.5.0', '--to', '0.6.0'], ['from=0.5.0', 'to=0.6.0']),
+        ]:
+            with self.subTest(flags=flags):
+                code, _, err, gh = self.invoke(['--addon', 'github', '--patch', *flags],
+                                               interactive=False, workflow=workflow)
+                self.assertEqual((code, err), (0, ''))
+                forwarded = [arg for arg in gh.call_args.args if arg.startswith(('from=', 'to='))]
+                self.assertEqual(forwarded, expected)
+
+    def test_editor_bounds_fail_before_dispatch_for_bad_ranges_or_old_workflows(self):
+        for flags in [['--from', '0.5.0'], ['--to', '0.4.8'], ['--to', 'bad'], ['--to', '0.6.0']]:
+            code, _, err, gh = self.invoke(['--addon', 'github', '--patch', *flags], interactive=False)
+            self.assertEqual(code, 1, err)
+            self.assert_no_dispatch(gh)
+
+    def test_editor_bounds_validate_every_addon_before_batch_dispatch(self):
+        replies = self.batch_replies()
+        replies[6] = replies[6].replace('>=0.4.8', '>=0.7.0').replace('<0.5.0', '<0.8.0')
+        code, _, err, gh = self.invoke(['--all', '--patch', '--to', '0.6.0'],
+                                       interactive=False, responses=replies)
+        self.assertEqual(code, 1)
+        self.assertIn('--from must be less than --to', err)
+        self.assert_no_dispatch(gh)
+
     def test_missing_compatibility_in_remote_manifest_stops_the_whole_batch(self):
         replies = self.batch_replies()
         # The last addon lacks compatibility metadata, matching the failed runs.

@@ -75,6 +75,8 @@ python3 scripts/release/release_addon.py --addon github --version 0.5.0
 python3 scripts/release/release_addon.py --addon github --minor
 python3 scripts/release/release_addon.py --addon github --addon codex --patch
 python3 scripts/release/release_addon.py --all --patch
+python3 scripts/release/release_addon.py --addon lsp-rust --patch --to 0.6.0
+python3 scripts/release/release_addon.py --all --patch --from 0.5.0 --to 0.6.0
 ```
 
 Omitting both `--addon` and `--all` offers an addon list, including language addons.
@@ -84,6 +86,14 @@ each selected addon independently, using its own highest source or released/rese
 version. These flags and `--version` are mutually exclusive; `--all` and `--addon`
 are also mutually exclusive. An explicit `--version` applies to every selected addon
 and must be valid for all of them.
+
+`--from x.y.z` changes the inclusive lower editor compatibility bound (`>=`);
+`--to x.y.z` changes the exclusive upper bound (`<`). Each omitted bound retains
+its source value. Omitting both preserves `editor_version_req` unchanged.
+Overrides apply to every selected addon's release manifest and catalogs, without
+editing local source files. Bounds must be stable versions with the lower less
+than the upper; editing requires an existing `>=x.y.z, <x.y.z` range. Merge the
+updated addon release workflow into `main` before using these options.
 
 Without a version or bump flag, the helper offers SemVer patch, minor, major, and
 custom choices for each selected addon; Enter selects
