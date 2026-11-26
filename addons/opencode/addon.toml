@@ -1,6 +1,6 @@
 id = "opencode"
 name = "OpenCode"
-version = "0.5.6"
+version = "0.5.7"
 editor_version_req = ">=0.4.8, <0.6.0"
 protocol = 1
 executable = "focus-addon-opencode"
