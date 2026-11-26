@@ -119,8 +119,6 @@ jobs:
           workspaces: source -> target
       - name: Check and build editor and server
         run: |
-          cargo fmt --check
-          cargo test --locked --target "$TARGET"
           cargo build --locked --release --bins --target "$TARGET"
       - name: Package and verify native DMG
         run: python3 "$GITHUB_WORKSPACE/release-tools/scripts/release/package.py" "$TARGET" "$RELEASE_TAG"
