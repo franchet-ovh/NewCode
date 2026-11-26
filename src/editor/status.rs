@@ -151,6 +151,10 @@ impl EditorApp {
                     .inner_margin(egui::Margin::symmetric(8, 2)),
             )
             .show(root, |ui| {
+                // The global controls are taller than this compact bar. Keep the
+                // overflow menu inside it so the panel reserves its full height.
+                ui.spacing_mut().interact_size.y = ui.available_height();
+                ui.spacing_mut().button_padding.y = 2.0;
                 ui.horizontal_centered(|ui| {
                     let spacing = ui.spacing().item_spacing.x;
                     // Reserve overflow access, then fit segments and truncate long messages.

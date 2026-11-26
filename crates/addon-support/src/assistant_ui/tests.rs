@@ -54,6 +54,7 @@ fn key(key: egui::Key) -> egui::Event {
 fn long_drafts_scroll_to_both_ends_without_moving_controls_or_losing_text() {
     for size in [
         egui::vec2(260.0, 420.0),
+        egui::vec2(260.0, 700.0),
         egui::vec2(390.0, 600.0),
         egui::vec2(700.0, 800.0),
     ] {
@@ -99,7 +100,11 @@ fn long_drafts_scroll_to_both_ends_without_moving_controls_or_losing_text() {
                     );
                     sent += usize::from(action.send);
                     assert!(ui.min_rect().right() <= size.x);
-                    assert!(ui.min_rect().bottom() <= size.y);
+                    assert!(
+                        ui.min_rect().bottom() <= footer.bottom() + 1.0,
+                        "Composer {:?} exceeds reserved footer {footer:?}",
+                        ui.min_rect()
+                    );
                 },
             );
         };

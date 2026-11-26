@@ -93,7 +93,7 @@ fn content(
             }
         });
     }
-    egui::Frame::new()
+    let response = egui::Frame::new()
         .fill(theme::colors(ui).chrome)
         .stroke(egui::Stroke::new(1.0, theme::colors(ui).border_strong))
         .inner_margin(8)
@@ -192,6 +192,8 @@ fn content(
                 }
             });
         });
+    ui.ctx()
+        .data_mut(|data| data.insert_temp(id.with("footer"), response.response.rect));
     if action.selected.iter().any(Option::is_some) || action.cycle.is_some() {
         log::debug!("Assistant model/thinking/mode selection changed");
     }
