@@ -55,7 +55,7 @@ def release_versions(repo):
 
 def release_addons(repo, editor_url):
     command = [sys.executable, str(ADDON_SCRIPT), '--all', '--minor', '--repo', repo]
-    print('\nReleasing all addons with independent minor version bumps…', flush=True)
+    print('\nPreparing an addon release PR with independent minor version bumps…', flush=True)
     try:
         result = subprocess.run(command, check=False)
     except OSError as error:
@@ -64,8 +64,8 @@ def release_addons(repo, editor_url):
     if result.returncode:
         raise RuntimeError(f'Editor release was created: {editor_url}\n'
                            f'Addon release helper exited with status {result.returncode}. '
-                           'Some addons may already have been dispatched; inspect its output before retrying. '
-                           'Retry remaining addons with release_addon.py rather than recreating the editor release.')
+                           'An addon release branch may already exist; inspect its output before retrying. '
+                           'Recover the addon PR with release_addon.py rather than recreating the editor release.')
 
 
 def run(argv=None):
@@ -76,7 +76,7 @@ def run(argv=None):
         version.add_argument(f'--{bump}', action='store_const', dest='bump', const=bump,
                              help=f'Apply a SemVer {bump} bump using the highest source or released/reserved version')
     parser.add_argument('--with-addon', action='store_true',
-                        help='After creating the editor release, call release_addon.py --all --minor')
+                        help='After creating the editor release, prepare an addon PR with release_addon.py --all --minor')
     parser.add_argument('--repo', default=DEFAULT_REPO, help=f'GitHub owner/repo (default: {DEFAULT_REPO})')
     args = parser.parse_args(argv)
     if not re.fullmatch(r'[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+', args.repo):

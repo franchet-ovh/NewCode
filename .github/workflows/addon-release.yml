@@ -9,15 +9,6 @@ on:
       source-sha:
         type: string
         required: true
-      version:
-        type: string
-        default: ''
-      from:
-        type: string
-        default: ''
-      to:
-        type: string
-        default: ''
   workflow_dispatch:
     inputs:
       addon:
@@ -26,15 +17,6 @@ on:
         required: true
       source-sha:
         description: Optional source commit SHA; otherwise use main at dispatch
-        type: string
-      version:
-        description: Optional explicit x.y.z; otherwise increment patch
-        type: string
-      from:
-        description: Optional inclusive minimum editor version (x.y.z)
-        type: string
-      to:
-        description: Optional exclusive maximum editor version (x.y.z)
         type: string
 permissions:
   contents: read
@@ -45,17 +27,19 @@ jobs:
   prepare:
     name: Prepare ${{ inputs.addon }}
     if: github.ref == 'refs/heads/main'
+    timeout-minutes: 10
     runs-on: ubuntu-24.04
     permissions:
       contents: write
     outputs:
       tag: ${{ steps.reserve.outputs.tag }}
       done: ${{ steps.reserve.outputs.done }}
-      sha: ${{ steps.source.outputs.sha }}
+      sha: ${{ steps.reserve.outputs.sha }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
           ref: ${{ inputs.source-sha || github.sha }}
+          fetch-depth: 0
           persist-credentials: false
       - id: source
         run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
@@ -64,11 +48,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           ADDON: ${{ inputs.addon }}
-          EDITOR_FROM: ${{ inputs.from }}
-          EDITOR_TO: ${{ inputs.to }}
-          VERSION: ${{ inputs.version }}
           SOURCE_SHA: ${{ steps.source.outputs.sha }}
-        run: python3 scripts/release/publish_addon.py reserve --addon "$ADDON" --from "$EDITOR_FROM" --to "$EDITOR_TO" --source-sha "$SOURCE_SHA" --version "$VERSION"
+        run: python3 scripts/release/publish_addon.py reserve --addon "$ADDON" --source-sha "$SOURCE_SHA"
   build:
     name: Build ${{ inputs.addon }} (${{ matrix.target }})
     needs: prepare
@@ -88,13 +69,11 @@ jobs:
         with:
           ref: ${{ needs.prepare.outputs.sha }}
           persist-credentials: false
-      - name: Stamp selected addon
+      - name: Validate committed addon versions
         env:
           ADDON: ${{ inputs.addon }}
-          EDITOR_FROM: ${{ inputs.from }}
-          EDITOR_TO: ${{ inputs.to }}
           TAG: ${{ needs.prepare.outputs.tag }}
-        run: python3 scripts/release/publish_addon.py stamp --addon "$ADDON" --from "$EDITOR_FROM" --to "$EDITOR_TO" --tag "$TAG"
+        run: python3 scripts/release/publish_addon.py check --addon "$ADDON" --tag "$TAG"
       - uses: ./.github/actions/linux-checks
         with:
           component: ${{ inputs.addon }}
@@ -103,11 +82,9 @@ jobs:
       - name: Package selected addon
         env:
           ADDON: ${{ inputs.addon }}
-          EDITOR_FROM: ${{ inputs.from }}
-          EDITOR_TO: ${{ inputs.to }}
           TAG: ${{ needs.prepare.outputs.tag }}
           TARGET: ${{ matrix.target }}
-        run: python3 scripts/release/publish_addon.py package --addon "$ADDON" --from "$EDITOR_FROM" --to "$EDITOR_TO" --tag "$TAG" --target "$TARGET"
+        run: python3 scripts/release/publish_addon.py package --addon "$ADDON" --tag "$TAG" --target "$TARGET"
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
           name: addon-${{ inputs.addon }}-${{ matrix.target }}
@@ -116,6 +93,7 @@ jobs:
           overwrite: true
   publish:
     name: Publish ${{ inputs.addon }}
+    timeout-minutes: 10
     needs: [prepare, build]
     runs-on: ubuntu-24.04
     permissions:
@@ -135,7 +113,33 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           ADDON: ${{ inputs.addon }}
-          EDITOR_FROM: ${{ inputs.from }}
-          EDITOR_TO: ${{ inputs.to }}
           TAG: ${{ needs.prepare.outputs.tag }}
-        run: python3 scripts/release/publish_addon.py publish --addon "$ADDON" --from "$EDITOR_FROM" --to "$EDITOR_TO" --tag "$TAG"
+        run: python3 scripts/release/publish_addon.py publish --addon "$ADDON" --tag "$TAG"
+  index:
+    name: Register published addon
+    timeout-minutes: 10
+    needs: [prepare, publish]
+    if: always() && needs.prepare.result == 'success' && (needs.publish.result == 'success' || needs.prepare.outputs.done == 'true')
+    runs-on: ubuntu-24.04
+    environment: release-version
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: ${{ needs.prepare.outputs.sha }}
+          persist-credentials: false
+      - name: Create release App token
+        id: release-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
+          permission-contents: write
+      - name: Update central index after publication
+        env:
+          GH_TOKEN: ${{ steps.release-token.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+          ADDON: ${{ inputs.addon }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+        run: python3 scripts/release/addon_index.py register --addon "$ADDON" --tag "$TAG"

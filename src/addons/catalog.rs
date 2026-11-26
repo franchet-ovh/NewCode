@@ -135,128 +135,39 @@ fn fetch_tag(client: &reqwest::blocking::Client, tag: &str) -> Result<Catalog, S
     );
     Ok(catalog)
 }
-fn release_identity(tag: &str) -> Option<(&str, semver::Version)> {
-    let (id, version) = tag.strip_prefix("addon_")?.rsplit_once('_')?;
-    let version = semver::Version::parse(version).ok()?;
-    (focus_addon_sdk::valid_id(id) && version.pre.is_empty() && version.build.is_empty())
-        .then_some((id, version))
-}
-
-fn compatible(package: &Package) -> bool {
-    focus_addon_sdk::check_compatibility(
-        package.editor_version_req.as_deref(),
-        package.protocol,
-        env!("CARGO_PKG_VERSION"),
-    )
-    .is_ok()
-}
+const INDEX_URL: &str = "https://raw.githubusercontent.com/franchet-ovh/NewCode/main/addons.json";
 
 fn fetch_latest(client: &reqwest::blocking::Client) -> Result<Catalog, String> {
-    let releases = discover_releases(|page| {
-        // Paginate explicitly: GitHub's latest endpoint represents one editor release,
-        // whereas each addon has its own version history.
-        let endpoint = format!(
-            "https://api.github.com/repos/franchet-ovh/NewCode/releases?per_page=100&page={page}"
-        );
-        let response = get(
-            client,
-            reqwest::Url::parse(&endpoint).unwrap(),
-            "release discovery",
-        )?
-        .error_for_status()
-        .map_err(request_error)?;
-        let mut bytes = Vec::new();
-        response
-            .take((focus_addon_sdk::MAX_MESSAGE + 1) as u64)
-            .read_to_end(&mut bytes)
-            .map_err(|e| e.to_string())?;
-        if bytes.len() > focus_addon_sdk::MAX_MESSAGE {
-            return Err("Release discovery exceeds size limit".into());
-        }
-        serde_json::from_slice(&bytes).map_err(|e| e.to_string())
-    })?;
-    select_packages(releases, |tag| fetch_tag(client, tag))
+    let response = get(
+        client,
+        reqwest::Url::parse(INDEX_URL).unwrap(),
+        "index fetch",
+    )?
+    .error_for_status()
+    .map_err(|e| format!("Cannot fetch addon index: {}", request_error(e)))?;
+    index_catalog(response)
 }
 
-type Release = (String, semver::Version, String);
-
-fn discover_releases(
-    mut page_entries: impl FnMut(usize) -> Result<Vec<serde_json::Value>, String>,
-) -> Result<Vec<Release>, String> {
-    let mut releases = Vec::new();
-    for page in 1..=100 {
-        let entries = page_entries(page)?;
-        let complete = entries.len() < 100;
-        for entry in entries {
-            if entry["draft"] == true || entry["prerelease"] == true {
-                continue;
-            }
-            if let Some(tag) = entry["tag_name"].as_str() {
-                if let Some((id, version)) = release_identity(tag) {
-                    releases.push((id.to_owned(), version, tag.to_owned()));
-                }
-            }
-        }
-        if complete {
-            break;
-        }
-        if page == 100 {
-            return Err("Too many release pages; select an explicit addon tag".into());
-        }
+fn index_catalog(reader: impl Read) -> Result<Catalog, String> {
+    let mut bytes = Vec::new();
+    reader
+        .take((focus_addon_sdk::MAX_MESSAGE + 1) as u64)
+        .read_to_end(&mut bytes)
+        .map_err(|e| e.to_string())?;
+    if bytes.len() > focus_addon_sdk::MAX_MESSAGE {
+        return Err("Addon index exceeds size limit".into());
     }
-    Ok(releases)
-}
-
-fn select_packages(
-    mut releases: Vec<Release>,
-    mut load: impl FnMut(&str) -> Result<Catalog, String>,
-) -> Result<Catalog, String> {
-    releases.sort_by(|a, b| b.1.cmp(&a.1));
-    let mut packages = std::collections::BTreeMap::<(String, String), Package>::new();
-    for (id, version, tag) in releases {
-        // Once this addon has a compatible native build, older releases cannot
-        // improve its selection. Other platforms are not displayed by this host.
-        let native_key = (
-            id.clone(),
-            super::packages::target().unwrap_or("").to_owned(),
-        );
-        if packages.get(&native_key).is_some_and(compatible) {
-            continue;
-        }
-        let catalog = load(&tag)?;
-        catalog.validate()?;
-        if catalog.release != tag {
-            return Err("Catalog does not match addon release tag".into());
-        }
-        if catalog.schema != 2 {
-            return Err("Independent addon release requires catalog schema 2".into());
-        }
-        for mut package in catalog.packages {
-            if package.id != id || package.version != version.to_string() {
-                return Err("Addon release tag and package identity differ".into());
-            }
-            if Some(package.target.as_str()) != super::packages::target() {
-                continue;
-            }
-            package.source_release = Some(tag.clone());
-            let key = (package.id.clone(), package.target.clone());
-            if !packages.contains_key(&key)
-                || (!compatible(&packages[&key]) && compatible(&package))
-            {
-                packages.insert(key, package);
-            }
-        }
-    }
-    if packages.is_empty() {
-        return Err("No independently released addons are available for this platform. Select an older editor release tag or install a local addon.".into());
-    }
-    let catalog = Catalog {
-        schema: 2,
-        release: "latest".into(),
-        editor_version: String::new(),
-        packages: packages.into_values().collect(),
-    };
-    catalog.validate()?;
+    let index: focus_addon_sdk::AddonIndex =
+        serde_json::from_slice(&bytes).map_err(|e| format!("Cannot parse addon index: {e}"))?;
+    let catalog = index.catalog_for(
+        env!("CARGO_PKG_VERSION"),
+        super::packages::target().unwrap_or("unsupported"),
+    )?;
+    log::info!(
+        "Loaded addon index packages={} bytes={}",
+        catalog.packages.len(),
+        bytes.len()
+    );
     Ok(catalog)
 }
 
@@ -303,104 +214,25 @@ pub(super) fn download(
 mod tests {
     use super::*;
 
-    fn catalog_for(tag: &str, requirement: &str) -> Catalog {
-        let (id, version) = release_identity(tag).unwrap();
-        serde_json::from_value(serde_json::json!({
-            "schema": 2, "release": tag, "packages": [{
-                "id": id, "name": id, "version": version.to_string(), "protocol": 1,
-                "editor_version_req": requirement, "target": super::super::packages::target().unwrap(),
-                "archive": "addon.tar.gz", "size": 1, "sha256": "a".repeat(64)
-            }]
-        })).unwrap()
-    }
-
     #[test]
-    fn release_pages_exclude_editor_drafts_and_prereleases() {
-        let mut pages = Vec::new();
-        let releases = discover_releases(|page| {
-            pages.push(page);
-            Ok(if page == 1 {
-                vec![serde_json::json!({"tag_name": "v0.4.8"}); 100]
-            } else {
-                vec![
-                    serde_json::json!({"tag_name": "addon_my_addon_1.2.3"}),
-                    serde_json::json!({"tag_name": "addon_draft_1.0.0", "draft": true}),
-                    serde_json::json!({"tag_name": "addon_preview_1.0.0-1", "prerelease": true}),
-                ]
-            })
-        })
-        .unwrap();
-        assert_eq!(pages, [1, 2]);
-        assert_eq!(releases.len(), 1);
-        assert_eq!(releases[0].0, "my_addon");
-        assert!(discover_releases(|_| Err("network unavailable".into())).is_err());
-    }
-
-    #[test]
-    fn discovery_selects_highest_compatible_version_and_retains_download_tag() {
-        let compatible_requirement = format!("={}", env!("CARGO_PKG_VERSION"));
-        let incompatible_requirement = format!(">{}", env!("CARGO_PKG_VERSION"));
-        let tags = [
-            "addon_github_0.4.9",
-            "addon_codex_2.0.0",
-            "addon_github_0.4.11",
-            "addon_github_0.4.10",
-        ];
-        let releases = tags
-            .iter()
-            .map(|tag| {
-                let (id, version) = release_identity(tag).unwrap();
-                (id.to_owned(), version, tag.to_string())
-            })
-            .collect();
-        let mut fetched = Vec::new();
-        let catalog = select_packages(releases, |tag| {
-            fetched.push(tag.to_owned());
-            Ok(catalog_for(
-                tag,
-                if tag.ends_with("0.4.11") {
-                    &incompatible_requirement
-                } else {
-                    &compatible_requirement
-                },
-            ))
-        })
-        .unwrap();
-        let github = catalog.packages.iter().find(|p| p.id == "github").unwrap();
-        assert!(compatible(github));
-        assert_eq!(github.version, "0.4.10");
-        assert_eq!(
-            github.source_release.as_deref(),
-            Some("addon_github_0.4.10")
-        );
-        assert!(!fetched.contains(&"addon_github_0.4.9".to_owned()));
-        assert_eq!(catalog.packages.len(), 2);
+    fn central_index_filters_before_installation_and_rejects_bad_responses() {
+        let catalog = index_catalog(include_bytes!("../../addons.json").as_slice()).unwrap();
+        assert!(catalog.packages.iter().all(|package| {
+            Some(package.target.as_str()) == super::super::packages::target()
+                && focus_addon_sdk::check_compatibility(
+                    package.editor_version_req.as_deref(),
+                    package.protocol,
+                    env!("CARGO_PKG_VERSION"),
+                )
+                .is_ok()
+                && package.source_release.is_some()
+        }));
+        assert!(index_catalog(b"invalid JSON".as_slice()).is_err());
+        assert!(index_catalog(b"{\"schema\":99,\"addons\":[]}".as_slice()).is_err());
         assert!(
-            url(github.source_release.as_deref().unwrap(), &github.archive)
-                .as_str()
-                .contains("addon_github_0.4.10/addon.tar.gz")
-        );
-    }
-
-    #[test]
-    fn incompatible_release_remains_visible_but_identity_mismatch_is_rejected() {
-        let tag = "addon_github_1.0.0";
-        let releases = || {
-            vec![(
-                "github".to_owned(),
-                semver::Version::new(1, 0, 0),
-                tag.to_owned(),
-            )]
-        };
-        let incompatible_requirement = format!(">{}", env!("CARGO_PKG_VERSION"));
-        let catalog = select_packages(releases(), |_| {
-            Ok(catalog_for(tag, &incompatible_requirement))
-        })
-        .unwrap();
-        assert!(!compatible(&catalog.packages[0]));
-        assert!(select_packages(releases(), |_| Err("download failed".into())).is_err());
-        assert!(
-            select_packages(releases(), |_| Ok(catalog_for("addon_other_1.0.0", "*"))).is_err()
+            index_catalog(std::io::repeat(b' '))
+                .unwrap_err()
+                .contains("size limit")
         );
     }
 

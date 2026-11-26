@@ -1,182 +1,61 @@
 #!/usr/bin/env python3
-"""Release selected addons with interactive or automatic SemVer bumps on main."""
+"""Prepare a branch and pull request for selected addon releases from main."""
 import argparse
 import json
 import re
 import shutil
-import subprocess
 import sys
 import tomllib
+import base64
+import uuid
 
-from publish_addon import next_version, stable, release_pages as github_release_pages
-from addon_release import editor_compatibility
+from addon_release import next_version, stable, editor_compatibility, version_files
+from addon_index import remote, entry, planned, encode, validate
+from github_api import gh, api
 
 DEFAULT_REPO = 'franchet-ovh/NewCode'
-WORKFLOW = 'addon-release.yml'
 
 
 class Cancelled(Exception):
     pass
 
 
-def gh(*args):
-    result = subprocess.run(['gh', *args], text=True, capture_output=True)
-    if result.returncode:
-        message = result.stderr.strip() or result.stdout.strip() or f'exit code {result.returncode}'
-        raise RuntimeError(f'GitHub CLI failed: {message}')
-    return result.stdout.strip()
-
-
 def discover(repo):
-    """Use one immutable main revision for discovery and the eventual build."""
+    """Read the registry at a single immutable main revision."""
     sha = gh('api', f'repos/{repo}/commits/main', '--jq', '.sha')
     if not re.fullmatch(r'[0-9a-f]{40}', sha):
         raise ValueError('GitHub returned an invalid main commit SHA')
-    tree = json.loads(gh('api', f'repos/{repo}/git/trees/{sha}?recursive=1'))
-    if tree.get('truncated'):
-        raise ValueError('GitHub truncated the repository tree; cannot discover all addons')
-    addons = {}
-    for entry in tree['tree']:
-        match = re.fullmatch(r'addons/([A-Za-z0-9_-]+)/addon\.toml', entry['path'])
-        if match and entry['type'] == 'blob':
-            addons[match[1]] = entry['path']
-    if not addons:
-        raise ValueError(f'No addon manifests found on {repo} main')
-    return sha, addons
+    index, _ = remote(repo, sha)
+    return sha, index
 
 
-def source_version(repo, sha, addon, path, lower='', upper=''):
-    manifest = tomllib.loads(gh('api', f'repos/{repo}/contents/{path}?ref={sha}',
-                               '-H', 'Accept: application/vnd.github.raw+json'))
-    if manifest['id'] != addon:
-        raise ValueError('Addon manifest ID does not match its directory')
-    editor_compatibility(manifest, lower, upper)
-    stable(manifest['version'])
-    return manifest['version']
+def contents(repo, sha, path):
+    return gh('api', f'repos/{repo}/contents/{path}?ref={sha}',
+              '-H', 'Accept: application/vnd.github.raw+json')
 
 
-def dispatch_inputs(workflow):
-    """Read input types/choices from the workflow's block-style YAML mapping.
-
-    Keep workflow_call inputs separate: reusable and manual triggers can declare
-    different inputs. No YAML dependency is needed for these mapping keys.
-    """
-    event_indent = inputs_indent = field_indent = property_indent = options_indent = None
-    inputs = {}
-    current = None
-    for line in workflow.splitlines():
-        stripped = line.strip()
-        if not stripped or stripped.startswith('#'):
-            continue
-        indent = len(line) - len(line.lstrip(' '))
-        key = re.fullmatch(r'([A-Za-z0-9_-]+):(?:\s+(.*))?', stripped)
-        if event_indent is None:
-            if key and key[1] == 'workflow_dispatch':
-                event_indent = indent
-            continue
-        if indent <= event_indent:
-            break
-        if inputs_indent is None:
-            if key and key[1] == 'inputs':
-                inputs_indent = indent
-            continue
-        if indent <= inputs_indent:
-            break
-        if key:
-            if field_indent is None:
-                field_indent = indent
-            if indent == field_indent:
-                if key[2] and not key[2].startswith('#'):
-                    raise ValueError('Workflow input declarations must use block-style YAML mappings')
-                current = key[1]
-                inputs[current] = {}
-                property_indent = options_indent = None
-                continue
-        if current is None:
-            continue
-        if options_indent is not None:
-            if indent >= options_indent and stripped.startswith('- '):
-                inputs[current]['options'].append(yaml_name(stripped[2:]))
-                continue
-            if indent <= options_indent:
-                options_indent = None
-        if not key:
-            continue
-        if property_indent is None:
-            property_indent = indent
-        if indent != property_indent:
-            continue
-        if key[1] == 'type':
-            inputs[current]['type'] = yaml_name(key[2] or '')
-        elif key[1] == 'options':
-            value = key[2] or ''
-            inputs[current]['options'] = []
-            if not value or value.startswith('#'):
-                options_indent = indent
-            else:
-                inline = re.fullmatch(r'\[(.*)\]\s*(?:#.*)?', value)
-                if not inline:
-                    raise ValueError('Workflow choices must be a list of plain or quoted names')
-                if inline[1].strip():
-                    inputs[current]['options'] = [yaml_name(item.strip()) for item in inline[1].split(',') if item.strip()]
-    return inputs
-
-
-def yaml_name(value):
-    """Types and addon/version choices are simple names, optionally quoted."""
-    match = re.fullmatch(r'''(?:"([A-Za-z0-9_.-]+)"|'([A-Za-z0-9_.-]+)'|([A-Za-z0-9_.-]+))\s*(?:#.*)?''', value.strip())
-    if not match:
-        raise ValueError(f'Unsupported workflow type or choice value: {value!r}')
-    return next(group for group in match.groups() if group is not None)
-
-
-def validate_choices(inputs, name, values):
-    definition = inputs[name]
-    kind = definition.get('type', 'string')
-    if kind == 'string':
-        return
-    if kind != 'choice' or not definition.get('options'):
-        raise ValueError(f'Unsupported manual workflow input definition for {name}')
-    allowed = definition['options']
-    rejected = sorted(set(values) - set(allowed))
-    if rejected:
-        raise ValueError(f'The release workflow on main does not allow {name} value(s): {", ".join(rejected)}. '
-                         f'Allowed: {", ".join(allowed)}. '
-                         f'Merge the .github/workflows/{WORKFLOW} change ({name} type: string) into main '
-                         'before releasing these addons. No workflows were dispatched.')
-
-
-def workflow_inputs(repo, sha):
-    workflow = gh('api', f'repos/{repo}/contents/.github/workflows/{WORKFLOW}?ref={sha}',
-                  '-H', 'Accept: application/vnd.github.raw+json')
-    inputs = dispatch_inputs(workflow)
-    missing = {'addon', 'version'} - inputs.keys()
-    if missing:
-        raise ValueError(f'The workflow on main does not declare required manual inputs: {", ".join(sorted(missing))}')
-    return inputs
-
-
-def release_pages(repo):
-    return github_release_pages(repo, query=gh)
-
-
-def release_versions(repo, addon, pages=None):
-    if pages is None:
-        pages = release_pages(repo)
-    prefix = f'addon_{addon}_'
-    versions = set()
-    for page in pages:
-        for release in page:
-            tag = release['tag_name']
-            if tag.startswith(prefix):
-                version = tag[len(prefix):]
-                try:
-                    stable(version)
-                except ValueError:
-                    continue
-                # Draft versions are reserved too; never suggest reusing one.
-                versions.add(version)
-    return sorted(versions, key=stable)
+def create_pr(repo, sha, changes, releases):
+    # A single tree/commit publishes the complete batch to the new branch.
+    tree = []
+    for path, content in sorted(changes.items()):
+        blob = api(repo, 'git/blobs', {'content': base64.b64encode(content.encode()).decode(), 'encoding': 'base64'})
+        tree.append({'path': path, 'mode': '100644', 'type': 'blob', 'sha': blob['sha']})
+    base = api(repo, f'git/commits/{sha}')
+    tree = api(repo, 'git/trees', {'base_tree': base['tree']['sha'], 'tree': tree})
+    title = 'chore: release addons ' + ', '.join(f'{addon} {version}' for addon, version in releases)
+    commit = api(repo, 'git/commits', {'message': title, 'tree': tree['sha'], 'parents': [sha]})
+    branch = f'release/addons-{sha[:12]}-{uuid.uuid4().hex[:12]}'
+    api(repo, 'git/refs', {'ref': f'refs/heads/{branch}', 'sha': commit['sha']})
+    url = f'https://github.com/{repo}/tree/{branch}'
+    body = ('Prepare independently versioned addon releases:\n\n' +
+            '\n'.join(f'- `{addon}`: `{version}`' for addon, version in releases) +
+            '\n\nAfter merging, main CI builds the committed versions. The addon index exposes downloads only after successful publication.')
+    try:
+        pull = api(repo, 'pulls', {'title': title, 'head': branch, 'base': 'main', 'body': body})
+    except (RuntimeError, OSError) as error:
+        raise RuntimeError(f'Branch created: {url}\nPR creation failed: {error}\n'
+                           f'Create a PR from {branch} to main; do not rerun the helper for this batch.') from error
+    print(f"Release PR created: {pull['html_url']}\nMerge after review and CI to publish the addons.")
 
 
 def bump_version(current, versions, bump):
@@ -268,7 +147,15 @@ def run(argv=None):
     if not shutil.which('gh'):
         raise RuntimeError('GitHub CLI (gh) is required; install it and run gh auth login')
     gh('auth', 'status')
-    sha, addons = discover(args.repo)
+    sha, index = discover(args.repo)
+    # Historical addons can remain in the index after their source is removed.
+    tree = api(args.repo, f'git/trees/{sha}?recursive=1')
+    if tree.get('truncated'):
+        raise ValueError('GitHub truncated the source tree')
+    paths = {item['path'] for item in tree['tree'] if item['type'] == 'blob'}
+    addons = {a['id']: a['path'] for a in index['addons'] if a['path'] + '/addon.toml' in paths}
+    if not addons:
+        raise ValueError('No indexed source addons found on main')
     if args.all:
         selected = sorted(addons)
     elif args.addon:
@@ -278,64 +165,42 @@ def run(argv=None):
     for addon in selected:
         if addon not in addons:
             raise ValueError(f'Unknown addon: {addon}. Available: {", ".join(sorted(addons))}')
-    # Resolve every version before starting remote workflows. A bad manifest,
-    # invalid version, or cancelled prompt must not dispatch a partial batch.
-    pages = None
+    # Validate every selected manifest/version before creating any remote objects.
     releases = []
+    changes = {}
     for addon in selected:
-        current = source_version(args.repo, sha, addon, addons[addon], args.editor_from, args.editor_to)
-        if pages is None:
-            pages = release_pages(args.repo)
-        versions = release_versions(args.repo, addon, pages)
+        path = addons[addon]
+        files = {name: contents(args.repo, sha, f'{path}/{name}')
+                 for name in ('addon.toml', 'Cargo.toml', 'Cargo.lock')}
+        manifest = tomllib.loads(files['addon.toml'])
+        if manifest['id'] != addon:
+            raise ValueError('Addon manifest ID does not match its directory')
+        current = manifest['version']
+        stable(current)
+        editor_compatibility(manifest, args.editor_from, args.editor_to)
+        versions = sorted((v['version'] for v in entry(index, addon)['versions']), key=stable)
         if args.version:
-            version = next_version(current, versions, args.version)
+            version = next_version(current, [current, *versions], args.version)
         elif args.bump:
             version = bump_version(current, versions, args.bump)
         else:
             print(f'\nAddon: {addon}')
-            version = select_version(current, versions)
+            version = select_version(current, [current, *versions])
+        prepared = version_files(files['addon.toml'], files['Cargo.toml'], files['Cargo.lock'],
+                                 version, args.editor_from, args.editor_to)
+        changes.update({f'{path}/{name}': text for name, text in prepared.items()})
+        manifest = tomllib.loads(prepared['addon.toml'])
+        for old in entry(index, addon)['versions']:
+            if old['status'] == 'planned':
+                old['status'] = 'reserved'
+        entry(index, addon)['versions'].append(planned(manifest))
         releases.append((addon, version))
-    inputs = workflow_inputs(args.repo, sha)
-    compatibility_inputs = {name: value for name, value in [('from', args.editor_from), ('to', args.editor_to)] if value}
-    for name, value in compatibility_inputs.items():
-        if name not in inputs:
-            raise ValueError(f'The workflow on main does not support {name}; merge the updated {WORKFLOW} before releasing. No workflows were dispatched.')
-        validate_choices(inputs, name, [value])
-    pin_source = 'source-sha' in inputs
-    validate_choices(inputs, 'addon', selected)
-    validate_choices(inputs, 'version', [version for _, version in releases])
-    if pin_source:
-        validate_choices(inputs, 'source-sha', [sha])
+    validate(index)
+    changes['addons.json'] = encode(index)
     print(f'\nRepository: {args.repo}\nSource: main at {sha}')
-    if args.editor_from:
-        print(f'Minimum editor override: >={args.editor_from}')
-    if args.editor_to:
-        print(f'Maximum editor override: <{args.editor_to}')
-    if not pin_source:
-        print('The workflow does not accept source-sha; releases will build main at dispatch time.')
     for addon, version in releases:
-        print(f'\nAddon: {addon}\nVersion: {version}\nTag: addon_{addon}_{version}')
-    print(flush=True)
-    url = f'https://github.com/{args.repo}/actions/workflows/{WORKFLOW}'
-    dispatched = []
-    for index, (addon, version) in enumerate(releases):
-        try:
-            command = ['workflow', 'run', WORKFLOW, '--repo', args.repo, '--ref', 'main',
-                       '-f', f'addon={addon}', '-f', f'version={version}']
-            if pin_source:
-                command += ['-f', f'source-sha={sha}']
-            for name, value in compatibility_inputs.items():
-                command += ['-f', f'{name}={value}']
-            gh(*command)
-        except (RuntimeError, OSError) as error:
-            remaining = ', '.join(a for a, _ in releases[index + 1:]) or 'none'
-            raise RuntimeError(f'Dispatch failed for {addon}: {error}\n'
-                               f'Already dispatched: {", ".join(dispatched) or "none"}\n'
-                               f'Not attempted: {remaining}\n'
-                               f'Check the status of {addon} before retrying: {url}') from error
-        dispatched.append(addon)
-        print(f'Release workflow dispatched for {addon}; publishing has not finished.', flush=True)
-    print(url)
+        print(f'Addon: {addon}  Version: {version}  Tag: addon_{addon}_{version}')
+    create_pr(args.repo, sha, changes, releases)
 
 
 def main(argv=None):
@@ -344,7 +209,7 @@ def main(argv=None):
     except (Cancelled, EOFError, KeyboardInterrupt):
         print('\nRelease cancelled.', file=sys.stderr)
         return 130
-    except (RuntimeError, ValueError, KeyError, TypeError, OSError) as error:
+    except (RuntimeError, ValueError, KeyError, TypeError, StopIteration, OSError) as error:
         print(f'Error: {error}', file=sys.stderr)
         return 1
     return 0
