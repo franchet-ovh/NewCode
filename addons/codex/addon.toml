@@ -1,7 +1,7 @@
 id = "codex"
 name = "Codex"
-version = "0.4.8"
-editor_version_req = ">=0.4.8, <0.5.0"
+version = "0.5.6"
+editor_version_req = ">=0.4.8, <0.6.0"
 protocol = 1
 executable = "focus-addon-codex"
 icon = "icon.png"
