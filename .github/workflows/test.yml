@@ -18,7 +18,7 @@ jobs:
       matrix: ${{ steps.select.outputs.matrix }}
       has_checks: ${{ steps.select.outputs.has_checks }}
       tooling: ${{ steps.select.outputs.tooling }}
-      addons: ${{ steps.select.outputs.addons }}
+      addons: ${{ steps.addons.outputs.addons }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
@@ -46,6 +46,15 @@ jobs:
               python3 scripts/ci/changes.py --base origin/main --merge-base
             fi
           fi
+      - name: Validate index and select planned releases
+        id: addons
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          python3 scripts/release/addon_index.py select
+          if [ -n "$BASE" ] && [ "$BASE" != 0000000000000000000000000000000000000000 ]; then
+            python3 scripts/release/addon_index.py check --base "$BASE"
+          fi
   tooling:
     needs: changes
     if: needs.changes.outputs.tooling == 'true'
@@ -56,6 +65,10 @@ jobs:
           persist-credentials: false
       - run: python3 -m unittest discover -s scripts/release -p 'test_*.py'
       - run: python3 -m unittest discover -s scripts/ci -p 'test_*.py'
+      - name: Validate installer index schema and compatibility requirements
+        run: |
+          rustup toolchain install stable --profile minimal
+          cargo +stable run --quiet --locked --manifest-path crates/addon-sdk/Cargo.toml --example validate-index --target-dir target < addons.json
   test:
     needs: changes
     if: needs.changes.outputs.has_checks == 'true'
@@ -90,6 +103,7 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.changes.outputs.addons != '[]'
     permissions:
       contents: write
+    secrets: inherit
     strategy:
       fail-fast: false
       matrix:

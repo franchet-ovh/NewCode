@@ -32,6 +32,9 @@ def select(paths, root=ROOT):
     tooling = False
     for path in paths:
         p = Path(path)
+        if path == 'addons.json':
+            tooling = True
+            continue
         if p.suffix == '.md' or path.startswith('ui-mocks/') or p.suffix == '.png' and not path.startswith('addons/'):
             continue
         if path.startswith('scripts/release/'):

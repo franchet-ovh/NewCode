@@ -9,6 +9,9 @@ class ChangeTests(unittest.TestCase):
     def test_addon_only(self):
         self.assertEqual(select(['addons/github/src/main.rs'])[0], ['github'])
 
+    def test_index_updates_validate_tooling_without_compiling_every_addon(self):
+        self.assertEqual(select(['addons.json']), ([], True))
+
     def test_editor_only(self):
         self.assertEqual(select(['src/main.rs', 'Cargo.lock'])[0], ['editor'])
 

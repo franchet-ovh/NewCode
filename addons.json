@@ -1,0 +1,1763 @@
+{
+  "schema": 1,
+  "addons": [
+    {
+      "id": "codex",
+      "path": "addons/codex",
+      "versions": [
+        {
+          "version": "0.5.5",
+          "release": "addon_codex_0.5.5",
+          "status": "published",
+          "packages": [
+            {
+              "id": "codex",
+              "name": "Codex",
+              "description": "",
+              "publisher": "",
+              "version": "0.5.5",
+              "protocol": 1,
+              "target": "aarch64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-codex-addon_codex_0.5.5-linux-arm64.tar.gz",
+              "size": 4845991,
+              "sha256": "6f316b23f5f21a3301ca3604092e008277879760a1cf87e36424481ff8bee83c"
+            },
+            {
+              "id": "codex",
+              "name": "Codex",
+              "description": "",
+              "publisher": "",
+              "version": "0.5.5",
+              "protocol": 1,
+              "target": "x86_64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-codex-addon_codex_0.5.5-linux-amd64.tar.gz",
+              "size": 5067803,
+              "sha256": "fa4d5aeb95bbecc0b7cb9d452d9be3ce885efe2886771d6292a60ec2fa279be3"
+            }
+          ],
+          "protocol": 1,
+          "editor_version_req": ">=0.4.8, <0.5.0"
+        },
+        {
+          "version": "0.5.4",
+          "release": "addon_codex_0.5.4",
+          "status": "published",
+          "packages": [
+            {
+              "id": "codex",
+              "name": "Codex",
+              "description": "",
+              "publisher": "",
+              "version": "0.5.4",
+              "protocol": 1,
+              "target": "aarch64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.6.0",
+              "archive": "focus-addon-codex-addon_codex_0.5.4-linux-arm64.tar.gz",
+              "size": 4846273,
+              "sha256": "9cb7eeef267152804ee72872ce376352b2dd5475c6bb9ea662b6eba8341c6157"
+            },
+            {
+              "id": "codex",
+              "name": "Codex",
+              "description": "",
+              "publisher": "",
+              "version": "0.5.4",
+              "protocol": 1,
+              "target": "x86_64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.6.0",
+              "archive": "focus-addon-codex-addon_codex_0.5.4-linux-amd64.tar.gz",
+              "size": 5068040,
+              "sha256": "717769aaad143c2850fd460ba6739eb73d9e992fec1d9b3451e0c2e0760c2cbf"
+            }
+          ],
+          "protocol": 1,
+          "editor_version_req": ">=0.4.8, <0.6.0"
+        },
+        {
+          "version": "0.5.3",
+          "release": "addon_codex_0.5.3",
+          "status": "published",
+          "packages": [
+            {
+              "id": "codex",
+              "name": "Codex",
+              "description": "",
+              "publisher": "",
+              "version": "0.5.3",
+              "protocol": 1,
+              "target": "aarch64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-codex-addon_codex_0.5.3-linux-arm64.tar.gz",
+              "size": 4846126,
+              "sha256": "86ec3f94004cbf0e03b6b0ebc199ce0da1eecf4e7c6d71f80c223e7fad965eed"
+            },
+            {
+              "id": "codex",
+              "name": "Codex",
+              "description": "",
+              "publisher": "",
+              "version": "0.5.3",
+              "protocol": 1,
+              "target": "x86_64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-codex-addon_codex_0.5.3-linux-amd64.tar.gz",
+              "size": 5068162,
+              "sha256": "c7e7b86a458b8114fa169c9039cdb13bc094b200f9648dd602b0658557a9fe48"
+            }
+          ],
+          "protocol": 1,
+          "editor_version_req": ">=0.4.8, <0.5.0"
+        },
+        {
+          "version": "0.5.2",
+          "release": "addon_codex_0.5.2",
+          "status": "published",
+          "packages": [
+            {
+              "id": "codex",
+              "name": "Codex",
+              "description": "",
+              "publisher": "",
+              "version": "0.5.2",
+              "protocol": 1,
+              "target": "aarch64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-codex-addon_codex_0.5.2-linux-arm64.tar.gz",
+              "size": 4845987,
+              "sha256": "63a625ce039a2d6cd83399574dae58f9593fffc45d6dab20d0a31895000aa512"
+            },
+            {
+              "id": "codex",
+              "name": "Codex",
+              "description": "",
+              "publisher": "",
+              "version": "0.5.2",
+              "protocol": 1,
+              "target": "x86_64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-codex-addon_codex_0.5.2-linux-amd64.tar.gz",
+              "size": 5067618,
+              "sha256": "4262b55f82db11a3e86cb4ad2bacaa2d7997ff978087e64fd952c10419266b08"
+            }
+          ],
+          "protocol": 1,
+          "editor_version_req": ">=0.4.8, <0.5.0"
+        },
+        {
+          "version": "0.5.1",
+          "release": "addon_codex_0.5.1",
+          "status": "published",
+          "packages": [
+            {
+              "id": "codex",
+              "name": "Codex",
+              "description": "",
+              "publisher": "",
+              "version": "0.5.1",
+              "protocol": 1,
+              "target": "aarch64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-codex-addon_codex_0.5.1-linux-arm64.tar.gz",
+              "size": 4845907,
+              "sha256": "e05c9f1c23885012a9447eea18c5fb97340dfdc7bc7e4911159b233bbc0d9216"
+            },
+            {
+              "id": "codex",
+              "name": "Codex",
+              "description": "",
+              "publisher": "",
+              "version": "0.5.1",
+              "protocol": 1,
+              "target": "x86_64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-codex-addon_codex_0.5.1-linux-amd64.tar.gz",
+              "size": 5067664,
+              "sha256": "1a43f05600947492c958b6f3e2f377750252042d5d4bf330ce203d8fc773b610"
+            }
+          ],
+          "protocol": 1,
+          "editor_version_req": ">=0.4.8, <0.5.0"
+        },
+        {
+          "version": "0.5.0",
+          "release": "addon_codex_0.5.0",
+          "status": "published",
+          "packages": [
+            {
+              "id": "codex",
+              "name": "Codex",
+              "description": "",
+              "publisher": "",
+              "version": "0.5.0",
+              "protocol": 1,
+              "target": "aarch64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-codex-addon_codex_0.5.0-linux-arm64.tar.gz",
+              "size": 4846798,
+              "sha256": "83031fc82debb5460a5b032f3f5143dc08bd87976eb569366c4681a06bf24877"
+            },
+            {
+              "id": "codex",
+              "name": "Codex",
+              "description": "",
+              "publisher": "",
+              "version": "0.5.0",
+              "protocol": 1,
+              "target": "x86_64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-codex-addon_codex_0.5.0-linux-amd64.tar.gz",
+              "size": 5068097,
+              "sha256": "98c5fe9eafe02db065f007bfece831aa8e8a1aa70de36db13b34f2277038301c"
+            }
+          ],
+          "protocol": 1,
+          "editor_version_req": ">=0.4.8, <0.5.0"
+        },
+        {
+          "version": "0.4.13",
+          "release": "addon_codex_0.4.13",
+          "status": "published",
+          "packages": [
+            {
+              "id": "codex",
+              "name": "Codex",
+              "description": "",
+              "publisher": "",
+              "version": "0.4.13",
+              "protocol": 1,
+              "target": "aarch64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-codex-addon_codex_0.4.13-linux-arm64.tar.gz",
+              "size": 4846202,
+              "sha256": "dc8090b034ad6c83259ed4a4032afa0310e4ed79673ade65ea8da8072035f83e"
+            },
+            {
+              "id": "codex",
+              "name": "Codex",
+              "description": "",
+              "publisher": "",
+              "version": "0.4.13",
+              "protocol": 1,
+              "target": "x86_64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-codex-addon_codex_0.4.13-linux-amd64.tar.gz",
+              "size": 5067923,
+              "sha256": "5992b4d3e4a2601fc886a3853872c2426a3a64467a32f30413eb2a3216057869"
+            }
+          ],
+          "protocol": 1,
+          "editor_version_req": ">=0.4.8, <0.5.0"
+        },
+        {
+          "version": "0.4.12",
+          "release": "addon_codex_0.4.12",
+          "status": "published",
+          "packages": [
+            {
+              "id": "codex",
+              "name": "Codex",
+              "description": "",
+              "publisher": "",
+              "version": "0.4.12",
+              "protocol": 1,
+              "target": "aarch64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-codex-addon_codex_0.4.12-linux-arm64.tar.gz",
+              "size": 4843745,
+              "sha256": "1d58f3e7658dd153fbb3a7a3177d5f3c3894ec3b67acc39278a0a9d60b2d614d"
+            },
+            {
+              "id": "codex",
+              "name": "Codex",
+              "description": "",
+              "publisher": "",
+              "version": "0.4.12",
+              "protocol": 1,
+              "target": "x86_64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-codex-addon_codex_0.4.12-linux-amd64.tar.gz",
+              "size": 5065152,
+              "sha256": "c621f1457845520fb26b08fee4bb03f968c2767821bb6a3db5bc8ca6326651e3"
+            }
+          ],
+          "protocol": 1,
+          "editor_version_req": ">=0.4.8, <0.5.0"
+        },
+        {
+          "version": "0.4.11",
+          "release": "addon_codex_0.4.11",
+          "status": "published",
+          "packages": [
+            {
+              "id": "codex",
+              "name": "Codex",
+              "description": "",
+              "publisher": "",
+              "version": "0.4.11",
+              "protocol": 1,
+              "target": "aarch64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-codex-addon_codex_0.4.11-linux-arm64.tar.gz",
+              "size": 4843952,
+              "sha256": "61b45ec7a5b2c589c59b3bb3ac90778f6ec71768e18b1455a6cc0fef78935cab"
+            },
+            {
+              "id": "codex",
+              "name": "Codex",
+              "description": "",
+              "publisher": "",
+              "version": "0.4.11",
+              "protocol": 1,
+              "target": "x86_64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-codex-addon_codex_0.4.11-linux-amd64.tar.gz",
+              "size": 5064638,
+              "sha256": "fbdde0a227ba8e39173d43ade3330c98284d6fa3615c024edd6cfdc9511f9980"
+            }
+          ],
+          "protocol": 1,
+          "editor_version_req": ">=0.4.8, <0.5.0"
+        },
+        {
+          "version": "0.4.10",
+          "release": "addon_codex_0.4.10",
+          "status": "published",
+          "packages": [
+            {
+              "id": "codex",
+              "name": "Codex",
+              "description": "",
+              "publisher": "",
+              "version": "0.4.10",
+              "protocol": 1,
+              "target": "aarch64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-codex-addon_codex_0.4.10-linux-arm64.tar.gz",
+              "size": 4844056,
+              "sha256": "64c4cfdb5a77c8504c8de52a4f6e84b4b3299b10c545654c1ca38764d19750fc"
+            },
+            {
+              "id": "codex",
+              "name": "Codex",
+              "description": "",
+              "publisher": "",
+              "version": "0.4.10",
+              "protocol": 1,
+              "target": "x86_64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-codex-addon_codex_0.4.10-linux-amd64.tar.gz",
+              "size": 5065070,
+              "sha256": "f0990c8fbf1d245c33c93281891dfc56afcc7ee49d9701ba3aa9100ccb1bb0bd"
+            }
+          ],
+          "protocol": 1,
+          "editor_version_req": ">=0.4.8, <0.5.0"
+        },
+        {
+          "version": "0.4.9",
+          "release": "addon_codex_0.4.9",
+          "status": "published",
+          "packages": [
+            {
+              "id": "codex",
+              "name": "Codex",
+              "description": "",
+              "publisher": "",
+              "version": "0.4.9",
+              "protocol": 1,
+              "target": "aarch64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-codex-addon_codex_0.4.9-linux-arm64.tar.gz",
+              "size": 4843742,
+              "sha256": "19c734f3de89ff9cc1007a855e998960a2a75cde95a4d994426cfad0e132cff2"
+            },
+            {
+              "id": "codex",
+              "name": "Codex",
+              "description": "",
+              "publisher": "",
+              "version": "0.4.9",
+              "protocol": 1,
+              "target": "x86_64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-codex-addon_codex_0.4.9-linux-amd64.tar.gz",
+              "size": 5064625,
+              "sha256": "016d3b3f0a58552a53e07ad438d064d0b3ae88d2538215b5cbddaccf4cb62e5b"
+            }
+          ],
+          "protocol": 1,
+          "editor_version_req": ">=0.4.8, <0.5.0"
+        }
+      ]
+    },
+    {
+      "id": "github",
+      "path": "addons/github",
+      "versions": [
+        {
+          "version": "0.5.5",
+          "release": "addon_github_0.5.5",
+          "status": "published",
+          "packages": [
+            {
+              "id": "github",
+              "name": "GitHub",
+              "description": "GitHub issues, pull requests, and issue branch workflows.",
+              "publisher": "Focus Editor project",
+              "version": "0.5.5",
+              "protocol": 1,
+              "target": "aarch64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-github-addon_github_0.5.5-linux-arm64.tar.gz",
+              "size": 567320,
+              "sha256": "b7c2998aebe0b2320427eeeb96f5db38741deac934fe06628f2e82d86ba8e26b"
+            },
+            {
+              "id": "github",
+              "name": "GitHub",
+              "description": "GitHub issues, pull requests, and issue branch workflows.",
+              "publisher": "Focus Editor project",
+              "version": "0.5.5",
+              "protocol": 1,
+              "target": "x86_64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-github-addon_github_0.5.5-linux-amd64.tar.gz",
+              "size": 591244,
+              "sha256": "c423e6bee552a9ae0435cd635f9ff8a1d06d223f3d24be7f9f0c0f8913efeeec"
+            }
+          ],
+          "protocol": 1,
+          "editor_version_req": ">=0.4.8, <0.5.0"
+        },
+        {
+          "version": "0.5.4",
+          "release": "addon_github_0.5.4",
+          "status": "published",
+          "packages": [
+            {
+              "id": "github",
+              "name": "GitHub",
+              "description": "GitHub issues, pull requests, and issue branch workflows.",
+              "publisher": "Focus Editor project",
+              "version": "0.5.4",
+              "protocol": 1,
+              "target": "aarch64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.6.0",
+              "archive": "focus-addon-github-addon_github_0.5.4-linux-arm64.tar.gz",
+              "size": 567586,
+              "sha256": "5a8b125c33066186f5d1ad57635dac48a120653cc01d504aa5512c97ade242d2"
+            },
+            {
+              "id": "github",
+              "name": "GitHub",
+              "description": "GitHub issues, pull requests, and issue branch workflows.",
+              "publisher": "Focus Editor project",
+              "version": "0.5.4",
+              "protocol": 1,
+              "target": "x86_64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.6.0",
+              "archive": "focus-addon-github-addon_github_0.5.4-linux-amd64.tar.gz",
+              "size": 591278,
+              "sha256": "70f4d95230e37bf4844c4c0497675b16a2d978309e030c8c5bd682a7781e0415"
+            }
+          ],
+          "protocol": 1,
+          "editor_version_req": ">=0.4.8, <0.6.0"
+        },
+        {
+          "version": "0.5.3",
+          "release": "addon_github_0.5.3",
+          "status": "published",
+          "packages": [
+            {
+              "id": "github",
+              "name": "GitHub",
+              "description": "GitHub issues, pull requests, and issue branch workflows.",
+              "publisher": "Focus Editor project",
+              "version": "0.5.3",
+              "protocol": 1,
+              "target": "aarch64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-github-addon_github_0.5.3-linux-arm64.tar.gz",
+              "size": 567354,
+              "sha256": "006cce6479d1eb61f54507f7e35bf1cc18bcf059858a6ac7ed7f956936eede74"
+            },
+            {
+              "id": "github",
+              "name": "GitHub",
+              "description": "GitHub issues, pull requests, and issue branch workflows.",
+              "publisher": "Focus Editor project",
+              "version": "0.5.3",
+              "protocol": 1,
+              "target": "x86_64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-github-addon_github_0.5.3-linux-amd64.tar.gz",
+              "size": 591209,
+              "sha256": "423a172a9bf3887f576e6c4eed7ace02aab83cef085beb54450f6ed283dd9f98"
+            }
+          ],
+          "protocol": 1,
+          "editor_version_req": ">=0.4.8, <0.5.0"
+        },
+        {
+          "version": "0.5.2",
+          "release": "addon_github_0.5.2",
+          "status": "published",
+          "packages": [
+            {
+              "id": "github",
+              "name": "GitHub",
+              "description": "GitHub issues, pull requests, and issue branch workflows.",
+              "publisher": "Focus Editor project",
+              "version": "0.5.2",
+              "protocol": 1,
+              "target": "aarch64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-github-addon_github_0.5.2-linux-arm64.tar.gz",
+              "size": 567440,
+              "sha256": "0d3424290b9e4c2d623f2b01afba386165f751fc8196255b15772934683b88a4"
+            },
+            {
+              "id": "github",
+              "name": "GitHub",
+              "description": "GitHub issues, pull requests, and issue branch workflows.",
+              "publisher": "Focus Editor project",
+              "version": "0.5.2",
+              "protocol": 1,
+              "target": "x86_64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-github-addon_github_0.5.2-linux-amd64.tar.gz",
+              "size": 591231,
+              "sha256": "7ba655accd0f34085304e8f19bc59674948c1e38c93de70374cba2e05253d6dd"
+            }
+          ],
+          "protocol": 1,
+          "editor_version_req": ">=0.4.8, <0.5.0"
+        },
+        {
+          "version": "0.5.1",
+          "release": "addon_github_0.5.1",
+          "status": "published",
+          "packages": [
+            {
+              "id": "github",
+              "name": "GitHub",
+              "description": "GitHub issues, pull requests, and issue branch workflows.",
+              "publisher": "Focus Editor project",
+              "version": "0.5.1",
+              "protocol": 1,
+              "target": "aarch64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-github-addon_github_0.5.1-linux-arm64.tar.gz",
+              "size": 567489,
+              "sha256": "41682d6333883df3f17e45c282a5d037eb82bee1f27507dfe18fd220d03db30b"
+            },
+            {
+              "id": "github",
+              "name": "GitHub",
+              "description": "GitHub issues, pull requests, and issue branch workflows.",
+              "publisher": "Focus Editor project",
+              "version": "0.5.1",
+              "protocol": 1,
+              "target": "x86_64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-github-addon_github_0.5.1-linux-amd64.tar.gz",
+              "size": 591215,
+              "sha256": "c1bca0e65ae69e4018afcd6186bfaf2ce64bc0361c10b84783bd5100d9895651"
+            }
+          ],
+          "protocol": 1,
+          "editor_version_req": ">=0.4.8, <0.5.0"
+        },
+        {
+          "version": "0.5.0",
+          "release": "addon_github_0.5.0",
+          "status": "published",
+          "packages": [
+            {
+              "id": "github",
+              "name": "GitHub",
+              "description": "GitHub issues, pull requests, and issue branch workflows.",
+              "publisher": "Focus Editor project",
+              "version": "0.5.0",
+              "protocol": 1,
+              "target": "aarch64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-github-addon_github_0.5.0-linux-arm64.tar.gz",
+              "size": 567298,
+              "sha256": "9d5a41ac6e4ab79b1f542538374fb251ce4ef31396d0f201ca3c1326708c1d1f"
+            },
+            {
+              "id": "github",
+              "name": "GitHub",
+              "description": "GitHub issues, pull requests, and issue branch workflows.",
+              "publisher": "Focus Editor project",
+              "version": "0.5.0",
+              "protocol": 1,
+              "target": "x86_64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-github-addon_github_0.5.0-linux-amd64.tar.gz",
+              "size": 591234,
+              "sha256": "00e14545526608d623077042d33017199ac7844d175edd81b5f9db0a08902621"
+            }
+          ],
+          "protocol": 1,
+          "editor_version_req": ">=0.4.8, <0.5.0"
+        },
+        {
+          "version": "0.4.13",
+          "release": "addon_github_0.4.13",
+          "status": "published",
+          "packages": [
+            {
+              "id": "github",
+              "name": "GitHub",
+              "description": "GitHub issues, pull requests, and issue branch workflows.",
+              "publisher": "Focus Editor project",
+              "version": "0.4.13",
+              "protocol": 1,
+              "target": "aarch64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-github-addon_github_0.4.13-linux-arm64.tar.gz",
+              "size": 567466,
+              "sha256": "a8cee2879549ffa02b054318d34e9549ac88eb515f0ab44dad333a546ce61c7c"
+            },
+            {
+              "id": "github",
+              "name": "GitHub",
+              "description": "GitHub issues, pull requests, and issue branch workflows.",
+              "publisher": "Focus Editor project",
+              "version": "0.4.13",
+              "protocol": 1,
+              "target": "x86_64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-github-addon_github_0.4.13-linux-amd64.tar.gz",
+              "size": 591280,
+              "sha256": "f57bf1153b16facf7ede50f02a7a310fd2096bc7f378f5d841b0a3d535d288a4"
+            }
+          ],
+          "protocol": 1,
+          "editor_version_req": ">=0.4.8, <0.5.0"
+        },
+        {
+          "version": "0.4.12",
+          "release": "addon_github_0.4.12",
+          "status": "published",
+          "packages": [
+            {
+              "id": "github",
+              "name": "GitHub",
+              "description": "GitHub issues, pull requests, and issue branch workflows.",
+              "publisher": "Focus Editor project",
+              "version": "0.4.12",
+              "protocol": 1,
+              "target": "aarch64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-github-addon_github_0.4.12-linux-arm64.tar.gz",
+              "size": 544085,
+              "sha256": "3b61f715984e36a93b687b30cd7022cdde03376c325e68ca760d063b915e6c2e"
+            },
+            {
+              "id": "github",
+              "name": "GitHub",
+              "description": "GitHub issues, pull requests, and issue branch workflows.",
+              "publisher": "Focus Editor project",
+              "version": "0.4.12",
+              "protocol": 1,
+              "target": "x86_64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-github-addon_github_0.4.12-linux-amd64.tar.gz",
+              "size": 568027,
+              "sha256": "1781b7f2ade522b54585d2d1cefad4de8ae727715bc0065c6c92a949b407fb3f"
+            }
+          ],
+          "protocol": 1,
+          "editor_version_req": ">=0.4.8, <0.5.0"
+        },
+        {
+          "version": "0.4.11",
+          "release": "addon_github_0.4.11",
+          "status": "published",
+          "packages": [
+            {
+              "id": "github",
+              "name": "GitHub",
+              "description": "GitHub issues, pull requests, and issue branch workflows.",
+              "publisher": "Focus Editor project",
+              "version": "0.4.11",
+              "protocol": 1,
+              "target": "aarch64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-github-addon_github_0.4.11-linux-arm64.tar.gz",
+              "size": 544063,
+              "sha256": "690634c75eeaa2b4c3d7cb3e2921fc317bad61b37ee3f442d6d4815f172916fd"
+            },
+            {
+              "id": "github",
+              "name": "GitHub",
+              "description": "GitHub issues, pull requests, and issue branch workflows.",
+              "publisher": "Focus Editor project",
+              "version": "0.4.11",
+              "protocol": 1,
+              "target": "x86_64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-github-addon_github_0.4.11-linux-amd64.tar.gz",
+              "size": 568066,
+              "sha256": "1020361f5e50826f6b9520000a099e34dea8f39e49777dce8b98b155d9f6cdd7"
+            }
+          ],
+          "protocol": 1,
+          "editor_version_req": ">=0.4.8, <0.5.0"
+        },
+        {
+          "version": "0.4.10",
+          "release": "addon_github_0.4.10",
+          "status": "published",
+          "packages": [
+            {
+              "id": "github",
+              "name": "GitHub",
+              "description": "GitHub issues, pull requests, and issue branch workflows.",
+              "publisher": "Focus Editor project",
+              "version": "0.4.10",
+              "protocol": 1,
+              "target": "aarch64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-github-addon_github_0.4.10-linux-arm64.tar.gz",
+              "size": 544238,
+              "sha256": "bad2f8cbd3304a53fafca35836fb697a96e96a67f2d931bd5659ddda93a86dd4"
+            },
+            {
+              "id": "github",
+              "name": "GitHub",
+              "description": "GitHub issues, pull requests, and issue branch workflows.",
+              "publisher": "Focus Editor project",
+              "version": "0.4.10",
+              "protocol": 1,
+              "target": "x86_64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-github-addon_github_0.4.10-linux-amd64.tar.gz",
+              "size": 568039,
+              "sha256": "12be4774e22c4fb284d1fd147a26c55bc9b7708b495a4838c05e6d1b74dd02bb"
+            }
+          ],
+          "protocol": 1,
+          "editor_version_req": ">=0.4.8, <0.5.0"
+        },
+        {
+          "version": "0.4.9",
+          "release": "addon_github_0.4.9",
+          "status": "published",
+          "packages": [
+            {
+              "id": "github",
+              "name": "GitHub",
+              "description": "GitHub issues, pull requests, and issue branch workflows.",
+              "publisher": "Focus Editor project",
+              "version": "0.4.9",
+              "protocol": 1,
+              "target": "aarch64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-github-addon_github_0.4.9-linux-arm64.tar.gz",
+              "size": 544191,
+              "sha256": "e52bfadc75463addcd16e921e0a30029267b497a58dcb87699229cae4caa826b"
+            },
+            {
+              "id": "github",
+              "name": "GitHub",
+              "description": "GitHub issues, pull requests, and issue branch workflows.",
+              "publisher": "Focus Editor project",
+              "version": "0.4.9",
+              "protocol": 1,
+              "target": "x86_64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-github-addon_github_0.4.9-linux-amd64.tar.gz",
+              "size": 568066,
+              "sha256": "b6140fc11114db12a972c83e0e14c17098c1cd0dfd59ec92cb80fb02d0e7fe03"
+            }
+          ],
+          "protocol": 1,
+          "editor_version_req": ">=0.4.8, <0.5.0"
+        }
+      ]
+    },
+    {
+      "id": "lsp-python",
+      "path": "addons/lsp-python",
+      "versions": [
+        {
+          "version": "0.5.5",
+          "release": "addon_lsp-python_0.5.5",
+          "status": "published",
+          "packages": [
+            {
+              "id": "lsp-python",
+              "name": "Python",
+              "description": "Python completion, mypy type checking, linting, formatting, and symbols.",
+              "publisher": "Focus Editor project",
+              "version": "0.5.5",
+              "protocol": 1,
+              "target": "aarch64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-lsp-python-addon_lsp-python_0.5.5-linux-arm64.tar.gz",
+              "size": 393906,
+              "sha256": "fd68a78bd86ecac8890b948f3500f6f415de302da060e722d2caf8ef135c9e7a"
+            },
+            {
+              "id": "lsp-python",
+              "name": "Python",
+              "description": "Python completion, mypy type checking, linting, formatting, and symbols.",
+              "publisher": "Focus Editor project",
+              "version": "0.5.5",
+              "protocol": 1,
+              "target": "x86_64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-lsp-python-addon_lsp-python_0.5.5-linux-amd64.tar.gz",
+              "size": 405174,
+              "sha256": "8b5a1edbde748f57c573ff47b1e00fadf5d0a1a657294f23799b617bf4c839b7"
+            }
+          ],
+          "protocol": 1,
+          "editor_version_req": ">=0.4.8, <0.5.0"
+        },
+        {
+          "version": "0.5.4",
+          "release": "addon_lsp-python_0.5.4",
+          "status": "published",
+          "packages": [
+            {
+              "id": "lsp-python",
+              "name": "Python",
+              "description": "Python completion, mypy type checking, linting, formatting, and symbols.",
+              "publisher": "Focus Editor project",
+              "version": "0.5.4",
+              "protocol": 1,
+              "target": "aarch64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.6.0",
+              "archive": "focus-addon-lsp-python-addon_lsp-python_0.5.4-linux-arm64.tar.gz",
+              "size": 393918,
+              "sha256": "08a3b31791fcc098496aa5962d472d84f2f567a863c5cb26ce8c04f2f6e5ae9a"
+            },
+            {
+              "id": "lsp-python",
+              "name": "Python",
+              "description": "Python completion, mypy type checking, linting, formatting, and symbols.",
+              "publisher": "Focus Editor project",
+              "version": "0.5.4",
+              "protocol": 1,
+              "target": "x86_64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.6.0",
+              "archive": "focus-addon-lsp-python-addon_lsp-python_0.5.4-linux-amd64.tar.gz",
+              "size": 405159,
+              "sha256": "aa7bea7c6cf89a74f850119502b85f064e2655180523782e1364e610ca7bc639"
+            }
+          ],
+          "protocol": 1,
+          "editor_version_req": ">=0.4.8, <0.6.0"
+        },
+        {
+          "version": "0.5.3",
+          "release": "addon_lsp-python_0.5.3",
+          "status": "published",
+          "packages": [
+            {
+              "id": "lsp-python",
+              "name": "Python",
+              "description": "Python completion, mypy type checking, linting, formatting, and symbols.",
+              "publisher": "Focus Editor project",
+              "version": "0.5.3",
+              "protocol": 1,
+              "target": "aarch64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-lsp-python-addon_lsp-python_0.5.3-linux-arm64.tar.gz",
+              "size": 393899,
+              "sha256": "4ed9a53de63806336a54d7dad2423b4db6b449e26436ba28d30ffa4a931302f5"
+            },
+            {
+              "id": "lsp-python",
+              "name": "Python",
+              "description": "Python completion, mypy type checking, linting, formatting, and symbols.",
+              "publisher": "Focus Editor project",
+              "version": "0.5.3",
+              "protocol": 1,
+              "target": "x86_64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-lsp-python-addon_lsp-python_0.5.3-linux-amd64.tar.gz",
+              "size": 405164,
+              "sha256": "5857a91b1787ead9446c2bdfb85de7e83764b0fcf657910708bf2817df092c7d"
+            }
+          ],
+          "protocol": 1,
+          "editor_version_req": ">=0.4.8, <0.5.0"
+        },
+        {
+          "version": "0.5.2",
+          "release": "addon_lsp-python_0.5.2",
+          "status": "published",
+          "packages": [
+            {
+              "id": "lsp-python",
+              "name": "Python",
+              "description": "Python completion, mypy type checking, linting, formatting, and symbols.",
+              "publisher": "Focus Editor project",
+              "version": "0.5.2",
+              "protocol": 1,
+              "target": "aarch64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-lsp-python-addon_lsp-python_0.5.2-linux-arm64.tar.gz",
+              "size": 393895,
+              "sha256": "7b22febea03c2c861a144b8513ce6974d9b8edb8e224ff8a599b3a36cfa2b813"
+            },
+            {
+              "id": "lsp-python",
+              "name": "Python",
+              "description": "Python completion, mypy type checking, linting, formatting, and symbols.",
+              "publisher": "Focus Editor project",
+              "version": "0.5.2",
+              "protocol": 1,
+              "target": "x86_64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-lsp-python-addon_lsp-python_0.5.2-linux-amd64.tar.gz",
+              "size": 405175,
+              "sha256": "afe3c71a07ed1054d2677567f3cde66e6678102f5a1135ddb7f5c8768c478d77"
+            }
+          ],
+          "protocol": 1,
+          "editor_version_req": ">=0.4.8, <0.5.0"
+        },
+        {
+          "version": "0.5.1",
+          "release": "addon_lsp-python_0.5.1",
+          "status": "published",
+          "packages": [
+            {
+              "id": "lsp-python",
+              "name": "Python",
+              "description": "Python completion, mypy type checking, linting, formatting, and symbols.",
+              "publisher": "Focus Editor project",
+              "version": "0.5.1",
+              "protocol": 1,
+              "target": "aarch64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-lsp-python-addon_lsp-python_0.5.1-linux-arm64.tar.gz",
+              "size": 393910,
+              "sha256": "df0e6b4a218b0e5d70a009671aa4433972d64707475945a289df0e80cc4cc92a"
+            },
+            {
+              "id": "lsp-python",
+              "name": "Python",
+              "description": "Python completion, mypy type checking, linting, formatting, and symbols.",
+              "publisher": "Focus Editor project",
+              "version": "0.5.1",
+              "protocol": 1,
+              "target": "x86_64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-lsp-python-addon_lsp-python_0.5.1-linux-amd64.tar.gz",
+              "size": 405169,
+              "sha256": "269495ff491be175ecc8cef47d9ca5687063bbaf376fc7d6a924a22ff2c5dcd2"
+            }
+          ],
+          "protocol": 1,
+          "editor_version_req": ">=0.4.8, <0.5.0"
+        },
+        {
+          "version": "0.5.0",
+          "release": "addon_lsp-python_0.5.0",
+          "status": "published",
+          "packages": [
+            {
+              "id": "lsp-python",
+              "name": "Python",
+              "description": "Python completion, mypy type checking, linting, formatting, and symbols.",
+              "publisher": "Focus Editor project",
+              "version": "0.5.0",
+              "protocol": 1,
+              "target": "aarch64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-lsp-python-addon_lsp-python_0.5.0-linux-arm64.tar.gz",
+              "size": 393904,
+              "sha256": "4fd9465ff6adf1dee8765ae9a5b6f96d2423d31c7b1eb3a043fade494d51ec32"
+            },
+            {
+              "id": "lsp-python",
+              "name": "Python",
+              "description": "Python completion, mypy type checking, linting, formatting, and symbols.",
+              "publisher": "Focus Editor project",
+              "version": "0.5.0",
+              "protocol": 1,
+              "target": "x86_64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-lsp-python-addon_lsp-python_0.5.0-linux-amd64.tar.gz",
+              "size": 405152,
+              "sha256": "7ba5c47ab1c99192411dade210158a83c7f6f2e09e7332219beb6e5a76a27f6a"
+            }
+          ],
+          "protocol": 1,
+          "editor_version_req": ">=0.4.8, <0.5.0"
+        },
+        {
+          "version": "0.4.14",
+          "release": "addon_lsp-python_0.4.14",
+          "status": "published",
+          "packages": [
+            {
+              "id": "lsp-python",
+              "name": "Python",
+              "description": "Python completion, mypy type checking, linting, formatting, and symbols.",
+              "publisher": "Focus Editor project",
+              "version": "0.4.14",
+              "protocol": 1,
+              "target": "aarch64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-lsp-python-addon_lsp-python_0.4.14-linux-arm64.tar.gz",
+              "size": 393915,
+              "sha256": "f05d8674683eab8138231a7e967e0efadb05737bb529f70b42114a3e038a6c6f"
+            },
+            {
+              "id": "lsp-python",
+              "name": "Python",
+              "description": "Python completion, mypy type checking, linting, formatting, and symbols.",
+              "publisher": "Focus Editor project",
+              "version": "0.4.14",
+              "protocol": 1,
+              "target": "x86_64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-lsp-python-addon_lsp-python_0.4.14-linux-amd64.tar.gz",
+              "size": 405154,
+              "sha256": "3bc20a3ed665b11def9d567f4d9ca9a16bc9c52a875c0005a5eac9a4a78efde4"
+            }
+          ],
+          "protocol": 1,
+          "editor_version_req": ">=0.4.8, <0.5.0"
+        },
+        {
+          "version": "0.4.13",
+          "release": "addon_lsp-python_0.4.13",
+          "status": "published",
+          "packages": [
+            {
+              "id": "lsp-python",
+              "name": "Python",
+              "description": "Python completion, mypy type checking, linting, formatting, and symbols.",
+              "publisher": "Focus Editor project",
+              "version": "0.4.13",
+              "protocol": 1,
+              "target": "aarch64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-lsp-python-addon_lsp-python_0.4.13-linux-arm64.tar.gz",
+              "size": 391907,
+              "sha256": "f4e41d19e9f873c9cba7b6da00231dff529fcada6c2c630f58effea6bc7b06c0"
+            },
+            {
+              "id": "lsp-python",
+              "name": "Python",
+              "description": "Python completion, mypy type checking, linting, formatting, and symbols.",
+              "publisher": "Focus Editor project",
+              "version": "0.4.13",
+              "protocol": 1,
+              "target": "x86_64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-lsp-python-addon_lsp-python_0.4.13-linux-amd64.tar.gz",
+              "size": 402250,
+              "sha256": "9b9c327f8f423f557a79f137fe4c1366e579b9bf3d3ecae92805b2a3a7a8b99e"
+            }
+          ],
+          "protocol": 1,
+          "editor_version_req": ">=0.4.8, <0.5.0"
+        },
+        {
+          "version": "0.4.12",
+          "release": "addon_lsp-python_0.4.12",
+          "status": "reserved",
+          "packages": []
+        },
+        {
+          "version": "0.4.11",
+          "release": "addon_lsp-python_0.4.11",
+          "status": "reserved",
+          "packages": []
+        },
+        {
+          "version": "0.4.10",
+          "release": "addon_lsp-python_0.4.10",
+          "status": "reserved",
+          "packages": []
+        },
+        {
+          "version": "0.4.9",
+          "release": "addon_lsp-python_0.4.9",
+          "status": "reserved",
+          "packages": []
+        }
+      ]
+    },
+    {
+      "id": "lsp-rust",
+      "path": "addons/lsp-rust",
+      "versions": [
+        {
+          "version": "0.5.5",
+          "release": "addon_lsp-rust_0.5.5",
+          "status": "published",
+          "packages": [
+            {
+              "id": "lsp-rust",
+              "name": "Rust",
+              "description": "Rust completion, type checking, Clippy linting, formatting, and symbols.",
+              "publisher": "Focus Editor project",
+              "version": "0.5.5",
+              "protocol": 1,
+              "target": "aarch64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-lsp-rust-addon_lsp-rust_0.5.5-linux-arm64.tar.gz",
+              "size": 393911,
+              "sha256": "ee4f0775344a55b3364812ab56d56667497eed03dd4c84cc316d9586bd0612aa"
+            },
+            {
+              "id": "lsp-rust",
+              "name": "Rust",
+              "description": "Rust completion, type checking, Clippy linting, formatting, and symbols.",
+              "publisher": "Focus Editor project",
+              "version": "0.5.5",
+              "protocol": 1,
+              "target": "x86_64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-lsp-rust-addon_lsp-rust_0.5.5-linux-amd64.tar.gz",
+              "size": 405114,
+              "sha256": "14f9d9a24d74efea510c22fad59873e46f161dc08c0b53e02db85bd220ef6921"
+            }
+          ],
+          "protocol": 1,
+          "editor_version_req": ">=0.4.8, <0.5.0"
+        },
+        {
+          "version": "0.5.4",
+          "release": "addon_lsp-rust_0.5.4",
+          "status": "published",
+          "packages": [
+            {
+              "id": "lsp-rust",
+              "name": "Rust",
+              "description": "Rust completion, type checking, Clippy linting, formatting, and symbols.",
+              "publisher": "Focus Editor project",
+              "version": "0.5.4",
+              "protocol": 1,
+              "target": "aarch64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.6.0",
+              "archive": "focus-addon-lsp-rust-addon_lsp-rust_0.5.4-linux-arm64.tar.gz",
+              "size": 393915,
+              "sha256": "dd3e74d5ad858f930a602d77a81bbf427ba07c3859150da2ffbd2b2ecbc3d1ea"
+            },
+            {
+              "id": "lsp-rust",
+              "name": "Rust",
+              "description": "Rust completion, type checking, Clippy linting, formatting, and symbols.",
+              "publisher": "Focus Editor project",
+              "version": "0.5.4",
+              "protocol": 1,
+              "target": "x86_64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.6.0",
+              "archive": "focus-addon-lsp-rust-addon_lsp-rust_0.5.4-linux-amd64.tar.gz",
+              "size": 405126,
+              "sha256": "09cb73a43bdd479700fa05db7dda366459a361346b700540d5c1515edc14bb80"
+            }
+          ],
+          "protocol": 1,
+          "editor_version_req": ">=0.4.8, <0.6.0"
+        },
+        {
+          "version": "0.5.3",
+          "release": "addon_lsp-rust_0.5.3",
+          "status": "published",
+          "packages": [
+            {
+              "id": "lsp-rust",
+              "name": "Rust",
+              "description": "Rust completion, type checking, Clippy linting, formatting, and symbols.",
+              "publisher": "Focus Editor project",
+              "version": "0.5.3",
+              "protocol": 1,
+              "target": "aarch64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-lsp-rust-addon_lsp-rust_0.5.3-linux-arm64.tar.gz",
+              "size": 393889,
+              "sha256": "10493908f9bd15459aea382b5d186164c831faf1f06d3554336997090023272f"
+            },
+            {
+              "id": "lsp-rust",
+              "name": "Rust",
+              "description": "Rust completion, type checking, Clippy linting, formatting, and symbols.",
+              "publisher": "Focus Editor project",
+              "version": "0.5.3",
+              "protocol": 1,
+              "target": "x86_64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-lsp-rust-addon_lsp-rust_0.5.3-linux-amd64.tar.gz",
+              "size": 405120,
+              "sha256": "b1a4dcc39cddd551021ee248d8874a6e21b28950f79d472205bda93ec61ccad2"
+            }
+          ],
+          "protocol": 1,
+          "editor_version_req": ">=0.4.8, <0.5.0"
+        },
+        {
+          "version": "0.5.2",
+          "release": "addon_lsp-rust_0.5.2",
+          "status": "published",
+          "packages": [
+            {
+              "id": "lsp-rust",
+              "name": "Rust",
+              "description": "Rust completion, type checking, Clippy linting, formatting, and symbols.",
+              "publisher": "Focus Editor project",
+              "version": "0.5.2",
+              "protocol": 1,
+              "target": "aarch64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-lsp-rust-addon_lsp-rust_0.5.2-linux-arm64.tar.gz",
+              "size": 393904,
+              "sha256": "f41bf00b4f6fa0d7d96b750f1834fdbe61dba71d70a9da3f7ac7b21014a36c48"
+            },
+            {
+              "id": "lsp-rust",
+              "name": "Rust",
+              "description": "Rust completion, type checking, Clippy linting, formatting, and symbols.",
+              "publisher": "Focus Editor project",
+              "version": "0.5.2",
+              "protocol": 1,
+              "target": "x86_64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-lsp-rust-addon_lsp-rust_0.5.2-linux-amd64.tar.gz",
+              "size": 405115,
+              "sha256": "d2d551ecf3adc92ec7041e3e09cd9ea62b562dd3b1f17f484df20a09a6cf59f3"
+            }
+          ],
+          "protocol": 1,
+          "editor_version_req": ">=0.4.8, <0.5.0"
+        },
+        {
+          "version": "0.5.1",
+          "release": "addon_lsp-rust_0.5.1",
+          "status": "published",
+          "packages": [
+            {
+              "id": "lsp-rust",
+              "name": "Rust",
+              "description": "Rust completion, type checking, Clippy linting, formatting, and symbols.",
+              "publisher": "Focus Editor project",
+              "version": "0.5.1",
+              "protocol": 1,
+              "target": "aarch64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-lsp-rust-addon_lsp-rust_0.5.1-linux-arm64.tar.gz",
+              "size": 393881,
+              "sha256": "8f65de143d5e3a149023dd81c9fc4472dd12d7f98e678fdb039dea2fced5dbf0"
+            },
+            {
+              "id": "lsp-rust",
+              "name": "Rust",
+              "description": "Rust completion, type checking, Clippy linting, formatting, and symbols.",
+              "publisher": "Focus Editor project",
+              "version": "0.5.1",
+              "protocol": 1,
+              "target": "x86_64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-lsp-rust-addon_lsp-rust_0.5.1-linux-amd64.tar.gz",
+              "size": 405109,
+              "sha256": "705399fad34dd72aa7697b9dbbd524007c9ed67c0c8de2bdc31a2f1386fc1237"
+            }
+          ],
+          "protocol": 1,
+          "editor_version_req": ">=0.4.8, <0.5.0"
+        },
+        {
+          "version": "0.5.0",
+          "release": "addon_lsp-rust_0.5.0",
+          "status": "published",
+          "packages": [
+            {
+              "id": "lsp-rust",
+              "name": "Rust",
+              "description": "Rust completion, type checking, Clippy linting, formatting, and symbols.",
+              "publisher": "Focus Editor project",
+              "version": "0.5.0",
+              "protocol": 1,
+              "target": "aarch64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-lsp-rust-addon_lsp-rust_0.5.0-linux-arm64.tar.gz",
+              "size": 393901,
+              "sha256": "7382dd79757740b685e3f62264eb2cd9e1f32d1320bbf09d06bd9927db9ad37d"
+            },
+            {
+              "id": "lsp-rust",
+              "name": "Rust",
+              "description": "Rust completion, type checking, Clippy linting, formatting, and symbols.",
+              "publisher": "Focus Editor project",
+              "version": "0.5.0",
+              "protocol": 1,
+              "target": "x86_64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-lsp-rust-addon_lsp-rust_0.5.0-linux-amd64.tar.gz",
+              "size": 405127,
+              "sha256": "99ff62c42813ad758d618ce495732b31b89fe0386b973e56b3672beedcbfdd2e"
+            }
+          ],
+          "protocol": 1,
+          "editor_version_req": ">=0.4.8, <0.5.0"
+        },
+        {
+          "version": "0.4.14",
+          "release": "addon_lsp-rust_0.4.14",
+          "status": "published",
+          "packages": [
+            {
+              "id": "lsp-rust",
+              "name": "Rust",
+              "description": "Rust completion, type checking, Clippy linting, formatting, and symbols.",
+              "publisher": "Focus Editor project",
+              "version": "0.4.14",
+              "protocol": 1,
+              "target": "aarch64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-lsp-rust-addon_lsp-rust_0.4.14-linux-arm64.tar.gz",
+              "size": 393899,
+              "sha256": "771515af4041aa4a265469d4fa74db37170b2e56eeff33d4a1c643e28c35fa1b"
+            },
+            {
+              "id": "lsp-rust",
+              "name": "Rust",
+              "description": "Rust completion, type checking, Clippy linting, formatting, and symbols.",
+              "publisher": "Focus Editor project",
+              "version": "0.4.14",
+              "protocol": 1,
+              "target": "x86_64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-lsp-rust-addon_lsp-rust_0.4.14-linux-amd64.tar.gz",
+              "size": 405130,
+              "sha256": "81713780289311d2f7b3d113f2bf1a5c551b8a4db4dc18e62d754f6fff75c0d2"
+            }
+          ],
+          "protocol": 1,
+          "editor_version_req": ">=0.4.8, <0.5.0"
+        },
+        {
+          "version": "0.4.13",
+          "release": "addon_lsp-rust_0.4.13",
+          "status": "published",
+          "packages": [
+            {
+              "id": "lsp-rust",
+              "name": "Rust",
+              "description": "Rust completion, type checking, Clippy linting, formatting, and symbols.",
+              "publisher": "Focus Editor project",
+              "version": "0.4.13",
+              "protocol": 1,
+              "target": "aarch64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-lsp-rust-addon_lsp-rust_0.4.13-linux-arm64.tar.gz",
+              "size": 391896,
+              "sha256": "7492e775f47ed63613a7934e7126c07f1d2c36aa58d785c3b51af58bd3fa9f25"
+            },
+            {
+              "id": "lsp-rust",
+              "name": "Rust",
+              "description": "Rust completion, type checking, Clippy linting, formatting, and symbols.",
+              "publisher": "Focus Editor project",
+              "version": "0.4.13",
+              "protocol": 1,
+              "target": "x86_64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-lsp-rust-addon_lsp-rust_0.4.13-linux-amd64.tar.gz",
+              "size": 402275,
+              "sha256": "732d94d3422c00515e4233f36c9a897781d93dadde5385280c92413c06c2127f"
+            }
+          ],
+          "protocol": 1,
+          "editor_version_req": ">=0.4.8, <0.5.0"
+        },
+        {
+          "version": "0.4.12",
+          "release": "addon_lsp-rust_0.4.12",
+          "status": "reserved",
+          "packages": []
+        },
+        {
+          "version": "0.4.11",
+          "release": "addon_lsp-rust_0.4.11",
+          "status": "reserved",
+          "packages": []
+        },
+        {
+          "version": "0.4.10",
+          "release": "addon_lsp-rust_0.4.10",
+          "status": "reserved",
+          "packages": []
+        },
+        {
+          "version": "0.4.9",
+          "release": "addon_lsp-rust_0.4.9",
+          "status": "reserved",
+          "packages": []
+        }
+      ]
+    },
+    {
+      "id": "opencode",
+      "path": "addons/opencode",
+      "versions": [
+        {
+          "version": "0.5.5",
+          "release": "addon_opencode_0.5.5",
+          "status": "published",
+          "packages": [
+            {
+              "id": "opencode",
+              "name": "OpenCode",
+              "description": "",
+              "publisher": "",
+              "version": "0.5.5",
+              "protocol": 1,
+              "target": "aarch64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-opencode-addon_opencode_0.5.5-linux-arm64.tar.gz",
+              "size": 6508062,
+              "sha256": "3cdfad5d7d433abfcb5253796f1be77c989f8e814eef9f3e6f2d4ba8b4fee7f4"
+            },
+            {
+              "id": "opencode",
+              "name": "OpenCode",
+              "description": "",
+              "publisher": "",
+              "version": "0.5.5",
+              "protocol": 1,
+              "target": "x86_64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-opencode-addon_opencode_0.5.5-linux-amd64.tar.gz",
+              "size": 6671458,
+              "sha256": "68c34ad03ba9bd9dfb2e448bbdd157a9a3e003351f29b2b0009a6c9d3b89eec9"
+            }
+          ],
+          "protocol": 1,
+          "editor_version_req": ">=0.4.8, <0.5.0"
+        },
+        {
+          "version": "0.5.4",
+          "release": "addon_opencode_0.5.4",
+          "status": "published",
+          "packages": [
+            {
+              "id": "opencode",
+              "name": "OpenCode",
+              "description": "",
+              "publisher": "",
+              "version": "0.5.4",
+              "protocol": 1,
+              "target": "aarch64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.6.0",
+              "archive": "focus-addon-opencode-addon_opencode_0.5.4-linux-arm64.tar.gz",
+              "size": 6507084,
+              "sha256": "bd782a6ebb6dd50e858fc41f5dec2b45856b1d64e80f543deda2d0a60ace4370"
+            },
+            {
+              "id": "opencode",
+              "name": "OpenCode",
+              "description": "",
+              "publisher": "",
+              "version": "0.5.4",
+              "protocol": 1,
+              "target": "x86_64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.6.0",
+              "archive": "focus-addon-opencode-addon_opencode_0.5.4-linux-amd64.tar.gz",
+              "size": 6671267,
+              "sha256": "84236bbb8492cc794087e9e491a4ceeafe3d822e6ef4a809622d2205caf77a06"
+            }
+          ],
+          "protocol": 1,
+          "editor_version_req": ">=0.4.8, <0.6.0"
+        },
+        {
+          "version": "0.5.3",
+          "release": "addon_opencode_0.5.3",
+          "status": "published",
+          "packages": [
+            {
+              "id": "opencode",
+              "name": "OpenCode",
+              "description": "",
+              "publisher": "",
+              "version": "0.5.3",
+              "protocol": 1,
+              "target": "aarch64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-opencode-addon_opencode_0.5.3-linux-arm64.tar.gz",
+              "size": 6507919,
+              "sha256": "87ff358df48465cda012b1617378700c386bc1d3e8ed02b468664bb8945339fe"
+            },
+            {
+              "id": "opencode",
+              "name": "OpenCode",
+              "description": "",
+              "publisher": "",
+              "version": "0.5.3",
+              "protocol": 1,
+              "target": "x86_64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-opencode-addon_opencode_0.5.3-linux-amd64.tar.gz",
+              "size": 6671820,
+              "sha256": "683bb62e99493c2035ca0bae9de69dbc5f1ad0ce3494ea3ce7a42aa7ebd81154"
+            }
+          ],
+          "protocol": 1,
+          "editor_version_req": ">=0.4.8, <0.5.0"
+        },
+        {
+          "version": "0.5.2",
+          "release": "addon_opencode_0.5.2",
+          "status": "published",
+          "packages": [
+            {
+              "id": "opencode",
+              "name": "OpenCode",
+              "description": "",
+              "publisher": "",
+              "version": "0.5.2",
+              "protocol": 1,
+              "target": "aarch64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-opencode-addon_opencode_0.5.2-linux-arm64.tar.gz",
+              "size": 6506447,
+              "sha256": "0170474787c3558a3a259f0039702c2e6ef6e9bf478fd7017d4c416920e15d94"
+            },
+            {
+              "id": "opencode",
+              "name": "OpenCode",
+              "description": "",
+              "publisher": "",
+              "version": "0.5.2",
+              "protocol": 1,
+              "target": "x86_64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-opencode-addon_opencode_0.5.2-linux-amd64.tar.gz",
+              "size": 6671522,
+              "sha256": "4339e713607734449325933ce35489a02342a3080c83904622f28b527b10fb32"
+            }
+          ],
+          "protocol": 1,
+          "editor_version_req": ">=0.4.8, <0.5.0"
+        },
+        {
+          "version": "0.5.1",
+          "release": "addon_opencode_0.5.1",
+          "status": "published",
+          "packages": [
+            {
+              "id": "opencode",
+              "name": "OpenCode",
+              "description": "",
+              "publisher": "",
+              "version": "0.5.1",
+              "protocol": 1,
+              "target": "aarch64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-opencode-addon_opencode_0.5.1-linux-arm64.tar.gz",
+              "size": 6506507,
+              "sha256": "85e714237f04b61828995ac0ec889c1dbd4bd500f699cabcf8204c94ac2bc1fb"
+            },
+            {
+              "id": "opencode",
+              "name": "OpenCode",
+              "description": "",
+              "publisher": "",
+              "version": "0.5.1",
+              "protocol": 1,
+              "target": "x86_64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-opencode-addon_opencode_0.5.1-linux-amd64.tar.gz",
+              "size": 6671443,
+              "sha256": "b3180c719f91a5df7401b619b0a36e5587d1af82164c1dceab64e1aa2a9ae279"
+            }
+          ],
+          "protocol": 1,
+          "editor_version_req": ">=0.4.8, <0.5.0"
+        },
+        {
+          "version": "0.5.0",
+          "release": "addon_opencode_0.5.0",
+          "status": "published",
+          "packages": [
+            {
+              "id": "opencode",
+              "name": "OpenCode",
+              "description": "",
+              "publisher": "",
+              "version": "0.5.0",
+              "protocol": 1,
+              "target": "aarch64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-opencode-addon_opencode_0.5.0-linux-arm64.tar.gz",
+              "size": 6506167,
+              "sha256": "9d18bea549c1e3f59dcad37a91684dff99d60a13b08a00ad66b7db082405179e"
+            },
+            {
+              "id": "opencode",
+              "name": "OpenCode",
+              "description": "",
+              "publisher": "",
+              "version": "0.5.0",
+              "protocol": 1,
+              "target": "x86_64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-opencode-addon_opencode_0.5.0-linux-amd64.tar.gz",
+              "size": 6671825,
+              "sha256": "4bbdfc958f9bd8eaaee738309055226653b149d9456648b789fda81c4173fa59"
+            }
+          ],
+          "protocol": 1,
+          "editor_version_req": ">=0.4.8, <0.5.0"
+        },
+        {
+          "version": "0.4.12",
+          "release": "addon_opencode_0.4.12",
+          "status": "published",
+          "packages": [
+            {
+              "id": "opencode",
+              "name": "OpenCode",
+              "description": "",
+              "publisher": "",
+              "version": "0.4.12",
+              "protocol": 1,
+              "target": "aarch64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-opencode-addon_opencode_0.4.12-linux-arm64.tar.gz",
+              "size": 6506467,
+              "sha256": "9a066558d76c7ababf5f83830de058aa6db8790d3fa0366aeb0aec5eabb45ec2"
+            },
+            {
+              "id": "opencode",
+              "name": "OpenCode",
+              "description": "",
+              "publisher": "",
+              "version": "0.4.12",
+              "protocol": 1,
+              "target": "x86_64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-opencode-addon_opencode_0.4.12-linux-amd64.tar.gz",
+              "size": 6671678,
+              "sha256": "afc145e03dd44a682e6c73af44c14e29f0e044f919595ed4c4ad9bd5b3f7896a"
+            }
+          ],
+          "protocol": 1,
+          "editor_version_req": ">=0.4.8, <0.5.0"
+        },
+        {
+          "version": "0.4.11",
+          "release": "addon_opencode_0.4.11",
+          "status": "published",
+          "packages": [
+            {
+              "id": "opencode",
+              "name": "OpenCode",
+              "description": "",
+              "publisher": "",
+              "version": "0.4.11",
+              "protocol": 1,
+              "target": "aarch64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-opencode-addon_opencode_0.4.11-linux-arm64.tar.gz",
+              "size": 6503178,
+              "sha256": "8068df9f4cc557f1d31d6a0e1b48665bf6322d0f0b2348dff9f2111a5f3237ff"
+            },
+            {
+              "id": "opencode",
+              "name": "OpenCode",
+              "description": "",
+              "publisher": "",
+              "version": "0.4.11",
+              "protocol": 1,
+              "target": "x86_64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-opencode-addon_opencode_0.4.11-linux-amd64.tar.gz",
+              "size": 6668147,
+              "sha256": "6f4937ea15a9d72899256221fe5b7a4cff2b9ce2f999902f7413ac39da07bb7b"
+            }
+          ],
+          "protocol": 1,
+          "editor_version_req": ">=0.4.8, <0.5.0"
+        },
+        {
+          "version": "0.4.10",
+          "release": "addon_opencode_0.4.10",
+          "status": "published",
+          "packages": [
+            {
+              "id": "opencode",
+              "name": "OpenCode",
+              "description": "",
+              "publisher": "",
+              "version": "0.4.10",
+              "protocol": 1,
+              "target": "aarch64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-opencode-addon_opencode_0.4.10-linux-arm64.tar.gz",
+              "size": 6502362,
+              "sha256": "07907bca36b70c9266d3e79d735fa1ed9db80544b44d0fd4ef6f75a9ea27a93e"
+            },
+            {
+              "id": "opencode",
+              "name": "OpenCode",
+              "description": "",
+              "publisher": "",
+              "version": "0.4.10",
+              "protocol": 1,
+              "target": "x86_64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-opencode-addon_opencode_0.4.10-linux-amd64.tar.gz",
+              "size": 6668221,
+              "sha256": "0b397750200ca079ff4ddc1cf9fe9e530f9e70a824d90df7a2ea0e9bb2970133"
+            }
+          ],
+          "protocol": 1,
+          "editor_version_req": ">=0.4.8, <0.5.0"
+        },
+        {
+          "version": "0.4.9",
+          "release": "addon_opencode_0.4.9",
+          "status": "published",
+          "packages": [
+            {
+              "id": "opencode",
+              "name": "OpenCode",
+              "description": "",
+              "publisher": "",
+              "version": "0.4.9",
+              "protocol": 1,
+              "target": "aarch64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-opencode-addon_opencode_0.4.9-linux-arm64.tar.gz",
+              "size": 6503593,
+              "sha256": "5aa1f55ef7bb04f6ac7351b096a271b787db8e3f4c3a1aa8f597af31ecf9fb5c"
+            },
+            {
+              "id": "opencode",
+              "name": "OpenCode",
+              "description": "",
+              "publisher": "",
+              "version": "0.4.9",
+              "protocol": 1,
+              "target": "x86_64-unknown-linux-gnu",
+              "editor_version_req": ">=0.4.8, <0.5.0",
+              "archive": "focus-addon-opencode-addon_opencode_0.4.9-linux-amd64.tar.gz",
+              "size": 6668308,
+              "sha256": "12f17cff952c8d07e31e619765a2ba479466d83b7a7a60f0f36541bef0e99ecc"
+            }
+          ],
+          "protocol": 1,
+          "editor_version_req": ">=0.4.8, <0.5.0"
+        }
+      ]
+    }
+  ]
+}

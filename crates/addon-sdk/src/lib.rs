@@ -7,6 +7,9 @@ use std::{
     path::PathBuf,
 };
 
+mod index;
+pub use index::*;
+
 mod assistant;
 pub use assistant::*;
 pub mod language;

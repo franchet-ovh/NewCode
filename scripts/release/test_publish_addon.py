@@ -7,7 +7,8 @@ import tempfile
 import unittest
 from unittest.mock import patch
 import tomllib
-from addon_release import RELEASE_TARGETS, assets, manifests, package_addons, editor_compatibility
+from addon_release import RELEASE_TARGETS, assets, manifests, package_addons, editor_compatibility, version_files
+from addon_index import planned, encode
 import publish_addon as publisher
 
 
@@ -38,7 +39,7 @@ class AddonReleaseTests(unittest.TestCase):
                 root = Path(temporary)
                 self.fixture(root)
                 other = {p: p.read_bytes() for p in (root / 'addons/second').iterdir()}
-                publisher.stamp('first', 'addon_first_0.4.9', lower, upper)
+                self.commit_version(root, '0.4.9', lower, upper)
                 self.assertEqual(other, {p: p.read_bytes() for p in other})
                 manifest_path, manifest = publisher.definition('first')
                 self.assertEqual(manifest['editor_version_req'], expected)
@@ -56,29 +57,45 @@ class AddonReleaseTests(unittest.TestCase):
                         self.assertEqual(tomllib.loads(archive.extractfile('addon.toml').read().decode())['editor_version_req'], expected)
                 publisher.finalize('first', 'addon_first_0.4.9', root / 'dist')
 
-    def test_reservation_distinguishes_editor_overrides_and_reuses_matching_retry(self):
-        manifest = {'id': 'first', 'version': '0.4.8', 'editor_version_req': '>=0.4.8, <0.5.0'}
-        releases = [{'tag_name': 'addon_first_0.4.9', 'body': 'Addon source: ' + 'a' * 40 + '\nAddon inputs: fingerprint', 'draft': False}]
-        with patch.object(publisher, 'definition', return_value=(None, manifest)), patch.object(publisher, 'fingerprint', return_value='fingerprint'), patch.dict('os.environ', GH_REPO='owner/repo'):
-            with patch.object(publisher, 'gh', side_effect=[json.dumps(releases), '']) as gh:
-                self.assertEqual(publisher.reserve('first', 'a' * 40, '', upper='0.6.0'), ('addon_first_0.4.10', False))
-                body = gh.call_args.args[gh.call_args.args.index('--notes') + 1]
-                self.assertIn('Editor compatibility override: >=0.4.8, <0.6.0', body)
-            releases = [{'tag_name': 'addon_first_0.4.10', 'body': body, 'draft': True}]
-            with patch.object(publisher, 'gh', return_value=json.dumps(releases)) as gh:
-                self.assertEqual(publisher.reserve('first', 'a' * 40, '', upper='0.6.0'), ('addon_first_0.4.10', False))
-                gh.assert_called_once()
-            for upper in ['', '0.7.0']:
-                with patch.object(publisher, 'gh', side_effect=[json.dumps(releases), '']):
-                    self.assertEqual(publisher.reserve('first', 'a' * 40, '', upper=upper), ('addon_first_0.4.11', False))
+    def test_reservation_uses_committed_version_and_retries_exact_tag(self):
+        for draft in [True, False]:
+            with tempfile.TemporaryDirectory() as temporary, patch.object(publisher, 'ROOT', Path(temporary)):
+                root = Path(temporary)
+                self.fixture(root)
+                self.commit_version(root, '0.4.9')
+                release = {'draft': draft, 'body': 'Addon inputs: fingerprint'}
+                with patch.object(publisher, 'api', side_effect=[release, {'object': {'type': 'commit', 'sha': 'a'*40}}]) as api, patch.object(publisher, 'fingerprint', return_value='fingerprint'), patch.object(publisher.subprocess, 'run'), patch.dict('os.environ', GH_REPO='owner/repo'), patch.object(publisher, 'gh') as gh:
+                    self.assertEqual(publisher.reserve('first', 'a'*40), ('addon_first_0.4.9', not draft, 'a'*40))
+                    self.assertTrue(all('addon_first_0.4.9' in call.args[1] for call in api.call_args_list))
+                    gh.assert_not_called()
 
-    def test_missing_compatibility_fails_before_querying_or_reserving_a_release(self):
-        for requirement in [None, '', '   ', 42]:
-            manifest = {'id': 'first', 'version': '0.4.8', 'editor_version_req': requirement}
-            with patch.object(publisher, 'definition', return_value=(None, manifest)), patch.object(publisher, 'gh') as gh:
-                with self.assertRaisesRegex(ValueError, 'first.*editor_version_req'):
-                    publisher.reserve('first', 'a' * 40, '')
-                gh.assert_not_called()
+    def test_conflicting_release_or_tag_is_never_replaced(self):
+        for release, tag in [({'draft': True, 'body': 'Addon inputs: different'}, 'a'*40), (None, 'b'*40)]:
+            with tempfile.TemporaryDirectory() as temporary, patch.object(publisher, 'ROOT', Path(temporary)):
+                root = Path(temporary)
+                self.fixture(root)
+                self.commit_version(root, '0.4.9')
+                with patch.object(publisher, 'api', return_value=release), patch.object(publisher, 'tag_sha', return_value=tag), patch.object(publisher, 'fingerprint', return_value='fingerprint'), patch.dict('os.environ', GH_REPO='owner/repo'), patch.object(publisher, 'gh') as gh:
+                    with self.assertRaises(ValueError):
+                        publisher.reserve('first', 'a'*40)
+                    gh.assert_not_called()
+
+    def test_new_draft_uses_exact_committed_version_without_writing_metadata(self):
+        with tempfile.TemporaryDirectory() as temporary, patch.object(publisher, 'ROOT', Path(temporary)):
+            root = Path(temporary)
+            self.fixture(root)
+            self.commit_version(root, '0.4.9')
+            before = {p: p.read_bytes() for p in root.rglob('*') if p.is_file()}
+            with patch.object(publisher, 'api', return_value=None), patch.object(publisher, 'fingerprint', return_value='fingerprint'), patch.dict('os.environ', GH_REPO='owner/repo'), patch.object(publisher, 'gh') as gh:
+                self.assertEqual(publisher.reserve('first', 'a'*40), ('addon_first_0.4.9', False, 'a'*40))
+                self.assertIn('--draft', gh.call_args.args)
+                self.assertIn('addon_first_0.4.9', gh.call_args.args)
+            self.assertEqual(before, {p: p.read_bytes() for p in before})
+            (root/'addons/first/Cargo.toml').write_text('[package]\nname="focus-addon-first"\nversion="0.4.8"\n')
+            with patch.object(publisher, 'api') as api:
+                with self.assertRaisesRegex(ValueError, 'versions differ'):
+                    publisher.reserve('first', 'a'*40)
+                api.assert_not_called()
 
     def test_all_bundled_addons_have_compatibility_metadata_for_both_release_targets(self):
         repo = publisher.ROOT
@@ -145,6 +162,14 @@ class AddonReleaseTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 publisher.next_version('0.4.8', ['0.4.9'], invalid)
 
+    def commit_version(self, root, version, lower='', upper=''):
+        path = root / 'addons/first'
+        files = version_files(*( (path/name).read_text() for name in ('addon.toml', 'Cargo.toml', 'Cargo.lock')), version, lower, upper)
+        for name, text in files.items():
+            (path/name).write_text(text)
+        manifest = tomllib.loads(files['addon.toml'])
+        (root/'addons.json').write_text(encode({'schema': 1, 'addons': [{'id': 'first', 'path': 'addons/first', 'versions': [planned(manifest)]}, {'id': 'second', 'path': 'addons/second', 'versions': []}]}))
+
     def fixture(self, root):
         for name in ['first', 'second']:
             path = root / 'addons' / name
@@ -159,7 +184,7 @@ class AddonReleaseTests(unittest.TestCase):
             root = Path(temporary)
             self.fixture(root)
             other = {p: p.read_bytes() for p in (root / 'addons/second').iterdir()}
-            publisher.stamp('first', 'addon_first_0.4.9')
+            self.commit_version(root, '0.4.9')
             self.assertEqual(tomllib.loads((root / 'Cargo.toml').read_text())['package']['version'], '0.4.8')
             self.assertEqual(other, {p: p.read_bytes() for p in other})
             manifest = publisher.definition('first')[1]
@@ -180,26 +205,6 @@ class AddonReleaseTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'checksum'):
                 publisher.finalize('first', 'addon_first_0.4.9', root / 'dist')
 
-    def test_reservation_reuses_draft_and_completed_release(self):
-        for draft in [True, False]:
-            release = {'tag_name': 'addon_first_0.4.9', 'body': 'Addon source: ' + 'a' * 40, 'draft': draft}
-            with patch.object(publisher, 'fingerprint', return_value='fingerprint'), patch.object(publisher, 'definition', return_value=(None, {'id': 'first', 'version': '0.4.8', 'editor_version_req': '>=0.4.8, <0.5.0'})), patch.dict('os.environ', GH_REPO='owner/repo'), patch.object(publisher, 'gh', return_value=json.dumps([release])) as gh:
-                self.assertEqual(publisher.reserve('first', 'a' * 40, ''), ('addon_first_0.4.9', not draft))
-                gh.assert_called_once()
-
-    def test_unchanged_inputs_skip_only_the_latest_published_version(self):
-        releases = [
-            {'tag_name': 'addon_first_0.4.10', 'body': 'Addon inputs: newer', 'draft': False},
-            {'tag_name': 'addon_first_0.4.9', 'body': 'Addon inputs: old', 'draft': False},
-        ]
-        with patch.object(publisher, 'definition', return_value=(None, {'id': 'first', 'version': '0.4.8', 'editor_version_req': '>=0.4.8, <0.5.0'})), patch.dict('os.environ', GH_REPO='owner/repo'):
-            with patch.object(publisher, 'fingerprint', return_value='newer'), patch.object(publisher, 'gh', return_value=json.dumps(releases)) as gh:
-                self.assertEqual(publisher.reserve('first', 'a' * 40, ''), ('addon_first_0.4.10', True))
-                gh.assert_called_once()
-            # Reverting to older inputs still needs a NEW release to reach users.
-            with patch.object(publisher, 'fingerprint', return_value='old'), patch.object(publisher, 'gh', side_effect=[json.dumps(releases), '']) as gh:
-                self.assertEqual(publisher.reserve('first', 'a' * 40, ''), ('addon_first_0.4.11', False))
-                self.assertEqual(gh.call_count, 2)
 
 
 if __name__ == '__main__':

@@ -53,7 +53,7 @@ python3 scripts/release/release_editor.py --with-addon
 
 By default, the helper publishes the current Cargo package version from remote `main` as `v<x.y.z>`. That version must not already be released or reserved by a draft. Use `--patch`, `--minor`, or `--major` to calculate a newer version from the highest source or released/reserved editor version, or `--version x.y.z` to choose one explicitly. These flags are mutually exclusive. Editor and addon release versions are independent; addon tags and prereleases do not influence editor bumps. `--repo owner/repo` selects another repository.
 
-The helper reads one immutable `main` revision for the source version and new tag target, then publishes a GitHub release with generated notes. The existing release workflow commits the selected editor version to `main` and builds that version commit. Local files and versions are untouched. `--with-addon` subsequently calls `release_addon.py --all --minor`, forwarding the same repository; each addon receives its own minor bump regardless of the editor bump. Neither helper waits for builds or asset uploads. If addon dispatch fails, the editor release remains created; inspect the output and retry remaining addons with `release_addon.py`, rather than recreating the editor release.
+The helper reads one immutable `main` revision for the source version and new tag target, then publishes a GitHub release with generated notes. The existing release workflow commits the selected editor version to `main` and builds that version commit. Local files and versions are untouched. `--with-addon` subsequently calls `release_addon.py --all --minor`, forwarding the same repository; each addon receives its own minor bump regardless of the editor bump. The addon helper creates one release branch and pull request; merge it after review and CI to publish the addons. Neither helper waits for addon builds. If addon PR preparation fails, the editor release remains created; follow the reported recovery instructions rather than recreating the editor release.
 
 Merge the workflow and packaging scripts into the default branch before releasing. Saving a draft or pushing a tag alone does not build downloads. Both Linux native builds and packaging checks must pass before any assets are uploaded. Rerun failed jobs from GitHub Actions to retry; matching assets are replaced. Release tags containing filename-unsafe characters such as `/` use `-` in download names. The bundle and executable version come from Cargo metadata; release filenames use the tag.
 
@@ -61,17 +61,14 @@ Editor releases retain the existing release-version GitHub App and environment s
 
 Branch pushes and pull requests select affected Cargo projects, including consumers of changed local dependencies. Documentation-only changes skip compilation. SDK changes test all consumers; support changes test the editor and assistant addons. CI reports selected jobs and check durations. Feature branches compare with their merge base against main; main compares against its last successful run, so changes from interrupted runs are included.
 
-After successful checks on main, changed addons publish independently as `addon_<id>_<x.y.z>`, for example `addon_github_0.4.9`. Automatic releases increment the addon's own patch version, independently of the editor. Publishing compares build-input fingerprints to avoid releasing unchanged addons. Both Linux builds must succeed before the draft becomes public. Addon releases never replace GitHub's latest editor release.
+Addon releases use committed metadata. The root [`addons.json`](addons.json) records every addon, its source directory, version history, editor/protocol compatibility, publication state, and verified per-platform download metadata. Archives remain on GitHub releases as `addon_<id>_<x.y.z>`. The installer reads the index once and displays only each addon's newest **published** version compatible with the current editor, protocol, and platform. Older compatible versions remain available; no release-history scan is needed. An incompatible installed addon remains visible for management and removal.
 
-For a manual release, run **Independent addon release** on `main`, enter the addon ID, and optionally supply a stable `x.y.z` version. Without a version it increments the patch; an explicit version must exceed previous releases. Rerun a failed workflow to reuse its reserved draft/version. Release builds stamp only that addon's manifest and lockfile in the isolated checkout, without committing version changes to main. To reproduce one from source, check out its tag, run `python3 scripts/release/publish_addon.py stamp --addon github --tag addon_github_0.4.9`, then build with `scripts/addons.py`.
-
-Alternatively, use the interactive release helper (Python 3.11+ and authenticated
-GitHub CLI `gh` required):
+Prepare a release with Python 3.11+ and an authenticated GitHub CLI (`gh auth login`) with repository Contents and Pull requests write access:
 
 ```sh
 python3 scripts/release/release_addon.py
-python3 scripts/release/release_addon.py --addon github
-python3 scripts/release/release_addon.py --addon github --version 0.5.0
+python3 scripts/release/release_addon.py --addon github --patch
+python3 scripts/release/release_addon.py --addon github --version 0.6.0
 python3 scripts/release/release_addon.py --addon github --minor
 python3 scripts/release/release_addon.py --addon github --addon codex --patch
 python3 scripts/release/release_addon.py --all --patch
@@ -79,57 +76,31 @@ python3 scripts/release/release_addon.py --addon lsp-rust --patch --to 0.6.0
 python3 scripts/release/release_addon.py --all --patch --from 0.5.0 --to 0.6.0
 ```
 
-Omitting both `--addon` and `--all` offers an addon list, including language addons.
-Repeat `--addon` to select several, or use `--all` to select every discovered addon.
-`--major`, `--minor`, or `--patch` automatically calculates the next version for
-each selected addon independently, using its own highest source or released/reserved
-version. These flags and `--version` are mutually exclusive; `--all` and `--addon`
-are also mutually exclusive. An explicit `--version` applies to every selected addon
-and must be valid for all of them.
+The helper reads an immutable remote `main` revision, validates the complete batch, then creates one `release/addons-*` branch and PR targeting main. It commits the selected addons' `addon.toml`, Cargo package versions, local package entries in their lockfiles, and planned index records together. Local files and your checkout are untouched. It prints the PR URL; merge after review and CI to publish. A failure after branch creation reports the branch to use when recovering the PR.
 
-`--from x.y.z` changes the inclusive lower editor compatibility bound (`>=`);
-`--to x.y.z` changes the exclusive upper bound (`<`). Each omitted bound retains
-its source value. Omitting both preserves `editor_version_req` unchanged.
-Overrides apply to every selected addon's release manifest and catalogs, without
-editing local source files. Bounds must be stable versions with the lower less
-than the upper; editing requires an existing `>=x.y.z, <x.y.z` range. Merge the
-updated addon release workflow into `main` before using these options.
+Omitting both `--addon` and `--all` offers an addon list, including language addons. Repeat `--addon` to select several, or use `--all` for every indexed source addon. Without a bump flag the interactive helper offers patch, minor, major, and custom stable SemVer choices; Enter selects patch. `--major`, `--minor`, `--patch`, and `--version` are mutually exclusive. Noninteractive use requires explicit addon selection and a version/bump flag. Each addon uses the maximum of its source and indexed published/reserved/planned versions as its baseline; an explicit version must exceed both. `--repo owner/repo` selects another repository with the same workflow and index.
 
-Without a version or bump flag, the helper offers SemVer patch, minor, major, and
-custom choices for each selected addon; Enter selects
-patch. For example, after `0.4.9` these are `0.4.10`, `0.5.0`, and `1.0.0`.
-Choose patch for compatible fixes, minor for compatible features, and major for
-incompatible changes. Versions remain stable `x.y.z`; prereleases are not supported
-by the publishing workflow. Noninteractive use requires `--addon` or `--all`, plus
-`--version` or a bump flag. Use `--repo owner/repo` to select another repository
-with this workflow.
+`--from x.y.z` changes the inclusive lower editor bound; `--to x.y.z` changes the exclusive upper bound. Omitted bounds retain their source values. Bounds apply to every selected addon and require a valid existing `>=x.y.z, <x.y.z` range with lower less than upper. These compatibility edits are committed alongside the version bump and subsequently reach archives and catalogs.
 
-The helper reads the remote `main` manifest and all existing release pages,
-including reserved drafts, and uses the highest version as the bump baseline.
-After validating all selected versions, the helper checks the manual inputs
-declared by the remote workflow, including allowed addon/version choices, before
-launching any workflows. If a selected addon is not allowed, the entire batch
-stops and identifies the workflow change to merge into `main`; it does not skip
-addons or start a partial batch. When
-`source-sha` is supported, builds are pinned to the same inspected `main` commit.
-Older workflows receive only `addon` and `version` and build `main` at dispatch
-time; the helper reports this behavior before dispatching. Local edits and version files
-are untouched. If dispatch fails partway through, it stops and lists successful
-dispatches and addons not attempted. The helper reports
-dispatch success and the workflow link; follow that link for build/publish status.
-Merge the workflow changes into `main` to enable source pinning and a free-form
-addon ID for manual releases, including language addons. A local workflow edit
-does not update GitHub's workflow until it is merged into `main`. If another
-release reserves the selected version first, the workflow will reject the
-conflict; select a newer version or rerun the original failed workflow.
+After main CI passes, only committed **planned** index entries are released. Addon code, shared dependency, and compatibility changes run the appropriate checks but need a version bump and plan to publish. Failed plans remain eligible for retry. The workflow reads committed versions, validates agreement between the index, manifest, Cargo, lockfile, and tag, and builds both native Linux targets without modifying version files. Both builds and packaging/checksums must pass before the draft becomes public. Addon releases never replace GitHub's latest editor release. New releases reproduce directly by checking out their tag and building with `scripts/addons.py`; older historical tags still have their original unstamped metadata.
 
-If an earlier batch already dispatched some addons, release only the remaining
-ones rather than rerunning `--all`. For example, after `codex` and `github` have
-been dispatched, merge the workflow update and resume with:
+After publication, a separate job uses the existing `release-version` environment and release GitHub App to mark that version published and add verified archive names, sizes, targets, and SHA-256 hashes to main's index. Package locations are derived from the repository, version's release tag, and archive name. Index updates use file-SHA conflict checks and retries to preserve concurrent/newer records, and do not schedule another release. Planned versions and historical reserved drafts are never offered for installation.
+
+Retry failed jobs in GitHub Actions to reuse the original draft/tag. For manual recovery, run **Independent addon release** on main with the addon ID and, when needed, the original main commit as `source-sha`. Manual runs use committed metadata rather than version/compatibility overrides. Existing tags with different build inputs are rejected; they are never moved. A matching completed release skips rebuilding and retries index registration. If assets published but index registration failed, retry the registration job; the previous compatible release remains discoverable meanwhile. To supersede a failed plan after changing build inputs, prepare a newer version; the previous planned version becomes reserved and is never reused.
+
+Merge these workflow, index, and script changes into main before using the new helper. Add new source addons to the index with an empty `versions` list before preparing their first release. CI validates index history and planned/source metadata. Check the index locally with:
 
 ```sh
-python3 scripts/release/release_addon.py --addon lsp-python --addon lsp-rust --addon opencode --patch
+python3 scripts/release/addon_index.py check
 ```
+
+The included index imports historical published catalogs and reserves draft or incomplete releases without advertising them. For another repository, perform the one-time migration into a new file, review it, and commit it as the root index:
+
+```sh
+python3 scripts/release/import_addon_index.py --repo owner/repo --output imported-addons.json
+```
+
+The importer is the only addon tool that scans release history. Routine preparation reads the committed index; publishing uses only exact-tag lookups for retry/conflict checks. Existing editor release version discovery remains separate.
 
 
 ## Build and run
@@ -225,7 +196,7 @@ cargo run --release -- ~/projects/my-app
 
 Addons compile independently from the editor and run as separate executables. The main Rust process renders their native panels. Open **Addons**, the activity-bar entry immediately below Source Control, or use **Addons → Manage addons…**. **Installed** lists local addons and their status; **Available** lists the official release packages. Search either list and select an addon to see its details in the center. Enable/disable, restart, credentials, and uninstall controls are in those details.
 
-Choose **Refresh / check updates** to discover independently released addons from `franchet-ovh/NewCode`. The default `latest` selects the highest compatible stable version of each addon for this platform. You can enter an explicit addon release tag, or an older editor release tag with a legacy catalog. Catalog requests are anonymous and do not use stored addon credentials.
+Choose **Refresh / check updates** to fetch the central addon index from `franchet-ovh/NewCode`. The default `latest` displays only the highest published stable version of each addon compatible with the current editor, protocol, and platform. Historical compatible releases remain in the index. You can enter an explicit addon release tag, or an older editor release tag with a legacy catalog. Index and catalog requests are anonymous and do not use stored addon credentials.
 
 Each addon declares `editor_version_req` using Cargo/Rust SemVer requirement syntax, initially `>=0.4.8, <0.5.0` for the included addons. Installation, upgrades, and loading check that range, the addon protocol, and the platform. This allows editor patch updates to reuse an addon without republishing it. Legacy schema-1 catalogs retain exact editor-version matching; older installed manifests without a range retain protocol/platform validation. Install an updated editor before using schema-2 catalogs.
 

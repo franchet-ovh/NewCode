@@ -5,6 +5,7 @@ from pathlib import Path
 import re
 import tarfile
 import tomllib
+from prepare_version import release_version, replace_version
 
 TARGETS = {"x86_64-unknown-linux-gnu": ("linux-amd64", ".tar.gz"),
            "aarch64-unknown-linux-gnu": ("linux-arm64", ".tar.gz"),
@@ -120,3 +121,56 @@ def package_addons(binary_directory, destination, tag, target, root=Path("."), s
                "packages": packages}
     (destination / index_name(target)).write_text(json.dumps(catalog, indent=2) + "\n")
     return catalog
+
+
+def stable(version):
+    release_version(version)
+    if not re.fullmatch(r'\d+\.\d+\.\d+', version):
+        raise ValueError('Addon releases require a stable x.y.z version')
+    return tuple(map(int, version.split('.')))
+
+
+def next_version(current, versions, explicit=''):
+    previous = max([stable(current), *(stable(v) for v in versions)])
+    if explicit:
+        chosen = stable(explicit)
+        if chosen <= max((stable(v) for v in versions), default=(0, 0, 0)) or chosen < stable(current):
+            raise ValueError('Explicit version must exceed released versions and not precede the source version')
+        return explicit
+    return f'{previous[0]}.{previous[1]}.{previous[2] + 1}'
+
+
+def version_files(manifest_text, project_text, lock_text, version, lower='', upper=''):
+    """Prepare all three metadata files without writing or resolving dependencies."""
+    stable(version)
+    manifest = tomllib.loads(manifest_text)
+    requirement = editor_compatibility(manifest, lower, upper)
+    name = tomllib.loads(project_text)['package']['name']
+    sections = re.split(r'(?m)(?=^\[)', project_text)
+    count = 0
+    for i, section in enumerate(sections):
+        if section.startswith('[package]\n'):
+            sections[i] = replace_version(section, version)
+            count += 1
+    if count != 1:
+        raise ValueError('Expected one Cargo package section')
+    blocks = lock_text.split('[[package]]')
+    matches = 0
+    for i in range(1, len(blocks)):
+        package = tomllib.loads(blocks[i])
+        if package['name'] == name and 'source' not in package:
+            blocks[i] = replace_version(blocks[i], version)
+            matches += 1
+    if matches != 1:
+        raise ValueError('Expected one local package in addon lockfile')
+    manifest_text = replace_version(manifest_text, version)
+    if lower or upper:
+        manifest_text, count = re.subn(r'(?m)^editor_version_req\s*=.*$',
+                                      'editor_version_req = ' + json.dumps(requirement), manifest_text)
+        if count != 1:
+            raise ValueError('Expected one editor_version_req in addon manifest')
+    result = {'addon.toml': manifest_text, 'Cargo.toml': ''.join(sections),
+              'Cargo.lock': '[[package]]'.join(blocks)}
+    for value in result.values():
+        tomllib.loads(value)
+    return result

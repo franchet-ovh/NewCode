@@ -231,6 +231,36 @@ mod tests {
         assert!(compatibility(&catalog, &p).is_some());
     }
     #[test]
+    fn install_choices_hide_incompatible_and_foreign_packages() {
+        let mut p = package();
+        p.editor_version_req = Some(format!("={}", env!("CARGO_PKG_VERSION")));
+        let mut catalog = Catalog {
+            schema: 2,
+            release: "latest".into(),
+            editor_version: String::new(),
+            packages: vec![p.clone()],
+        };
+        assert_eq!(available(&catalog).len(), 1);
+        for bad in [
+            Package {
+                protocol: 99,
+                ..p.clone()
+            },
+            Package {
+                target: "foreign-platform".into(),
+                ..p.clone()
+            },
+            Package {
+                editor_version_req: Some(">99.0.0".into()),
+                ..p.clone()
+            },
+        ] {
+            catalog.packages = vec![bad];
+            assert!(available(&catalog).is_empty());
+        }
+    }
+
+    #[test]
     fn disconnected_worker_releases_manager_controls() {
         let mut host = Addons::default();
         let (sender, receiver) = mpsc::channel();
@@ -267,7 +297,7 @@ mod tests {
                 260.0,
                 false,
                 "absent",
-                "No available addons match this search.",
+                "No compatible addons match this editor, platform, and search.",
             ),
             (500.0, true, "", "No installed addons match this search."),
         ] {
@@ -325,6 +355,9 @@ fn compatibility(catalog: &Catalog, package: &Package) -> Option<String> {
 fn available(catalog: &Catalog) -> Vec<Package> {
     let mut map = BTreeMap::new();
     for p in &catalog.packages {
+        if compatibility(catalog, p).is_some() {
+            continue;
+        }
         if !map.contains_key(&p.id) || Some(p.target.as_str()) == packages::target() {
             map.insert(p.id.clone(), p.clone());
         }
@@ -761,7 +794,7 @@ impl Addons {
                         "No installed addons match this search."
                     } else {
                         if self.manager.catalog.is_some() {
-                            "No available addons match this search."
+                            "No compatible addons match this editor, platform, and search."
                         } else {
                             "Refresh a release catalog to browse available addons."
                         }
