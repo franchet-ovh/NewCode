@@ -2,7 +2,7 @@ id = "lsp-rust"
 name = "Rust"
 description = "Rust completion, type checking, Clippy linting, formatting, and symbols."
 publisher = "Focus Editor project"
-version = "0.5.6"
+version = "0.5.7"
 editor_version_req = ">=0.4.8, <0.6.0"
 protocol = 1
 executable = "focus-addon-lsp-rust"
