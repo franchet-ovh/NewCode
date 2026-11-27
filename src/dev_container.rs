@@ -1,7 +1,8 @@
-//! Docker Compose-backed Dev Container discovery, lifecycle, and command setup.
+//! Compose-managed and explicitly attached Dev Container runtimes.
 
 use eframe::egui;
 use serde::Deserialize;
+pub(crate) mod attachment;
 mod compose;
 mod diagnostics;
 mod persistence;
@@ -54,6 +55,7 @@ enum Action {
 }
 
 enum State {
+    Attached(attachment::Session),
     Unavailable,
     Available(Configuration),
     Starting(Configuration),
@@ -62,6 +64,8 @@ enum State {
 }
 
 enum Event {
+    Reattached(Result<attachment::Attachment, String>),
+    Detached,
     Started(Configuration, Result<Runtime, String>, &'static str),
     Stopped(Configuration, Result<(), String>),
 }
@@ -107,6 +111,7 @@ impl DevContainer {
 
     pub(crate) fn runtime(&self) -> Option<&Runtime> {
         match &self.state {
+            State::Attached(session) => Some(&session.attachment.runtime),
             State::Ready(_, runtime) => Some(runtime),
             _ => None,
         }
@@ -122,6 +127,13 @@ impl DevContainer {
         };
         self.events = None;
         match event {
+            Event::Reattached(result) => self.reattached(result),
+            Event::Detached => {
+                // Reload optional Compose configuration on the next frame, after
+                // the editor has observed the explicit return to local execution.
+                self.workspace = None;
+                true
+            }
             Event::Started(configuration, Ok(runtime), operation) => {
                 log::info!("Dev Container {operation} completed; connected");
                 self.state = State::Ready(configuration, runtime);
@@ -153,8 +165,13 @@ impl DevContainer {
             ctx.data_mut(|data| data.insert_temp(egui::Id::new("show_dev_container_logs"), true));
             ui.close();
         }
+        if matches!(self.state, State::Attached(_)) {
+            self.attachment_menu(ui, ctx);
+            return;
+        }
         let mut action = None;
         match &self.state {
+            State::Attached(_) => unreachable!(),
             State::Unavailable => {
                 ui.add_enabled(
                     false,
@@ -242,6 +259,7 @@ impl DevContainer {
 
     pub(crate) fn label(&self) -> Option<&str> {
         match &self.state {
+            State::Attached(session) => Some(&session.attachment.request.container),
             State::Ready(configuration, _) => Some(&configuration.name),
             _ => None,
         }

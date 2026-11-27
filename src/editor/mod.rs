@@ -101,7 +101,17 @@ impl EditorApp {
         let (settings, settings_path) = crate::settings::load_workspace(directory_argument)
             .unwrap_or_else(|error| {
                 log::warn!("{error}");
-                (Settings::default(), PathBuf::new())
+                // Keep attachment intent even if settings become unreadable after preflight.
+                (
+                    Settings {
+                        workspace: arguments
+                            .attachment
+                            .as_ref()
+                            .map(|attachment| attachment.runtime.host_workspace.clone()),
+                        ..Default::default()
+                    },
+                    PathBuf::new(),
+                )
             });
         ctx.send_viewport_cmd(egui::ViewportCommand::Title(crate::launch::window_title(
             settings.workspace.as_deref(),
@@ -111,7 +121,16 @@ impl EditorApp {
             settings.workspace.is_some()
         );
         let cwd = settings.workspace.as_deref();
-        let (top, terminal_error) = match Terminal::spawn("", cwd, ctx.clone()) {
+        let dev_container = arguments
+            .attachment
+            .clone()
+            .map(crate::dev_container::DevContainer::attached)
+            .unwrap_or_default();
+        let terminal = match dev_container.runtime() {
+            Some(runtime) => Terminal::spawn_with_runtime("", cwd, Some(runtime), ctx.clone()),
+            None => Terminal::spawn("", cwd, ctx.clone()),
+        };
+        let (top, terminal_error) = match terminal {
             Ok(terminal) => (Some(terminal), None),
             Err(error) => (None, Some(format!("Terminal failed to start: {error}"))),
         };
@@ -129,6 +148,7 @@ impl EditorApp {
             })
             .collect();
         let mut addons = crate::addons::Addons::default();
+        addons.sync(settings.workspace.as_deref(), dev_container.runtime());
         addons.set_workspace_storage(settings.workspace.as_deref());
         addons.discover(&settings.addon_enabled);
         addons.suppressed = arguments.disabled_addons.clone();
@@ -153,7 +173,7 @@ impl EditorApp {
             terminal_error,
             bottom_tab: Default::default(),
             logs: Default::default(),
-            dev_container: Default::default(),
+            dev_container,
             creation: None,
             deletion: None,
             rename_target: None,
@@ -234,7 +254,7 @@ impl EditorApp {
                 .dev_container
                 .label()
                 .map(|name| format!("Connected to {name}"))
-                .unwrap_or_else(|| "Dev Container stopped".into());
+                .unwrap_or_else(|| "Using local workspace".into());
         }
         let cwd = self.settings.workspace.clone();
         let runtime = self.dev_container.runtime().cloned();

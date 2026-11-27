@@ -47,7 +47,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         )?;
         return Ok(());
     }
-    let arguments = logging::Arguments::parse(std::env::args_os().skip(1))?;
+    let mut arguments = logging::Arguments::parse(std::env::args_os().skip(1))?;
     if arguments.help {
         println!("{}", logging::HELP);
         return Ok(());
@@ -59,6 +59,11 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     platform::prepare_environment();
     if !cfg!(any(target_os = "linux", target_os = "macos")) {
         return Err("Focus Editor supports Linux and macOS".into());
+    }
+    arguments.resolve_attachment()?;
+    if arguments.attachment.is_some() {
+        // Attachment must not fall back to an empty local session on settings errors.
+        settings::load_workspace(arguments.workspace.as_deref())?;
     }
     if arguments.headless
         && !arguments

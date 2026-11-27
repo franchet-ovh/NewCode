@@ -253,7 +253,19 @@ PR creation uses the selected repository's configured remote. If that remote has
 
 ## Dev Containers
 
-Focus Editor can use a Docker Compose development container without Node.js or the Dev Container CLI. With a workspace open, use **Dev Container** in the toolbar to start the service defined by `.devcontainer/devcontainer.json`. The container stays running when the editor closes; use **Stop** from the same menu when needed. **Rebuild** and **Rebuild without cache** are available before connecting, while connected, and after a failed build or start. Both recreate the container; the latter rebuilds the service and its buildable dependencies without using cached build layers. Neither removes volumes or saved assistant data. Each start or rebuild reloads `devcontainer.json`, so configuration fixes take effect on the next attempt.
+To attach to an already running container, supply its name and the folder to open inside it:
+
+```sh
+focus-editor --attach-container my-container --container-workspace /workspaces/my-project
+```
+
+No `.devcontainer`, Compose file, host-path setting, or user setting is required. Focus Editor discovers the host directory from Docker's bind-mount metadata and uses the container's default user for terminals, Git, assistants, and language servers. Explorer, search, editing, and saved files use the corresponding host directory. The folder must be inside a bind mount whose source is accessible on the editor's machine; Docker-managed volumes and container-only folders are unsupported. The container must already be running and unpaused. The two flags also work with `--ui`, `--browser`, and `--headless`; do not supply a positional host workspace with them.
+
+Attachment takes precedence over any project Dev Container configuration. It installs no editor server, adds no mounts, and does not change `.gitignore` or provision assistant storage. Tools must be available inside the container; enabled addons retain their existing authentication transfer and tool setup behavior. Assistant histories remain in the container's existing storage, whose persistence is controlled by its owner.
+
+Use **Dev Container → Reconnect** to inspect the container name again, including after an external replacement. A replacement must map the folder to the same host workspace; otherwise relaunch with the two parameters. Failed reconnects retain container execution instead of switching tools to the host. **Detach** returns to local execution; switching workspaces also clears attachment. Closing the editor, detaching, and reconnecting leave the container running. Attachment is selected per launch, while ordinary workspace settings continue to save automatically. The attached menu offers no Stop or Rebuild actions. Encoded VS Code `--folder-uri` arguments are not supported.
+
+Focus Editor can also use a Docker Compose development container without Node.js or the Dev Container CLI. With a workspace open, use **Dev Container** in the toolbar to start the service defined by `.devcontainer/devcontainer.json`. The container stays running when the editor closes; use **Stop** from the same menu when needed. **Rebuild** and **Rebuild without cache** are available before connecting, while connected, and after a failed build or start. Both recreate the container; the latter rebuilds the service and its buildable dependencies without using cached build layers. Neither removes volumes or saved assistant data. Each start or rebuild reloads `devcontainer.json`, so configuration fixes take effect on the next attempt.
 
 The built-in backend supports Compose-based configurations with `dockerComposeFile`, `service`, `workspaceFolder`, and optional `remoteUser`. It starts the service with Docker Compose, then runs the integrated shell, Source Control commands, Codex, and OpenCode with `docker exec` in that container. Explorer, search, editing, and saved files stay on the host bind mount.
 
@@ -261,7 +273,7 @@ The launcher resolves build settings relative to the first Compose file's direct
 
 Focus Editor mounts `.devcontainer/mounted_files/` from each host workspace to persist Codex and OpenCode data across container restarts and rebuilds. It adds this directory to the workspace’s root `.gitignore` before writing data. Existing container histories are migrated on first startup without overwriting persisted data. Deleting this directory removes the saved container assistant data. Connected window and browser titles include **Devcontainer**.
 
-Docker Engine and the Docker Compose plugin are required. Node.js and `@devcontainers/cli` are not required or installed. The bundled image installs Codex and OpenCode using their official curl installers as `vscode`, with both commands available to noninteractive `docker exec`. Custom images must provide the tools you enable. Dev Container Features and lifecycle commands are not interpreted by Focus Editor; express required setup in the Dockerfile or Compose service instead.
+Docker Engine is required; the Docker Compose plugin is additionally required for Compose-managed containers. Node.js and `@devcontainers/cli` are not required or installed. The bundled image installs Codex and OpenCode using their official curl installers as `vscode`, with both commands available to noninteractive `docker exec`. Custom images must provide the tools you enable. Dev Container Features and lifecycle commands are not interpreted by Focus Editor; express required setup in the Dockerfile or Compose service instead.
 
 Temporarily disable an addon for one launch:
 
@@ -377,7 +389,7 @@ Git's periodic checks cover known modified/staged paths and repository metadata.
 - The left activity bar switches between **Explorer**, **Search**, and **Source Control**.
 - The center contains file tabs, the editor, and Git diff previews.
 - The bottom of the center column contains an interactive terminal and Logs, with a Restart action.
-- **Dev Container** starts a configured Docker Compose service and changes the terminal, Git, and assistants to use it.
+- **Dev Container** manages a configured Docker Compose service or reconnects/detaches a container selected with the two attachment flags; terminals, Git, assistants, and language servers use the connected container.
 - The optional right pane contains Codex and/or OpenCode. Its header keeps status visible alongside horizontally scrollable session controls; **Usage / status** has its own section below.
 - Drag the dividers to resize the sidebar, terminal, and assistant pane. Their sizes are saved.
 

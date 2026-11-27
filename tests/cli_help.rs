@@ -30,6 +30,11 @@ fn help_exits_without_runtime_dependencies_or_state_files() {
             let help = String::from_utf8(output.stdout).unwrap();
             assert!(help.contains(&format!("Usage: {name}")));
             assert!(help.contains("--log-level") && help.contains("--help"));
+            if name == "focus-editor" {
+                assert!(
+                    help.contains("--attach-container") && help.contains("--container-workspace")
+                );
+            }
         }
     }
     assert_eq!(std::fs::read_dir(data.path()).unwrap().count(), 0);
