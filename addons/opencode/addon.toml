@@ -1,7 +1,8 @@
+execution = "workspace"
 id = "opencode"
 name = "OpenCode"
-version = "0.6.0"
-editor_version_req = ">=0.6.0, <0.7.0"
+version = "0.6.1"
+editor_version_req = ">=0.6.1, <0.7.0"
 protocol = 1
 executable = "focus-addon-opencode"
 icon = "icon.png"

@@ -49,11 +49,19 @@ runs:
         rustup toolchain install stable --profile minimal --component rustfmt
         rustup default stable
         host=$(rustc -vV | sed -n 's/^host: //p')
-        if [ "$host" != "$TARGET" ]; then
+        if [ "$host" != "${TARGET/-musl/-gnu}" ]; then
           echo "Native tests require $TARGET, but this runner provides $host" >&2
           exit 1
         fi
         rustup target add "$TARGET"
+        if [[ "$TARGET" == *-musl ]]; then
+          sudo apt-get update
+          sudo apt-get install -y musl-tools
+          echo "CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER=musl-gcc" >> "$GITHUB_ENV"
+          echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER=musl-gcc" >> "$GITHUB_ENV"
+          echo "CC_x86_64_unknown_linux_musl=musl-gcc" >> "$GITHUB_ENV"
+          echo "CC_aarch64_unknown_linux_musl=musl-gcc" >> "$GITHUB_ENV"
+        fi
     - name: Install pinned Zig toolchain for Ghostty
       if: inputs.component == 'editor'
       shell: bash

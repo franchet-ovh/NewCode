@@ -88,6 +88,15 @@ def main():
     for component in affected:
         for runner, target in [('ubuntu-24.04', 'x86_64-unknown-linux-gnu'), ('ubuntu-24.04-arm', 'aarch64-unknown-linux-gnu')]:
             matrix.append(dict(component=component, runner=runner, target=target))
+    from sys import path as module_path
+    module_path.insert(0, str(ROOT / 'scripts/release'))
+    from addon_release import build_matrix
+    for component in affected:
+        manifest = ROOT / 'addons' / component / 'addon.toml'
+        if manifest.is_file():
+            definition = tomllib.loads(manifest.read_text())
+            if definition.get('execution') == 'workspace':
+                matrix.extend(dict(component=component, **item) for item in build_matrix(definition)['include'] if item['target'].endswith('-musl'))
     result = {'matrix': {'include': matrix}, 'has_checks': bool(matrix), 'tooling': tooling,
               'addons': [a for a in affected if (ROOT / 'addons' / a / 'addon.toml').is_file()]}
     if os.environ.get('GITHUB_OUTPUT'):

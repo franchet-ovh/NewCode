@@ -1,5 +1,4 @@
 //! Owned local OpenCode process and asynchronous HTTP/SSE transport.
-use crate::dev_container::Runtime;
 use egui;
 use serde_json::Value;
 use std::{
@@ -48,12 +47,7 @@ pub(crate) struct Server {
     child: Arc<Mutex<Option<Child>>>,
 }
 impl Server {
-    pub(crate) fn spawn(
-        cwd: &Path,
-        runtime: Option<Runtime>,
-        binary_path: String,
-        ctx: egui::Context,
-    ) -> Self {
+    pub(crate) fn spawn(cwd: &Path, binary_path: String, ctx: egui::Context) -> Self {
         log::info!("spawn requested");
         let (tx, events) = mpsc::channel();
         let (commands, rx) = mpsc::channel();
@@ -65,7 +59,6 @@ impl Server {
         std::thread::spawn(move || {
             worker::run(
                 cwd,
-                runtime,
                 binary_path,
                 rx,
                 Events { tx, ctx },

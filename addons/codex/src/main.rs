@@ -6,9 +6,7 @@ use std::{
     path::PathBuf,
 };
 mod app_server;
-mod authentication;
 mod codex_ui;
-mod dev_container;
 mod logging;
 #[cfg(test)]
 fn test_frame(
@@ -28,6 +26,13 @@ struct App {
     sessions: BTreeMap<PathBuf, String>,
 }
 impl Panel for App {
+    fn persistent_state(&self) -> Option<serde_json::Value> {
+        self.context
+            .workspace
+            .as_ref()
+            .map(|_| self.current.snapshot())
+    }
+
     fn assistant_capabilities(&self) -> Option<focus_addon_sdk::AssistantCapabilities> {
         Some(self.current.assistant_capabilities())
     }
@@ -58,8 +63,6 @@ impl Panel for App {
             .and_then(|bytes| serde_json::from_slice(&bytes).ok())
             .or_else(|| serde_json::from_value(self.context.state["sessions"].clone()).ok())
             .unwrap_or_default();
-        let runtime = self.context.runtime.clone().map(Into::into);
-        self.current.set_runtime(runtime.as_ref());
         if let Some(id) = self
             .context
             .workspace
@@ -68,6 +71,10 @@ impl Panel for App {
             .cloned()
         {
             self.current.restore_session(id);
+        }
+        if !self.context.persistent_state.is_null() {
+            self.current
+                .restore_snapshot(&self.context.persistent_state);
         }
         if self.context.workspace.is_some()
             && self.context.state["autostart"].as_bool() != Some(false)
@@ -81,17 +88,6 @@ impl Panel for App {
         if let (Some(root), Some(id)) = (&self.context.workspace, self.current.saved_session()) {
             if self.sessions.get(root) != Some(&id) {
                 self.sessions.insert(root.clone(), id);
-                if std::fs::create_dir_all(&self.context.storage).is_ok() {
-                    if let Ok(bytes) = serde_json::to_vec(&self.sessions) {
-                        let temporary = self.context.storage.join("sessions.tmp");
-                        if std::fs::write(&temporary, bytes).is_ok() {
-                            let _ = std::fs::rename(
-                                temporary,
-                                self.context.storage.join("sessions.json"),
-                            );
-                        }
-                    }
-                }
             }
         }
     }
@@ -112,6 +108,15 @@ fn main() {
     if std::env::args().any(|arg| arg == "--version") {
         println!("focus-addon-codex {}", env!("CARGO_PKG_VERSION"));
         return;
+    }
+    if let Some(result) = focus_addon_support::container::entry() {
+        match result {
+            Ok(code) => std::process::exit(code),
+            Err(error) => {
+                eprintln!("ERROR {error}");
+                std::process::exit(1);
+            }
+        }
     }
     if let Err(error) = focus_addon_support::runner::run(App::default()) {
         eprintln!("ERROR Addon stopped: {error}");

@@ -1,11 +1,13 @@
 //! Installed executable addons. Native UI and credential handling stay in the host.
 mod assistant;
 mod catalog;
+mod container;
 mod credentials;
 mod installation;
 mod language;
 mod manager;
 mod packages;
+mod persistence;
 mod process;
 mod ui;
 #[cfg(test)]
@@ -84,6 +86,7 @@ pub(crate) struct Addons {
     runtime: Option<Runtime>,
     generation: Arc<AtomicU64>,
     process_generation: u64,
+    retiring: BTreeMap<String, mpsc::Receiver<()>>,
     tx: mpsc::Sender<Completion>,
     rx: mpsc::Receiver<Completion>,
     confirm: Option<Task>,
@@ -118,6 +121,7 @@ impl Default for Addons {
             runtime: None,
             generation: Arc::new(AtomicU64::new(0)),
             process_generation: 0,
+            retiring: BTreeMap::new(),
             tx,
             rx,
             confirm: None,
@@ -137,6 +141,9 @@ impl Drop for Addons {
             if let Some(process) = addon.process.take() {
                 process.stop_now();
             }
+        }
+        for (_, done) in std::mem::take(&mut self.retiring) {
+            let _ = done.recv_timeout(Duration::from_secs(10));
         }
     }
 }
@@ -210,6 +217,15 @@ impl Addons {
             addon.values.clear();
             addon.surface.workspace_changed();
             addon.status.clear();
+            if addon.manifest.execution == focus_addon_sdk::Execution::Workspace {
+                if let Some(process) = addon.process.take() {
+                    self.retiring
+                        .insert(addon.manifest.id.clone(), process.retire());
+                }
+                addon.error = None;
+                addon.working = false;
+                continue;
+            }
             if let Some(process) = &addon.process {
                 let mut context = self.context.clone();
                 context.storage = addon.storage.clone();
@@ -219,7 +235,7 @@ impl Addons {
         }
     }
     pub fn activate(&mut self, id: String, ctx: &egui::Context) {
-        if self.installation_pending(&id) {
+        if self.installation_pending(&id) || self.retiring.contains_key(&id) {
             return;
         }
         if self
@@ -334,6 +350,12 @@ impl Addons {
     }
     /// Return true after any Git mutation, including partially completed failures.
     pub fn tick(&mut self, ctx: &egui::Context, dirty: bool, visible: bool) -> bool {
+        self.retiring.retain(|_, completion| {
+            matches!(completion.try_recv(), Err(mpsc::TryRecvError::Empty))
+        });
+        if !self.retiring.is_empty() {
+            ctx.request_repaint_after(Duration::from_millis(25));
+        }
         let starters: Vec<_> = self
             .entries
             .iter()
@@ -517,6 +539,9 @@ impl Addons {
                 if process.expired() && failure.is_none() {
                     failure =
                         Some("Addon stopped or initialization timed out. Use Restart.".into());
+                }
+                if let Some(error) = process.launch_error.take() {
+                    failure = Some(error);
                 }
             }
             if let Some(error) = failure {

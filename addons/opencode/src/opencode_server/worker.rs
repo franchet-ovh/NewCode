@@ -1,6 +1,5 @@
 //! Process startup, bounded HTTP requests, and process cleanup.
 use super::{Event, Events, Request, stream};
-use crate::dev_container::Runtime;
 use reqwest::blocking::Client;
 use serde_json::Value;
 use std::{
@@ -18,7 +17,6 @@ use std::{
 
 pub(super) fn run(
     cwd: PathBuf,
-    runtime: Option<Runtime>,
     binary_path: String,
     commands: Receiver<Request>,
     events: Events,
@@ -26,15 +24,7 @@ pub(super) fn run(
     owned: Arc<Mutex<Option<Child>>>,
 ) {
     log::debug!("OpenCode worker starting");
-    let result = serve(
-        &cwd,
-        runtime.as_ref(),
-        &binary_path,
-        commands,
-        &events,
-        &cancel,
-        &owned,
-    );
+    let result = serve(&cwd, &binary_path, commands, &events, &cancel, &owned);
     if let Some(mut child) = owned.lock().unwrap().take() {
         super::kill(&mut child);
         let _ = child.wait();
@@ -48,24 +38,20 @@ pub(super) fn run(
 }
 fn serve(
     cwd: &std::path::Path,
-    runtime: Option<&Runtime>,
     binary_path: &str,
     commands: Receiver<Request>,
     events: &Events,
     cancel: &Arc<AtomicBool>,
     owned: &Arc<Mutex<Option<Child>>>,
 ) -> Result<(), String> {
-    if let Some(runtime) = runtime {
-        crate::authentication::prepare(runtime)?;
-    }
     let (url_tx, url_rx) = mpsc::channel();
     {
         let mut guard = owned.lock().unwrap();
         if cancel.load(Ordering::Relaxed) {
             return Ok(());
         }
-        let program = executable(cwd, runtime, binary_path);
-        let mut command = server_command(cwd, runtime, &program);
+        let program = executable(cwd, binary_path);
+        let mut command = server_command(cwd, &program);
         command.process_group(0);
         let child = command
             .stdin(Stdio::null())
@@ -106,7 +92,7 @@ fn serve(
         {
             return Err(format!(
                 "OpenCode executable {:?} exited during startup ({status}). Check its CLI configuration and OpenCode binary in Addons → OpenCode → Workspace settings.",
-                executable(cwd, runtime, binary_path)
+                executable(cwd, binary_path)
             ));
         }
         if Instant::now() >= deadline {
@@ -121,27 +107,14 @@ fn serve(
     {
         return Err("OpenCode returned an unexpected server address".into());
     }
-    let cwd = runtime.map_or_else(
-        || Ok(cwd.to_path_buf()),
-        |runtime| runtime.container_path(cwd),
-    )?;
-    let url = if let Some(runtime) = runtime {
-        let address = runtime.container_ip()?;
-        format!(
-            "http://{address}:{}",
-            parsed.port().ok_or("OpenCode did not return a port")?
-        )
-    } else {
-        url
-    };
     let client = Client::builder()
         .no_proxy()
         .redirect(reqwest::redirect::Policy::none())
         .connect_timeout(Duration::from_secs(3))
         .build()
         .map_err(|e| e.to_string())?;
-    log::debug!("OpenCode HTTP connection established");
     let health = execute(&client, &url, &cwd, "GET", "/global/health", None)?;
+    log::debug!("OpenCode HTTP connection established");
     events.send(Event::Ready(
         health["version"].as_str().unwrap_or("unknown").into(),
     ));
@@ -187,119 +160,45 @@ fn serve(
     Ok(())
 }
 
-fn executable(cwd: &std::path::Path, runtime: Option<&Runtime>, binary_path: &str) -> String {
+fn executable(cwd: &std::path::Path, binary_path: &str) -> String {
     let binary_path = binary_path.trim();
     if binary_path.is_empty() {
         return "opencode".into();
     }
     let path = std::path::Path::new(binary_path);
     if path.is_relative() && binary_path.contains('/') {
-        let directory = runtime.map_or(cwd, |r| r.workspace_folder.as_path());
-        directory.join(path).to_string_lossy().into_owned()
+        cwd.join(path).to_string_lossy().into_owned()
     } else {
         binary_path.into()
     }
 }
 
-fn server_command(cwd: &std::path::Path, runtime: Option<&Runtime>, program: &str) -> Command {
-    let mut command = runtime.map_or_else(
-        || Command::new(program),
-        |runtime| {
-            focus_addon_support::authentication::command(
-                runtime,
-                program,
-                crate::authentication::ENV,
-            )
-        },
-    );
-    command.args([
-        "serve",
-        "--hostname",
-        if runtime.is_some() {
-            "0.0.0.0"
-        } else {
-            "127.0.0.1"
-        },
-        "--port",
-        "0",
-    ]);
-    if runtime.is_none() {
-        command.current_dir(cwd);
-    }
+fn server_command(cwd: &std::path::Path, program: &str) -> Command {
+    let mut command = Command::new(program);
+    command
+        .args(["serve", "--hostname", "127.0.0.1", "--port", "0"])
+        .current_dir(cwd);
     command
 }
 
 #[cfg(test)]
 mod command_tests {
     use super::*;
-    use std::path::Path;
-
     #[test]
-    fn configured_executable_uses_the_active_runtime_workspace() {
-        let cwd = Path::new("/host/project");
-        let runtime = Runtime {
-            host_workspace: cwd.into(),
-            container_id: "fixture-container".into(),
-            workspace_folder: "/workspace/project".into(),
-            remote_user: Some("developer".into()),
-        };
-        for (value, host, container) in [
-            ("", "opencode", "opencode"),
-            (" \t", "opencode", "opencode"),
-            ("custom-opencode", "custom-opencode", "custom-opencode"),
-            (
-                " /opt/my tools/opencode ",
-                "/opt/my tools/opencode",
-                "/opt/my tools/opencode",
-            ),
-            (
-                "./tools/opencode",
-                "/host/project/./tools/opencode",
-                "/workspace/project/./tools/opencode",
-            ),
-        ] {
-            assert_eq!(executable(cwd, None, value), host);
-            assert_eq!(executable(cwd, Some(&runtime), value), container);
-        }
+    fn executable_is_local_to_the_addon_workspace_and_literal() {
+        let cwd = std::path::Path::new("/workspace/project");
+        assert_eq!(executable(cwd, ""), "opencode");
+        assert_eq!(
+            executable(cwd, " ./tools/opencode "),
+            "/workspace/project/./tools/opencode"
+        );
         let program = "/container tools/opencode; echo $HOME";
-        let command = server_command(cwd, None, program);
+        let command = server_command(cwd, program);
         assert_eq!(command.get_program(), program);
         assert_eq!(command.get_current_dir(), Some(cwd));
         assert_eq!(
             command.get_args().collect::<Vec<_>>(),
             ["serve", "--hostname", "127.0.0.1", "--port", "0"]
-        );
-        let command = server_command(cwd, Some(&runtime), program);
-        assert_eq!(command.get_program(), "docker");
-        let args = command
-            .get_args()
-            .map(|s| s.to_string_lossy().into_owned())
-            .collect::<Vec<_>>();
-        assert_eq!(
-            &args[..7],
-            [
-                "exec",
-                "-i",
-                "-w",
-                "/workspace/project",
-                "-u",
-                "developer",
-                "fixture-container"
-            ]
-        );
-        // The user path is a positional argument to exec "$@", never shell code.
-        assert!(args[9].contains("exec \"$@\""));
-        assert_eq!(
-            &args[10..],
-            [
-                "addon-tool",
-                program,
-                "serve",
-                "--hostname",
-                "0.0.0.0",
-                "--port",
-                "0"
-            ]
         );
     }
 }
@@ -340,7 +239,14 @@ pub(super) fn execute(
     if let Some(body) = body {
         request = request.json(body);
     }
-    let response = request.send().map_err(|e|format!("OpenCode request failed: {e}. Refresh history before retrying a prompt; it may have been accepted."))?;
+    let response = request.send().map_err(|error| {
+        use std::error::Error;
+        let error = error.without_url();
+        let mut detail = error.to_string();
+        let mut cause = error.source();
+        while let Some(error) = cause { detail.push_str(": "); detail.push_str(&error.to_string()); cause = error.source(); }
+        format!("OpenCode request failed: {detail}. Refresh history before retrying a prompt; it may have been accepted.")
+    })?;
     let status = response.status();
     let text = response.text().map_err(|e| e.to_string())?;
     if !status.is_success() {

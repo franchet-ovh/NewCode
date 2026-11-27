@@ -1,5 +1,5 @@
 //! Native OpenCode panel; backend events and rendering remain separate.
-use crate::{dev_container::Runtime, opencode_server::Server};
+use crate::opencode_server::Server;
 use egui;
 use serde_json::Value;
 use std::{
@@ -91,7 +91,6 @@ pub(crate) struct OpenCodeUi {
     history_before: Option<String>,
     last_refresh: Option<Instant>,
     markdown: crate::assistant_ui::content::CommonMarkCache,
-    runtime: Option<Runtime>,
     binary_path: String,
     issue_launch: Option<focus_addon_sdk::AssistantSession>,
 }
@@ -129,13 +128,32 @@ impl Default for OpenCodeUi {
             history_before: None,
             last_refresh: None,
             markdown: Default::default(),
-            runtime: None,
             binary_path: String::new(),
             issue_launch: None,
         }
     }
 }
 impl OpenCodeUi {
+    pub(crate) fn snapshot(&self) -> Value {
+        serde_json::json!({"session":self.session,"draft":self.input,"model":self.model,"variant":self.variant,"agent":self.agent})
+    }
+    pub(crate) fn restore_snapshot(&mut self, state: &Value) {
+        if let Some(session) = state["session"].as_str() {
+            self.remember_session(session.into());
+        }
+        if let Some(draft) = state["draft"].as_str() {
+            self.input = draft.into();
+        }
+        if let Ok(model) = serde_json::from_value(state["model"].clone()) {
+            self.model = model;
+        }
+        if let Some(variant) = state["variant"].as_str() {
+            self.variant = variant.into();
+        }
+        if let Some(agent) = state["agent"].as_str() {
+            self.agent = agent.into();
+        }
+    }
     pub(crate) fn start(&mut self, cwd: Option<&Path>, ctx: egui::Context) {
         log::info!("start requested");
         if self.server.is_some() {
@@ -147,7 +165,6 @@ impl OpenCodeUi {
             .unwrap_or_else(|_| cwd.unwrap_or(Path::new(".")).to_path_buf());
         self.server = Some(Server::spawn(
             &self.workspace,
-            self.runtime.clone(),
             self.binary_path.clone(),
             ctx,
         ));
@@ -170,15 +187,7 @@ impl OpenCodeUi {
     pub(crate) fn set_binary_path(&mut self, path: &str) {
         self.binary_path = path.trim().into();
     }
-    pub(crate) fn set_runtime(&mut self, runtime: Option<&Runtime>) -> bool {
-        if self.runtime.as_ref() != runtime {
-            self.stop();
-            self.runtime = runtime.cloned();
-            true
-        } else {
-            false
-        }
-    }
+
     pub(crate) fn stop(&mut self) {
         self.issue_launch = None;
         log::info!("stop requested");

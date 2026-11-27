@@ -7,11 +7,24 @@ import tarfile
 import tomllib
 from prepare_version import release_version, replace_version
 
-TARGETS = {"x86_64-unknown-linux-gnu": ("linux-amd64", ".tar.gz"),
+TARGETS = {"x86_64-unknown-linux-musl": ("linux-musl-amd64", ".tar.gz"),
+           "aarch64-unknown-linux-musl": ("linux-musl-arm64", ".tar.gz"),
+           "x86_64-unknown-linux-gnu": ("linux-amd64", ".tar.gz"),
            "aarch64-unknown-linux-gnu": ("linux-arm64", ".tar.gz"),
            "x86_64-apple-darwin": ("macos-amd64", ".dmg"),
            "aarch64-apple-darwin": ("macos-arm64", ".dmg")}
 RELEASE_TARGETS = ("x86_64-unknown-linux-gnu", "aarch64-unknown-linux-gnu")
+
+CONTAINER_TARGETS = ("x86_64-unknown-linux-musl", "aarch64-unknown-linux-musl")
+ALL_ADDON_TARGETS = RELEASE_TARGETS + CONTAINER_TARGETS
+
+
+def release_targets(manifest):
+    return ALL_ADDON_TARGETS if manifest.get('execution') == 'workspace' else RELEASE_TARGETS
+
+
+def build_matrix(manifest):
+    return {'include': [dict(runner='ubuntu-24.04-arm' if target.startswith('aarch64') else 'ubuntu-24.04', target=target) for target in release_targets(manifest)]}
 
 
 def safe_tag(tag):

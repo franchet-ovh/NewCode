@@ -137,6 +137,27 @@ fn fetch_tag(client: &reqwest::blocking::Client, tag: &str) -> Result<Catalog, S
 }
 const INDEX_URL: &str = "https://raw.githubusercontent.com/franchet-ovh/NewCode/main/addons.json";
 
+pub(super) fn runtime_package(id: &str, version: &str, target: &str) -> Result<Package, String> {
+    let response = get(
+        &client()?,
+        reqwest::Url::parse(INDEX_URL).unwrap(),
+        "container package lookup",
+    )?
+    .error_for_status()
+    .map_err(request_error)?;
+    let mut bytes = Vec::new();
+    response
+        .take((focus_addon_sdk::MAX_MESSAGE + 1) as u64)
+        .read_to_end(&mut bytes)
+        .map_err(|e| e.to_string())?;
+    if bytes.len() > focus_addon_sdk::MAX_MESSAGE {
+        return Err("Addon index exceeds size limit".into());
+    }
+    let index: focus_addon_sdk::AddonIndex =
+        serde_json::from_slice(&bytes).map_err(|e| e.to_string())?;
+    index.package_for(id, version, target, env!("CARGO_PKG_VERSION"))
+}
+
 fn fetch_latest(client: &reqwest::blocking::Client) -> Result<Catalog, String> {
     let response = get(
         client,

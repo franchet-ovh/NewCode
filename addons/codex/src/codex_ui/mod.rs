@@ -1,5 +1,5 @@
 //! Codex panel state and lifecycle; rendering and protocol handling are separate modules.
-use crate::{app_server::AppServer, dev_container::Runtime};
+use crate::app_server::AppServer;
 use egui;
 use messages::{Message, PendingRequest};
 use serde_json::{Value, json};
@@ -48,7 +48,6 @@ pub(crate) struct CodexUi {
     answer: String,
     plan: plan::PlanState,
     markdown: crate::assistant_ui::content::CommonMarkCache,
-    runtime: Option<Runtime>,
     issue_launch: Option<issue::Launch>,
 }
 
@@ -82,13 +81,32 @@ impl Default for CodexUi {
             answer: String::new(),
             plan: plan::PlanState::default(),
             markdown: Default::default(),
-            runtime: None,
             issue_launch: None,
         }
     }
 }
 
 impl CodexUi {
+    pub(crate) fn snapshot(&self) -> Value {
+        serde_json::json!({"session":self.saved_session(),"draft":self.input,"model":self.model,"effort":self.effort,"mode":self.mode})
+    }
+    pub(crate) fn restore_snapshot(&mut self, state: &Value) {
+        if let Some(session) = state["session"].as_str() {
+            self.restore_session(session.into());
+        }
+        if let Some(draft) = state["draft"].as_str() {
+            self.input = draft.into();
+        }
+        if let Some(model) = state["model"].as_str() {
+            self.model = model.into();
+        }
+        if let Ok(effort) = serde_json::from_value(state["effort"].clone()) {
+            self.effort = effort;
+        }
+        if let Ok(mode) = serde_json::from_value(state["mode"].clone()) {
+            self.mode = mode;
+        }
+    }
     pub(crate) fn saved_session(&self) -> Option<String> {
         self.thread_id
             .clone()
@@ -103,7 +121,7 @@ impl CodexUi {
         if self.server.is_some() {
             return;
         }
-        match AppServer::spawn(cwd, self.runtime.as_ref(), ctx) {
+        match AppServer::spawn(cwd, ctx) {
             Ok(mut server) => {
                 self.initializing_id = match server.request("initialize", json!({
                     "clientInfo":{"name":"focus_editor","title":"Focus Editor","version":env!("CARGO_PKG_VERSION")},
@@ -125,22 +143,9 @@ impl CodexUi {
             Err(error) => self.status = error,
         }
     }
-    pub(crate) fn set_runtime(&mut self, runtime: Option<&Runtime>) -> bool {
-        if self.runtime.as_ref() != runtime {
-            self.stop();
-            self.runtime = runtime.cloned();
-            true
-        } else {
-            false
-        }
-    }
+
     pub(super) fn remote_cwd(&self, cwd: Option<&Path>) -> Option<std::path::PathBuf> {
-        cwd.and_then(|path| {
-            self.runtime.as_ref().map_or_else(
-                || Some(path.to_path_buf()),
-                |runtime| runtime.container_path(path).ok(),
-            )
-        })
+        cwd.map(Path::to_path_buf)
     }
 
     pub(crate) fn stop(&mut self) {

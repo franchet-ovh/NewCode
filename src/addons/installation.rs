@@ -3,6 +3,13 @@ use std::fs;
 use std::path::Component;
 
 pub(super) fn load_manifest(path: &Path) -> Result<Manifest, String> {
+    load_manifest_for_target(path, packages::target())
+}
+
+pub(super) fn load_manifest_for_target(
+    path: &Path,
+    target: Option<&str>,
+) -> Result<Manifest, String> {
     let metadata = fs::metadata(path).map_err(|e| e.to_string())?;
     if metadata.len() > 64 * 1024 {
         return Err("Addon manifest is too large".into());
@@ -25,7 +32,7 @@ pub(super) fn load_manifest(path: &Path) -> Result<Manifest, String> {
     if manifest
         .target
         .as_deref()
-        .is_some_and(|target| Some(target) != packages::target())
+        .is_some_and(|actual| target.is_some_and(|expected| actual != expected))
     {
         return Err("Addon package targets a different platform".into());
     }
