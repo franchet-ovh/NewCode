@@ -878,10 +878,37 @@
         {
           "version": "0.7.1",
           "release": "addon_lsp-python_0.7.1",
-          "status": "planned",
+          "status": "published",
           "protocol": 1,
           "editor_version_req": ">=0.6.0, <0.8.0",
-          "packages": []
+          "packages": [
+            {
+              "id": "lsp-python",
+              "name": "Python",
+              "description": "Python completion, mypy type checking, linting, formatting, and symbols.",
+              "publisher": "Focus Editor project",
+              "version": "0.7.1",
+              "protocol": 1,
+              "target": "aarch64-unknown-linux-gnu",
+              "editor_version_req": ">=0.6.0, <0.8.0",
+              "archive": "focus-addon-lsp-python-addon_lsp-python_0.7.1-linux-arm64.tar.gz",
+              "size": 394797,
+              "sha256": "1ce93af9cf81a2c545f5c960f626cc74a646d8095d8d0c2b3e68db2a344d77eb"
+            },
+            {
+              "id": "lsp-python",
+              "name": "Python",
+              "description": "Python completion, mypy type checking, linting, formatting, and symbols.",
+              "publisher": "Focus Editor project",
+              "version": "0.7.1",
+              "protocol": 1,
+              "target": "x86_64-unknown-linux-gnu",
+              "editor_version_req": ">=0.6.0, <0.8.0",
+              "archive": "focus-addon-lsp-python-addon_lsp-python_0.7.1-linux-amd64.tar.gz",
+              "size": 407881,
+              "sha256": "bf945e8439bdb325aabd809021e21062f9bf247928c30ca30efcc3fbc4f5c9ba"
+            }
+          ]
         },
         {
           "version": "0.7.0",
