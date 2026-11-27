@@ -1335,10 +1335,37 @@
         {
           "version": "0.7.1",
           "release": "addon_lsp-rust_0.7.1",
-          "status": "planned",
+          "status": "published",
           "protocol": 1,
           "editor_version_req": ">=0.6.0, <0.8.0",
-          "packages": []
+          "packages": [
+            {
+              "id": "lsp-rust",
+              "name": "Rust",
+              "description": "Rust completion, type checking, Clippy linting, formatting, and symbols.",
+              "publisher": "Focus Editor project",
+              "version": "0.7.1",
+              "protocol": 1,
+              "target": "aarch64-unknown-linux-gnu",
+              "editor_version_req": ">=0.6.0, <0.8.0",
+              "archive": "focus-addon-lsp-rust-addon_lsp-rust_0.7.1-linux-arm64.tar.gz",
+              "size": 394796,
+              "sha256": "0687d0ecbdf2833a54bc4b982f8aa39e6ff5cf728c651b2822bfcb88ad7e307e"
+            },
+            {
+              "id": "lsp-rust",
+              "name": "Rust",
+              "description": "Rust completion, type checking, Clippy linting, formatting, and symbols.",
+              "publisher": "Focus Editor project",
+              "version": "0.7.1",
+              "protocol": 1,
+              "target": "x86_64-unknown-linux-gnu",
+              "editor_version_req": ">=0.6.0, <0.8.0",
+              "archive": "focus-addon-lsp-rust-addon_lsp-rust_0.7.1-linux-amd64.tar.gz",
+              "size": 407891,
+              "sha256": "6e55e5313eea8b7ee965faed18da823829f0f5a12df585064cfd54189d20231f"
+            }
+          ]
         },
         {
           "version": "0.7.0",
