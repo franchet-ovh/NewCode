@@ -1712,10 +1712,63 @@
         {
           "version": "0.7.1",
           "release": "addon_opencode_0.7.1",
-          "status": "planned",
+          "status": "published",
           "protocol": 1,
           "editor_version_req": ">=0.6.1, <0.8.0",
-          "packages": []
+          "packages": [
+            {
+              "id": "opencode",
+              "name": "OpenCode",
+              "description": "",
+              "publisher": "",
+              "version": "0.7.1",
+              "protocol": 1,
+              "target": "aarch64-unknown-linux-gnu",
+              "editor_version_req": ">=0.6.1, <0.8.0",
+              "archive": "focus-addon-opencode-addon_opencode_0.7.1-linux-arm64.tar.gz",
+              "size": 6513182,
+              "sha256": "d060fb551af22a9011d31982d9391d5cb3e16031e2d53caddac17aed689569f0"
+            },
+            {
+              "id": "opencode",
+              "name": "OpenCode",
+              "description": "",
+              "publisher": "",
+              "version": "0.7.1",
+              "protocol": 1,
+              "target": "aarch64-unknown-linux-musl",
+              "editor_version_req": ">=0.6.1, <0.8.0",
+              "archive": "focus-addon-opencode-addon_opencode_0.7.1-linux-musl-arm64.tar.gz",
+              "size": 6543214,
+              "sha256": "0273e00eb713512bfc36bfb9bf33f146400ffb62a87b7689f27de68c561e6308"
+            },
+            {
+              "id": "opencode",
+              "name": "OpenCode",
+              "description": "",
+              "publisher": "",
+              "version": "0.7.1",
+              "protocol": 1,
+              "target": "x86_64-unknown-linux-gnu",
+              "editor_version_req": ">=0.6.1, <0.8.0",
+              "archive": "focus-addon-opencode-addon_opencode_0.7.1-linux-amd64.tar.gz",
+              "size": 6680504,
+              "sha256": "1d6503f95ef802755b58aa37395c4ae77907d2ff735e80b5322159dd3926bbb3"
+            },
+            {
+              "id": "opencode",
+              "name": "OpenCode",
+              "description": "",
+              "publisher": "",
+              "version": "0.7.1",
+              "protocol": 1,
+              "target": "x86_64-unknown-linux-musl",
+              "editor_version_req": ">=0.6.1, <0.8.0",
+              "archive": "focus-addon-opencode-addon_opencode_0.7.1-linux-musl-amd64.tar.gz",
+              "size": 6976431,
+              "sha256": "a9f7010549fec92cdf867fca061361109823aa834f3bcf593b4ccc6f5b0aa5b0"
+            }
+          ]
         },
         {
           "version": "0.7.0",
