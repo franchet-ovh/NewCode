@@ -81,17 +81,7 @@ fn archive(root: &Path, name: &str, target: &str) -> (PathBuf, Manifest) {
     let manifest: Manifest = toml::from_str(&text).unwrap();
     assert_eq!(manifest.execution, Execution::Workspace);
     let path = root.join(format!("{name}.tar.gz"));
-    let encoder =
-        flate2::write::GzEncoder::new(File::create(&path).unwrap(), flate2::Compression::fast());
-    let mut builder = tar::Builder::new(encoder);
     let text = format!("target = {target:?}\n{text}");
-    let mut header = tar::Header::new_gnu();
-    header.set_size(text.len() as u64);
-    header.set_mode(0o600);
-    header.set_cksum();
-    builder
-        .append_data(&mut header, "addon.toml", text.as_bytes())
-        .unwrap();
     let binary = repository
         .join("target")
         .join(target)
@@ -109,17 +99,82 @@ fn archive(root: &Path, name: &str, target: &str) -> (PathBuf, Manifest) {
         "{}",
         String::from_utf8_lossy(&output.stderr)
     );
-    builder
-        .append_path_with_name(stripped, &manifest.executable)
-        .unwrap();
-    builder
-        .append_path_with_name(
-            manifest_path.parent().unwrap().join(&manifest.icon),
-            &manifest.icon,
-        )
-        .unwrap();
-    builder.into_inner().unwrap().finish().unwrap();
+    write_archive(
+        &path,
+        &manifest,
+        &text,
+        &stripped,
+        &manifest_path.parent().unwrap().join(&manifest.icon),
+    );
     (path, manifest)
+}
+
+fn write_archive(path: &Path, manifest: &Manifest, text: &str, binary: &Path, icon: &Path) {
+    let encoder =
+        flate2::write::GzEncoder::new(File::create(path).unwrap(), flate2::Compression::fast());
+    let mut builder = tar::Builder::new(encoder);
+    // Stripped binaries can be sparse; the importer accepts regular entries only.
+    builder.sparse(false);
+    let mut header = tar::Header::new_gnu();
+    header.set_size(text.len() as u64);
+    header.set_mode(0o600);
+    header.set_cksum();
+    builder
+        .append_data(&mut header, "addon.toml", text.as_bytes())
+        .unwrap();
+    builder
+        .append_path_with_name(binary, &manifest.executable)
+        .unwrap();
+    builder.append_path_with_name(icon, &manifest.icon).unwrap();
+    builder.into_inner().unwrap().finish().unwrap();
+}
+
+#[test]
+fn sparse_fixture_archives_import_as_regular_files_and_preserve_contents() {
+    use std::io::{Seek, SeekFrom};
+
+    let root = tempfile::tempdir().unwrap();
+    let text = format!(
+        "execution='workspace'\nid='fixture'\nname='Fixture'\nversion='1.0.0'\nprotocol=1\nexecutable='program'\nicon='icon.png'\ntarget='{}'\n",
+        TARGETS[0]
+    );
+    let manifest: Manifest = toml::from_str(&text).unwrap();
+    let binary = root.path().join("program");
+    let mut file = File::create(&binary).unwrap();
+    file.write_all(b"header").unwrap();
+    file.seek(SeekFrom::Start(4 * 1024 * 1024)).unwrap();
+    file.write_all(b"tail").unwrap();
+    drop(file);
+    let icon = root.path().join("icon.png");
+    fs::write(&icon, b"icon").unwrap();
+    let path = root.path().join("fixture.tar.gz");
+    write_archive(&path, &manifest, &text, &binary, &icon);
+
+    let mut archive = tar::Archive::new(flate2::read::GzDecoder::new(File::open(&path).unwrap()));
+    let mut entries = Vec::new();
+    for entry in archive.entries().unwrap() {
+        let entry = entry.unwrap();
+        assert_eq!(entry.header().entry_type(), tar::EntryType::Regular);
+        entries.push(entry.path().unwrap().into_owned());
+    }
+    assert_eq!(
+        entries,
+        ["addon.toml", "program", "icon.png"].map(PathBuf::from)
+    );
+    let prepared = packages::prepare_archive_for_target(
+        &root.path().join("cache"),
+        &path,
+        None,
+        Some(TARGETS[0]),
+    )
+    .unwrap();
+    let mut expected = vec![0; 4 * 1024 * 1024 + 4];
+    expected[..6].copy_from_slice(b"header");
+    expected[4 * 1024 * 1024..].copy_from_slice(b"tail");
+    assert_eq!(
+        fs::read(prepared.payload().join("program")).unwrap(),
+        expected
+    );
 }
 fn assert_backend_gone(container: &Container, name: &str) {
     let script = format!(
@@ -232,7 +287,13 @@ fn live_container_assistants_smoke() {
             &format!("{}:/tmp/focus-tools/{name}", container.0),
         ]);
         let (package, manifest) = archive(&root, name, target);
-        assert!(import(&package).unwrap().is_some());
+        assert!(
+            import(&package)
+                .unwrap_or_else(|error| panic!(
+                    "Cannot import {name} smoke package for {target}: {error}"
+                ))
+                .is_some()
+        );
         let installed = root.join("installed").join(name);
         fs::create_dir_all(&installed).unwrap();
         let context = Context {
