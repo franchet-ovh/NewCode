@@ -6,9 +6,17 @@
       "path": "addons/codex",
       "versions": [
         {
+          "version": "0.7.0",
+          "release": "addon_codex_0.7.0",
+          "status": "planned",
+          "protocol": 1,
+          "editor_version_req": ">=0.6.1, <0.7.0",
+          "packages": []
+        },
+        {
           "version": "0.6.1",
           "release": "addon_codex_0.6.1",
-          "status": "planned",
+          "status": "reserved",
           "protocol": 1,
           "editor_version_req": ">=0.6.1, <0.7.0",
           "packages": []
@@ -429,9 +437,17 @@
       "path": "addons/github",
       "versions": [
         {
+          "version": "0.7.0",
+          "release": "addon_github_0.7.0",
+          "status": "planned",
+          "protocol": 1,
+          "editor_version_req": ">=0.6.0, <0.7.0",
+          "packages": []
+        },
+        {
           "version": "0.6.0",
           "release": "addon_github_0.6.0",
-          "status": "planned",
+          "status": "reserved",
           "protocol": 1,
           "editor_version_req": ">=0.6.0, <0.7.0",
           "packages": []
@@ -844,9 +860,17 @@
       "path": "addons/lsp-python",
       "versions": [
         {
+          "version": "0.7.0",
+          "release": "addon_lsp-python_0.7.0",
+          "status": "planned",
+          "protocol": 1,
+          "editor_version_req": ">=0.6.0, <0.7.0",
+          "packages": []
+        },
+        {
           "version": "0.6.0",
           "release": "addon_lsp-python_0.6.0",
-          "status": "planned",
+          "status": "reserved",
           "protocol": 1,
           "editor_version_req": ">=0.6.0, <0.7.0",
           "packages": []
@@ -1178,9 +1202,17 @@
       "path": "addons/lsp-rust",
       "versions": [
         {
+          "version": "0.7.0",
+          "release": "addon_lsp-rust_0.7.0",
+          "status": "planned",
+          "protocol": 1,
+          "editor_version_req": ">=0.6.0, <0.7.0",
+          "packages": []
+        },
+        {
           "version": "0.6.0",
           "release": "addon_lsp-rust_0.6.0",
-          "status": "planned",
+          "status": "reserved",
           "protocol": 1,
           "editor_version_req": ">=0.6.0, <0.7.0",
           "packages": []
@@ -1512,9 +1544,17 @@
       "path": "addons/opencode",
       "versions": [
         {
+          "version": "0.7.0",
+          "release": "addon_opencode_0.7.0",
+          "status": "planned",
+          "protocol": 1,
+          "editor_version_req": ">=0.6.1, <0.7.0",
+          "packages": []
+        },
+        {
           "version": "0.6.1",
           "release": "addon_opencode_0.6.1",
-          "status": "planned",
+          "status": "reserved",
           "protocol": 1,
           "editor_version_req": ">=0.6.1, <0.7.0",
           "packages": []
