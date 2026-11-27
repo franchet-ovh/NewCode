@@ -31,6 +31,8 @@ def verify_binary(binary, target, name="focus-editor", expected_version=None):
     print(description)
     architecture = {
         "x86_64-unknown-linux-gnu": "x86-64",
+        "x86_64-unknown-linux-musl": "x86-64",
+        "aarch64-unknown-linux-musl": "aarch64",
         "aarch64-unknown-linux-gnu": "aarch64",
         "x86_64-apple-darwin": "x86_64",
         "aarch64-apple-darwin": "arm64",
@@ -44,6 +46,9 @@ def verify_binary(binary, target, name="focus-editor", expected_version=None):
             raise RuntimeError("Ghostty must be statically linked in release binaries")
         if "not found" in libraries:
             raise RuntimeError("Unresolved Linux shared libraries")
+    elif target.endswith("linux-musl"):
+        if "INTERP" in run("readelf", "-l", str(binary)) or "(NEEDED)" in run("readelf", "-d", str(binary)):
+            raise RuntimeError("Container addon must be statically linked")
     else:
         if run("lipo", "-archs", str(binary)) != architecture:
             raise RuntimeError(f"Expected a native {architecture} Mach-O executable")
@@ -131,7 +136,7 @@ def package_macos(binary, output, stage):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("target", choices=TARGETS)
+    parser.add_argument("target", choices=RELEASE_TARGETS + MACOS_TARGETS)
     parser.add_argument("tag")
     args = parser.parse_args()
     binary = Path("target", args.target, "release/focus-editor").resolve(strict=True)

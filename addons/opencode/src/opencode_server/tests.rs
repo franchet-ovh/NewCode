@@ -115,7 +115,6 @@ fn configured_executable_with_spaces_is_launched_without_a_shell() {
     std::fs::set_permissions(&binary, std::fs::Permissions::from_mode(0o755)).unwrap();
     let server = Server::spawn(
         &root,
-        None,
         binary.to_str().unwrap().into(),
         egui::Context::default(),
     );
@@ -137,7 +136,6 @@ fn missing_configured_executable_reports_the_setting_to_fix() {
     let binary = root.join(format!("missing-opencode-{}", std::process::id()));
     let server = Server::spawn(
         &root,
-        None,
         binary.to_str().unwrap().into(),
         egui::Context::default(),
     );
@@ -155,7 +153,7 @@ fn installed_server_catalog_smoke() {
         std::process::id()
     ));
     std::fs::create_dir_all(&root).unwrap();
-    let mut server = Server::spawn(&root, None, String::new(), egui::Context::default());
+    let mut server = Server::spawn(&root, String::new(), egui::Context::default());
     let deadline = std::time::Instant::now() + Duration::from_secs(20);
     let mut ready = false;
     while std::time::Instant::now() < deadline && !ready {

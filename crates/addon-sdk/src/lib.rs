@@ -20,6 +20,8 @@ pub const MAX_MESSAGE: usize = 8 * 1024 * 1024;
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct Manifest {
     #[serde(default)]
+    pub execution: Execution,
+    #[serde(default)]
     pub languages: Vec<language::Language>,
     pub id: String,
     pub name: String,
@@ -47,6 +49,14 @@ pub struct Manifest {
     pub environment: Vec<String>,
     #[serde(default)]
     pub settings: Vec<Setting>,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Execution {
+    #[default]
+    Host,
+    Workspace,
 }
 
 /// A non-secret workspace text setting, delivered through `Context.state`.
@@ -184,6 +194,9 @@ pub struct Credential {
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct Context {
+    /// Non-secret workspace data retained by the host across process restarts.
+    #[serde(default)]
+    pub persistent_state: Value,
     pub generation: u64,
     pub workspace: Option<PathBuf>,
     pub storage: PathBuf,

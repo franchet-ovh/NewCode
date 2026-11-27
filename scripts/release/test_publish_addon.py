@@ -7,12 +7,20 @@ import tempfile
 import unittest
 from unittest.mock import patch
 import tomllib
-from addon_release import RELEASE_TARGETS, assets, manifests, package_addons, editor_compatibility, version_files
+from addon_release import release_targets, build_matrix, CONTAINER_TARGETS, RELEASE_TARGETS, assets, manifests, package_addons, editor_compatibility, version_files
 from addon_index import planned, encode
 import publish_addon as publisher
 
 
 class AddonReleaseTests(unittest.TestCase):
+    def test_workspace_releases_require_native_and_portable_packages(self):
+        self.assertEqual(set(release_targets({'execution': 'workspace'})), set(RELEASE_TARGETS + CONTAINER_TARGETS))
+        self.assertEqual(release_targets({}), RELEASE_TARGETS)
+        matrix = build_matrix({'execution': 'workspace'})['include']
+        self.assertEqual(len(matrix), 4)
+        for item in matrix:
+            self.assertEqual(item['runner'], 'ubuntu-24.04-arm' if item['target'].startswith('aarch64') else 'ubuntu-24.04')
+
     def test_editor_bounds_preserve_omitted_end_and_validate_ranges(self):
         manifest = {'editor_version_req': '>=0.4.8, <0.5.0'}
         for lower, upper, expected in [
@@ -178,6 +186,28 @@ class AddonReleaseTests(unittest.TestCase):
             (path / 'Cargo.toml').write_text(f'[package]\nname="focus-addon-{name}"\nversion="0.4.8"\n')
             (path / 'Cargo.lock').write_text(f'version=4\n[[package]]\nname="focus-addon-{name}"\nversion="0.4.8"\n')
         (root / 'Cargo.toml').write_text('[package]\nversion="0.4.8"\n')
+
+    def test_workspace_publication_rejects_missing_portable_target(self):
+        with tempfile.TemporaryDirectory() as temporary, patch.object(publisher, 'ROOT', Path(temporary)):
+            root = Path(temporary)
+            self.fixture(root)
+            manifest_path = root / 'addons/first/addon.toml'
+            manifest_path.write_text('execution="workspace"\n' + manifest_path.read_text())
+            self.commit_version(root, '0.4.9')
+            manifest = publisher.definition('first')[1]
+            for target in release_targets(manifest):
+                source = root / 'build' / target / 'addons/first'
+                source.mkdir(parents=True)
+                (source / 'addon.toml').write_text(f'target="{target}"\n' + manifest_path.read_text())
+                for asset in assets(manifest):
+                    if asset != 'addon.toml':
+                        (source / asset).write_bytes(b'fixture')
+                package_addons(root / 'build' / target, root / 'dist', 'addon_first_0.4.9', target, root, ['first'])
+            publisher.finalize('first', 'addon_first_0.4.9', root / 'dist')
+            self.assertEqual(len(json.loads((root / 'dist/addons.json').read_text())['packages']), 4)
+            (root / 'dist' / publisher.index_name(CONTAINER_TARGETS[0])).unlink()
+            with self.assertRaises(FileNotFoundError):
+                publisher.finalize('first', 'addon_first_0.4.9', root / 'dist')
 
     def test_isolated_stamp_and_complete_assets(self):
         with tempfile.TemporaryDirectory() as temporary, patch.object(publisher, 'ROOT', Path(temporary)):

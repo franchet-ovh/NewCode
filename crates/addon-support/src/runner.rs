@@ -8,6 +8,9 @@ use focus_addon_sdk::{
 use std::{io::BufReader, sync::mpsc, time::Duration};
 
 pub trait Panel {
+    fn persistent_state(&self) -> Option<serde_json::Value> {
+        None
+    }
     fn context(&mut self, context: Context, ctx: &egui::Context);
     fn tick(&mut self, ctx: &egui::Context);
     fn show(&mut self, ui: &mut egui::Ui, ctx: &egui::Context);
@@ -47,6 +50,7 @@ pub fn run(mut panel: impl Panel) -> Result<(), String> {
     let mut generation = 0;
     let mut last_state = String::new();
     let mut last_capabilities = None;
+    let mut last_data = None;
     loop {
         let message = match rx.recv_timeout(Duration::from_millis(50)) {
             Ok(m) => m,
@@ -56,6 +60,7 @@ pub fn run(mut panel: impl Panel) -> Result<(), String> {
                     &panel,
                     &mut last_state,
                     &mut last_capabilities,
+                    &mut last_data,
                     generation,
                     &mut output,
                 )?;
@@ -115,13 +120,25 @@ pub fn run(mut panel: impl Panel) -> Result<(), String> {
                 write_message(&mut output, &Message::notification("surface.frame", frame))
                     .map_err(|e| e.to_string())?;
             }
-            Some("shutdown") => break,
+            Some("shutdown") => {
+                panel.tick(&ctx);
+                report(
+                    &panel,
+                    &mut last_state,
+                    &mut last_capabilities,
+                    &mut last_data,
+                    generation,
+                    &mut output,
+                )?;
+                break;
+            }
             _ => panel.tick(&ctx),
         }
         report(
             &panel,
             &mut last_state,
             &mut last_capabilities,
+            &mut last_data,
             generation,
             &mut output,
         )?;
@@ -133,9 +150,22 @@ fn report(
     panel: &impl Panel,
     last: &mut String,
     last_capabilities: &mut Option<AssistantCapabilities>,
+    last_data: &mut Option<serde_json::Value>,
     generation: u64,
     output: &mut impl std::io::Write,
 ) -> Result<(), String> {
+    let data = panel.persistent_state();
+    if data.is_some() && &data != last_data {
+        write_message(
+            output,
+            &Message::notification(
+                "state.changed",
+                serde_json::json!({"generation":generation,"state":data}),
+            ),
+        )
+        .map_err(|e| e.to_string())?;
+        *last_data = data;
+    }
     let capabilities = panel.assistant_capabilities();
     if &capabilities != last_capabilities {
         write_message(

@@ -245,6 +245,15 @@ pub(super) fn prepare_archive(
     path: &Path,
     expected: Option<(&Package, &str)>,
 ) -> Result<Prepared, String> {
+    prepare_archive_for_target(root, path, expected, target())
+}
+
+pub(super) fn prepare_archive_for_target(
+    root: &Path,
+    path: &Path,
+    expected: Option<(&Package, &str)>,
+    target: Option<&str>,
+) -> Result<Prepared, String> {
     if fs::metadata(path).map_err(|e| e.to_string())?.len() > MAX_ARCHIVE {
         return Err("Addon archive exceeds size limit".into());
     }
@@ -291,8 +300,8 @@ pub(super) fn prepare_archive(
             return Err("Incomplete addon archive".into());
         }
     }
-    let manifest = load_manifest(&payload.join("addon.toml"))?;
-    check_manifest(&manifest)?;
+    let manifest =
+        super::installation::load_manifest_for_target(&payload.join("addon.toml"), target)?;
     let allowed: HashSet<_> = [
         PathBuf::from("addon.toml"),
         manifest.executable.clone(),
@@ -337,6 +346,12 @@ pub(super) fn prepare_archive(
         receipt,
         stage,
     })
+}
+
+impl Prepared {
+    pub(super) fn payload(&self) -> PathBuf {
+        self.stage.path().join("payload")
+    }
 }
 pub(super) fn commit(root: &Path, prepared: Prepared) -> Result<(Manifest, Receipt), String> {
     let id = &prepared.manifest.id;

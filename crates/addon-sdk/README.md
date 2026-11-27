@@ -58,6 +58,24 @@ The source installer calls `focus-editor --check-addon-compatibility addon.toml`
 without opening a window. Use its `--editor` option to choose a specific built
 editor executable; incompatibility fails before an existing installation changes.
 
+## Workspace execution
+
+Optional manifest `execution = "workspace"` runs the addon in the active workspace's
+container, or on the host when the workspace is local. The default is `"host"`.
+Container packages must match the installed addon version and target. The host
+translates `Context.workspace` and scratch `Context.storage` to container paths,
+clears `Context.runtime`, and transports the existing protocol over `docker exec -i`
+without a TTY. Use local child processes; do not invoke Docker inside the addon.
+
+`Context.persistent_state` optionally contains the host's last non-secret snapshot.
+The shared runner's `Panel::persistent_state()` hook publishes changed snapshots
+through `state.changed` with `{generation, state}`. State must be a JSON object
+within the normal protocol size limit. The host writes snapshots atomically to
+workspace addon data, isolated by addon and execution environment. On shutdown,
+flush the last snapshot before exiting; do not store credentials in snapshots.
+Workspace-executed processes restart across runtime changes. Old messages and
+cancelled preparations cannot replace the new generation's process or state.
+
 ## Lifecycle and UI
 
 1. Host sends request `initialize` with `{ "protocol": 1, "context": Context }`.

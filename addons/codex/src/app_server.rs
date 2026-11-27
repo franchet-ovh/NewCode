@@ -1,4 +1,3 @@
-use crate::dev_container::Runtime;
 use egui;
 use serde_json::{Value, json};
 use std::{
@@ -20,36 +19,15 @@ pub(crate) struct AppServer {
 }
 
 impl AppServer {
-    pub(crate) fn spawn(
-        cwd: Option<&Path>,
-        runtime: Option<&Runtime>,
-        ctx: egui::Context,
-    ) -> Result<Self, String> {
-        if let Some(runtime) = runtime {
-            crate::authentication::prepare(runtime)?;
-        }
+    pub(crate) fn spawn(cwd: Option<&Path>, ctx: egui::Context) -> Result<Self, String> {
         log::info!("spawn requested");
-        let mut command = runtime.map_or_else(
-            || Command::new("codex"),
-            |runtime| {
-                focus_addon_support::authentication::command(
-                    runtime,
-                    "codex",
-                    crate::authentication::ENV,
-                )
-            },
-        );
-        if runtime.is_some() {
-            command.args(["-c", "cli_auth_credentials_store=\"file\""]);
-        }
+        let mut command = Command::new("codex");
         command
             .args(["app-server", "--listen", "stdio://"])
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
-        if runtime.is_none()
-            && let Some(path) = cwd
-        {
+        if let Some(path) = cwd {
             command.current_dir(path);
         }
         let mut child = command.spawn().map_err(|e| {

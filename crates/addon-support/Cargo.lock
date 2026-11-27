@@ -510,6 +510,7 @@ dependencies = [
  "egui_commonmark",
  "env_logger",
  "focus-addon-sdk",
+ "libc",
  "log",
  "miniz_oxide 0.8.9",
  "regex",

@@ -8,7 +8,7 @@ from pathlib import Path
 import re
 import subprocess
 import tomllib
-from addon_release import manifests, package_addons, RELEASE_TARGETS, index_name, digest, archive_name, stable, next_version
+from addon_release import release_targets, build_matrix, ALL_ADDON_TARGETS, manifests, package_addons, RELEASE_TARGETS, index_name, digest, archive_name, stable, next_version
 from addon_index import load, record, check_metadata, validate_source
 from github_api import gh, api
 
@@ -122,7 +122,7 @@ def finalize(addon, tag, directory):
     _, manifest = definition(addon)
     packages = []
     expected = set()
-    for target in RELEASE_TARGETS:
+    for target in release_targets(manifest):
         name = index_name(target)
         expected.add(name)
         catalog = json.loads((directory / name).read_text())
@@ -150,7 +150,7 @@ def main():
     parser.add_argument('--addon', required=True)
     parser.add_argument('--tag')
     parser.add_argument('--source-sha')
-    parser.add_argument('--target', choices=RELEASE_TARGETS)
+    parser.add_argument('--target', choices=ALL_ADDON_TARGETS)
     args = parser.parse_args()
     if args.command == 'reserve':
         if not re.fullmatch(r'[0-9a-f]{40}', args.source_sha or ''):
@@ -162,6 +162,7 @@ def main():
         tag, done, sha = reserve(args.addon, args.source_sha)
         with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
             output.write(f'tag={tag}\ndone={str(done).lower()}\nsha={sha}\n')
+            output.write('matrix=' + json.dumps(build_matrix(definition(args.addon)[1])) + '\n')
         return
     if not args.tag:
         parser.error('--tag is required')

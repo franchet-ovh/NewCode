@@ -35,6 +35,41 @@ pub enum PublicationStatus {
 }
 
 impl AddonIndex {
+    pub fn package_for(
+        &self,
+        id: &str,
+        version: &str,
+        target: &str,
+        editor: &str,
+    ) -> Result<Package, String> {
+        self.validate()?;
+        for addon in &self.addons {
+            if addon.id != id {
+                continue;
+            }
+            for release in &addon.versions {
+                if release.version != version || release.status != PublicationStatus::Published {
+                    continue;
+                }
+                for package in &release.packages {
+                    if package.target == target {
+                        check_compatibility(
+                            package.editor_version_req.as_deref(),
+                            package.protocol,
+                            editor,
+                        )?;
+                        let mut package = package.clone();
+                        package.source_release = Some(release.release.clone());
+                        return Ok(package);
+                    }
+                }
+            }
+        }
+        Err(format!(
+            "No published {id} {version} container package for {target}. Install a release containing container packages, or import a matching local package."
+        ))
+    }
+
     pub fn validate(&self) -> Result<(), String> {
         if self.schema != 1 {
             return Err("Unsupported addon index schema".into());
@@ -146,6 +181,33 @@ impl AddonIndex {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn runtime_packages_require_the_exact_version_target_and_editor_compatibility() {
+        let index = index();
+        assert_eq!(
+            index
+                .package_for("codex", "0.5.4", "x86_64-unknown-linux-gnu", "0.5.3")
+                .unwrap()
+                .version,
+            "0.5.4"
+        );
+        assert!(
+            index
+                .package_for("codex", "9.9.9", "x86_64-unknown-linux-gnu", "0.5.3")
+                .is_err()
+        );
+        assert!(
+            index
+                .package_for("codex", "0.5.4", "x86_64-unknown-linux-musl", "0.5.3")
+                .is_err()
+        );
+        assert!(
+            index
+                .package_for("codex", "0.5.4", "x86_64-unknown-linux-gnu", "0.4.0")
+                .is_err()
+        );
+    }
 
     fn index() -> AddonIndex {
         let addons: Vec<_> = ["codex", "github", "lsp-python", "lsp-rust", "opencode"]

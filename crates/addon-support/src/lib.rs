@@ -1,5 +1,6 @@
 pub mod assistant_ui;
 pub mod authentication;
+pub mod container;
 pub mod controls;
 pub mod runner;
 pub mod runtime;

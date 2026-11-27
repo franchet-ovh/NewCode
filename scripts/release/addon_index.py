@@ -10,7 +10,7 @@ import subprocess
 import time
 import tomllib
 
-from addon_release import manifests, stable, require_editor_compatibility, RELEASE_TARGETS
+from addon_release import release_targets, CONTAINER_TARGETS, manifests, stable, require_editor_compatibility, RELEASE_TARGETS
 from github_api import api, gh, GitHubError
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -182,8 +182,12 @@ def register(index, addon_id, tag, catalog):
     item = record(result, addon_id, version)
     if item['release'] != tag or item['status'] not in ('planned', 'published') or catalog['schema'] != 2 or catalog['release'] != tag:
         raise ValueError('Release is not a matching planned/published index entry')
-    if {p['target'] for p in catalog['packages']} != set(RELEASE_TARGETS):
-        raise ValueError('Both release targets must be published before indexing')
+    source = ROOT / 'addons' / addon_id / 'addon.toml'
+    definition = tomllib.loads(source.read_text()) if source.is_file() else {}
+    # Source policy applies only to its matching release; historical records stay valid.
+    expected = release_targets(definition) if definition.get('version') == version else (RELEASE_TARGETS + CONTAINER_TARGETS if any(p['target'] in CONTAINER_TARGETS for p in catalog['packages']) else RELEASE_TARGETS)
+    if {p['target'] for p in catalog['packages']} != set(expected):
+        raise ValueError('Both release targets and any required container targets must be published before indexing')
     updated = dict(item, status='published', packages=sorted(catalog['packages'], key=lambda package: package['target']))
     validate_packages(addon_id, updated)
     if item['status'] == 'published' and item != updated:

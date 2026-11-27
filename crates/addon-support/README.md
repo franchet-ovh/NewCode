@@ -79,3 +79,10 @@ Build/release tooling discovers bundled manifests. Packaged executables support
 `ui_theme` re-exports shared control constructors and semantic `ButtonRole`. Use `action_button` for vector-icon actions and `icon_button` for labeled icon-only actions, `role_button` for semantic actions, and `control_button` when a caller needs egui builder options. The former color/boolean button signature has been removed. Use `singleline`/`multiline` for builder-based fields, or `text_field` for persistent labels, hints, and help. `list_row`, `panel_header`, `card`, `badge`, `text`, and `empty_state` share host appearance. Selectors and checkboxes inherit the same egui style.
 
 The editor owns Nord Light/Dark presets and workspace appearance settings. Addons consume the resolved theme, including defaulted control height, spacing, and radius metrics. Do not hardcode a preset or reset widget memory when appearance changes.
+
+Workspace-executed addons can expose non-secret restart state through
+`Panel::persistent_state()` and restore `Context.persistent_state` in `context`.
+Call `container::entry()` before creating workers to support the shared Linux
+supervisor. It transports protocol stdout unchanged, observes stdin EOF, and
+cleans up its owned descendants. Only the host needs Docker. Container launches
+use the user's existing configuration and credentials.

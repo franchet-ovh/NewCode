@@ -14,6 +14,7 @@ pub(super) enum Event {
     Installed(Manifest, Receipt),
     Removed(String),
     Error(String),
+    RuntimeImported(String),
 }
 pub(super) struct Manager {
     pub requested: bool,
@@ -214,6 +215,11 @@ mod tests {
             &egui::Context::default(),
             &mut BTreeMap::new(),
         );
+        let deadline = std::time::Instant::now() + Duration::from_secs(2);
+        while host.entries[0].process.is_none() && std::time::Instant::now() < deadline {
+            host.tick(&egui::Context::default(), false, true);
+            std::thread::sleep(Duration::from_millis(10));
+        }
         assert_ne!(host.entries[0].process.as_ref().unwrap().started, started);
         let path = host.entries[0].directory.join("initialize.json");
         let deadline = std::time::Instant::now() + Duration::from_secs(2);
@@ -522,7 +528,9 @@ impl Addons {
                 if let Some(addon) = self.entries.iter_mut().find(|a| a.manifest.id == id) {
                     addon.enabled = enabled;
                     if !enabled {
-                        addon.process = None;
+                        if let Some(process) = addon.process.take() {
+                            self.retiring.insert(id.clone(), process.retire());
+                        }
                         addon.working = false;
                     }
                 }
@@ -534,7 +542,7 @@ impl Addons {
             Action::Restart(id) => {
                 if let Some(addon) = self.entries.iter_mut().find(|a| a.manifest.id == id) {
                     if let Some(process) = addon.process.take() {
-                        process.stop_now();
+                        self.retiring.insert(id.clone(), process.retire());
                     }
                     addon.error = None;
                     addon.working = false;
@@ -561,7 +569,11 @@ impl Addons {
                 if addon.enabled {
                     self.manager.restart = Some(id.into());
                 }
-                process.stop_now();
+                if process.is_container() {
+                    self.retiring.insert(id.into(), process.retire());
+                } else {
+                    process.stop_now();
+                }
             }
         }
         Ok(())
@@ -584,6 +596,9 @@ impl Addons {
             {
                 packages::prepare_local(&root, &source)
             } else {
+                if let Some(message) = container::import(&source)? {
+                    return Ok(Event::RuntimeImported(message));
+                }
                 packages::prepare_archive(&root, &source, None)
             }
             .map(Event::Prepared)
@@ -616,6 +631,10 @@ impl Addons {
         }
         for event in events {
             match event {
+                Event::RuntimeImported(message) => {
+                    self.manager.progress = message;
+                    self.manager.pending = None;
+                }
                 Event::Progress(text) => self.manager.progress = text,
                 Event::Catalog(catalog) => {
                     self.manager.catalog = Some(catalog);
@@ -644,7 +663,11 @@ impl Addons {
                         continue;
                     }
                     self.manager.changing = Some(id);
+                    let retirement = self.retiring.remove(&prepared.manifest.id);
                     self.worker(ctx, "Installing addon…", move |_| {
+                        if let Some(done) = retirement {
+                            done.recv().map_err(|_| "Addon retirement failed")?;
+                        }
                         packages::commit(&root, prepared).map(|(m, r)| Event::Installed(m, r))
                     });
                 }
@@ -700,6 +723,7 @@ impl Addons {
                     }
                 }
                 Event::Removed(id) => {
+                    self.manager.changing = None;
                     self.manager.pending = None;
                     self.manager.restart = None;
                     self.entries.retain(|a| a.manifest.id != id);
@@ -1123,10 +1147,17 @@ impl Addons {
                 return;
             }
             match crate::app_paths::data_root() {
-                Ok(root) => self.worker(ctx, "Uninstalling addon…", move |_| {
-                    packages::uninstall(&root, &id)?;
-                    Ok(Event::Removed(id))
-                }),
+                Ok(root) => {
+                    self.manager.changing = Some(id.clone());
+                    let retirement = self.retiring.remove(&id);
+                    self.worker(ctx, "Uninstalling addon…", move |_| {
+                        if let Some(done) = retirement {
+                            done.recv().map_err(|_| "Addon retirement failed")?;
+                        }
+                        packages::uninstall(&root, &id)?;
+                        Ok(Event::Removed(id))
+                    });
+                }
                 Err(e) => self.manager.error = Some(e.to_string()),
             }
         }
