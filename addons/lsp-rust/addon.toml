@@ -1,3 +1,5 @@
+panel = "none"
+category = "Language"
 id = "lsp-rust"
 name = "Rust"
 description = "Rust completion, type checking, Clippy linting, formatting, and symbols."

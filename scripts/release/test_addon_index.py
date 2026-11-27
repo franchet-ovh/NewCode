@@ -30,7 +30,7 @@ class IndexTests(unittest.TestCase):
     def source(self, root):
         path = root/'addons/fixture'
         path.mkdir(parents=True)
-        (path/'addon.toml').write_text('id="fixture"\nname="Fixture"\nversion="1.0.0"\nprotocol=1\neditor_version_req=">=0.5.0, <0.6.0"\nexecutable="program"\nicon="icon.png"\n')
+        (path/'addon.toml').write_text('category="Test"\nid="fixture"\nname="Fixture"\nversion="1.0.0"\nprotocol=1\neditor_version_req=">=0.5.0, <0.6.0"\nexecutable="program"\nicon="icon.png"\n')
         (path/'Cargo.toml').write_text('[package]\nname="fixture"\nversion="1.0.0"\n')
         (path/'Cargo.lock').write_text('version=4\n[[package]]\nname="fixture"\nversion="1.0.0"\n')
 

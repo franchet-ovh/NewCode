@@ -135,7 +135,7 @@ fn sparse_fixture_archives_import_as_regular_files_and_preserve_contents() {
 
     let root = tempfile::tempdir().unwrap();
     let text = format!(
-        "execution='workspace'\nid='fixture'\nname='Fixture'\nversion='1.0.0'\nprotocol=1\nexecutable='program'\nicon='icon.png'\ntarget='{}'\n",
+        "execution='workspace'\ncategory='Test'\nid='fixture'\nname='Fixture'\nversion='1.0.0'\nprotocol=1\nexecutable='program'\nicon='icon.png'\ntarget='{}'\n",
         TARGETS[0]
     );
     let manifest: Manifest = toml::from_str(&text).unwrap();

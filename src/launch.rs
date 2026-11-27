@@ -4,7 +4,7 @@ use std::{
     io,
     path::{Path, PathBuf},
 };
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "macos"))]
 use std::{
     fs,
     process::{Command, Stdio},
@@ -18,7 +18,7 @@ fn should_detach(args: &[OsString]) -> bool {
         .any(|arg| arg == "--foreground" || arg == CHILD_FLAG)
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "macos"))]
 fn log_path() -> io::Result<PathBuf> {
     dirs::data_local_dir()
         .map(|root| root.join("focus-editor/logs/launch.log"))
@@ -29,7 +29,7 @@ fn log_path() -> io::Result<PathBuf> {
         })
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "macos"))]
 fn detached_command(executable: &Path, args: &[OsString], log: &Path) -> io::Result<Command> {
     use std::os::unix::process::CommandExt;
     let parent = log
@@ -63,7 +63,7 @@ pub(crate) fn detach() -> io::Result<bool> {
     if !should_detach(&args) {
         return Ok(false);
     }
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
     {
         let log = log_path()?;
         detached_command(&std::env::current_exe()?, &args, &log)?
@@ -79,7 +79,7 @@ pub(crate) fn detach() -> io::Result<bool> {
             })?;
         return Ok(true);
     }
-    #[cfg(not(target_os = "linux"))]
+    #[cfg(not(any(target_os = "linux", target_os = "macos")))]
     Ok(false)
 }
 
@@ -102,10 +102,10 @@ pub(crate) fn window_title(workspace: Option<&Path>) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
     use std::ffi::OsStr;
 
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
     #[test]
     fn log_level_arguments_are_forwarded_to_background_child() {
         let root = std::env::temp_dir().join(format!("focus-log-forward-{}", std::process::id()));
@@ -161,7 +161,7 @@ mod tests {
         assert_eq!(window_title(Some(unavailable)), "Focus Editor — title-test");
     }
 
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
     #[test]
     fn detached_child_preserves_arguments_and_outlives_launcher() {
         use std::{

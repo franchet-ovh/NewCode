@@ -182,7 +182,7 @@ class AddonReleaseTests(unittest.TestCase):
         for name in ['first', 'second']:
             path = root / 'addons' / name
             path.mkdir(parents=True)
-            (path / 'addon.toml').write_text(f'id="{name}"\nname="{name}"\nversion="0.4.8"\neditor_version_req=">=0.4.8, <0.5.0"\nprotocol=1\nexecutable="program"\nicon="icon.png"\n')
+            (path / 'addon.toml').write_text(f'category="Test"\nid="{name}"\nname="{name}"\nversion="0.4.8"\neditor_version_req=">=0.4.8, <0.5.0"\nprotocol=1\nexecutable="program"\nicon="icon.png"\n')
             (path / 'Cargo.toml').write_text(f'[package]\nname="focus-addon-{name}"\nversion="0.4.8"\n')
             (path / 'Cargo.lock').write_text(f'version=4\n[[package]]\nname="focus-addon-{name}"\nversion="0.4.8"\n')
         (root / 'Cargo.toml').write_text('[package]\nversion="0.4.8"\n')

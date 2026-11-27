@@ -12,12 +12,19 @@ addon…** and select its `addon.toml` or standalone `.tar.gz`, or use the relea
 installer. Repository directories are never searched for addons.
 Executable and PNG icon paths must stay inside the installation directory.
 Any addon may declare `panel = "right"` to use the shared right-hand dock.
+Background addons declare `panel = "none"` to stay out of panel selectors and the
+activity bar while continuing to provide services such as language support.
+Every manifest must declare a nonempty `category`: the bundled assistants use
+`IA Harness`, language addons use `Language`, and GitHub uses `CI/CD`.
+Manifests without a category are rejected; older addons need updated manifests
+or rebuilding before installation in this editor.
 The default `ui = "widgets"` uses declarative controls; rich interfaces can use
 `ui = "surface"` through the optional [UI helper](../addon-support/README.md).
 
 ```toml
 id = "example"
 name = "Example"
+category = "CI/CD"
 description = "What this addon provides"
 publisher = "Your name or organization"
 version = "0.1.0"

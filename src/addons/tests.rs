@@ -26,7 +26,7 @@ impl Fixture {
     fn manifest(&self) -> Manifest {
         fs::write(self.0.join("program"), b"fixture").unwrap();
         fs::write(self.0.join("icon.png"), b"fixture").unwrap();
-        fs::write(self.0.join("addon.toml"), "id='fixture'\nname='Fixture'\nversion='1'\nprotocol=1\nexecutable='program'\nicon='icon.png'\n").unwrap();
+        fs::write(self.0.join("addon.toml"), "category='Test'\nid='fixture'\nname='Fixture'\nversion='1'\nprotocol=1\nexecutable='program'\nicon='icon.png'\n").unwrap();
         load_manifest(&self.0.join("addon.toml")).unwrap()
     }
     fn git(&self, args: &[&str]) -> String {

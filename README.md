@@ -135,7 +135,7 @@ focus-editor --help
 focus-editor-server --help
 ```
 
-On Linux, both modes open in the background and immediately release the terminal. macOS uses the normal application lifecycle. Each launch opens a separate instance. App windows and native windows use **Focus Editor — workspace-name** as their title. Relative workspace paths are resolved for display: launching with `.` shows the actual folder name in the title and toolbar, with the full resolved path in the toolbar tooltip.
+On Linux and macOS, both modes open in the background and immediately release the terminal. Use `--foreground` to keep the editor attached for debugging. Each launch opens a separate instance. App windows and native windows use **Focus Editor — workspace-name** as their title. Relative workspace paths are resolved for display: launching with `.` shows the actual folder name in the title and toolbar, with the full resolved path in the toolbar tooltip.
 
 Each app window uses a private loopback connection. Refreshing or reconnecting preserves unsaved buffers, running terminals, and addon state in the same backend process. The session stays alive while its app window is running, including during temporary connection loss. Closing the window warns about unsaved documents, then saves workspace settings, stops owned PTY and addon processes, and removes the temporary browser profile. Waiting at that warning keeps the session alive until you respond. Unsaved buffers are not written to disk automatically. Separate launches use independent browser profiles and editor instances.
 
@@ -186,7 +186,7 @@ focus-editor --browser --foreground
 
 App-window mode prints its complete session URL in the foreground for diagnostics, including a private `#` fragment needed to connect. Treat the complete URL as a session credential; it is excluded from application diagnostic logs. If Chromium cannot start, inspect the foreground error or use `--ui`.
 
-Each launch starts a fresh diagnostic file at `$XDG_DATA_HOME/focus-editor/logs/launch.log`, usually `~/.local/share/focus-editor/logs/launch.log`. Failures to create the log or spawn the editor are reported in the launching terminal. Errors after detachment are recorded in the log.
+Each launch starts a fresh diagnostic file at `$XDG_DATA_HOME/focus-editor/logs/launch.log`, usually `~/.local/share/focus-editor/logs/launch.log` on Linux or `~/Library/Application Support/focus-editor/logs/launch.log` on macOS. Failures to create the log or spawn the editor are reported in the launching terminal. Errors after detachment are recorded in the log.
 
 Open a workspace directly:
 
@@ -265,7 +265,7 @@ No `.devcontainer`, Compose file, host-path setting, or user setting is required
 
 Attachment takes precedence over any project Dev Container configuration. It adds no mounts and does not change `.gitignore` or provision assistant history storage. Codex and OpenCode CLIs must be available and authenticated inside the container. The editor automatically stages their matching addon executables in the container user’s private cache. Assistant histories remain in the container's existing storage, whose persistence is controlled by its owner.
 
-Use **Dev Container → Reconnect** to inspect the container name again, including after an external replacement. A replacement must map the folder to the same host workspace; otherwise relaunch with the two parameters. Failed reconnects retain container execution instead of switching tools to the host. **Detach** returns to local execution; switching workspaces also clears attachment. Closing the editor, detaching, and reconnecting leave the container running. Attachment is selected per launch, while ordinary workspace settings continue to save automatically. The attached menu offers no Stop or Rebuild actions. Encoded VS Code `--folder-uri` arguments are not supported.
+When started with `--attach-container`, the editor hides the Dev Container toolbar menu. Relaunch with the two attachment parameters to reconnect or select a replacement container. Attachment is selected per launch, while ordinary workspace settings continue to save automatically. Switching workspaces clears the attachment, and closing the editor leaves the container running. Encoded VS Code `--folder-uri` arguments are not supported.
 
 Focus Editor can also use a Docker Compose development container without Node.js or the Dev Container CLI. With a workspace open, use **Dev Container** in the toolbar to start the service defined by `.devcontainer/devcontainer.json`. The container stays running when the editor closes; use **Stop** from the same menu when needed. **Rebuild** and **Rebuild without cache** are available before connecting, while connected, and after a failed build or start. Both recreate the container; the latter rebuilds the service and its buildable dependencies without using cached build layers. Neither removes volumes or saved assistant data. Each start or rebuild reloads `devcontainer.json`, so configuration fixes take effect on the next attempt.
 
@@ -397,7 +397,7 @@ Git's periodic checks cover known modified/staged paths and repository metadata.
 - The left activity bar switches between **Explorer**, **Search**, and **Source Control**.
 - The center contains file tabs, the editor, and Git diff previews.
 - The bottom of the center column contains an interactive terminal and Logs, with a Restart action.
-- **Dev Container** manages a configured Docker Compose service or reconnects/detaches a container selected with the two attachment flags; terminals, Git, assistants, and language servers use the connected container.
+- **Dev Container** manages a configured Docker Compose service. The menu is hidden when launched with the attachment flags; terminals, Git, assistants, and language servers use the attached container.
 - The optional right pane contains Codex and/or OpenCode. Its header keeps status visible alongside horizontally scrollable session controls; **Usage / status** has its own section below.
 - Drag the dividers to resize the sidebar, terminal, and assistant pane. Their sizes are saved.
 

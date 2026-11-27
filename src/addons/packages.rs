@@ -473,7 +473,7 @@ mod tests {
     use super::*;
     fn source(version: &str) -> tempfile::TempDir {
         let directory = tempfile::tempdir().unwrap();
-        fs::write(directory.path().join("addon.toml"),format!("id='fixture'\nname='Fixture'\nversion='{version}'\nprotocol=1\nexecutable='program'\nicon='icon.png'\ntarget='{}'\n",target().unwrap())).unwrap();
+        fs::write(directory.path().join("addon.toml"),format!("category='Test'\nid='fixture'\nname='Fixture'\nversion='{version}'\nprotocol=1\nexecutable='program'\nicon='icon.png'\ntarget='{}'\n",target().unwrap())).unwrap();
         fs::write(directory.path().join("program"), version).unwrap();
         fs::write(directory.path().join("icon.png"), "icon").unwrap();
         directory

@@ -142,7 +142,7 @@ mod tests {
         use std::os::unix::fs::PermissionsExt;
         let directory = root.join("addons/fixture");
         std::fs::create_dir_all(&directory).unwrap();
-        std::fs::write(directory.join("addon.toml"), "id='fixture'\nname='Fixture'\nversion='1'\nprotocol=1\nexecutable='program'\nicon='icon.png'\npanel='right'\n").unwrap();
+        std::fs::write(directory.join("addon.toml"), "category='Test'\nid='fixture'\nname='Fixture'\nversion='1'\nprotocol=1\nexecutable='program'\nicon='icon.png'\npanel='right'\n").unwrap();
         std::fs::write(directory.join("program"), "#!/bin/sh\nwhile IFS= read -r line; do\ncase \"$line\" in *initialize*) printf '%s' \"$line\" > initialize.json;; *shutdown*) exit 0;; esac\ndone\n").unwrap();
         std::fs::set_permissions(
             directory.join("program"),
@@ -830,8 +830,8 @@ impl Addons {
                 .iter()
                 .filter(|a| {
                     format!(
-                        "{} {} {}",
-                        a.manifest.id, a.manifest.name, a.manifest.description
+                        "{} {} {} {}",
+                        a.manifest.id, a.manifest.name, a.manifest.description, a.manifest.category
                     )
                     .to_lowercase()
                     .contains(&query)
@@ -840,7 +840,12 @@ impl Addons {
                     (
                         a.manifest.id.clone(),
                         a.manifest.name.clone(),
-                        format!("{} · {}", a.manifest.version, state(a)),
+                        format!(
+                            "{} · {} · {}",
+                            a.manifest.category,
+                            a.manifest.version,
+                            state(a)
+                        ),
                     )
                 })
                 .collect()

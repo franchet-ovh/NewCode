@@ -1,3 +1,4 @@
+category = "CI/CD"
 description = "GitHub issues, pull requests, and issue branch workflows."
 publisher = "Focus Editor project"
 id = "github"

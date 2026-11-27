@@ -48,6 +48,37 @@ mod tests {
         }
     }
     #[test]
+    fn panel_selector_loads_and_reuses_the_addon_icon() {
+        let ctx = egui::Context::default();
+        let mut host = Addons::default();
+        let mut entry = addon("icon-tool");
+        entry.directory = Path::new(env!("CARGO_MANIFEST_DIR")).join("addons/github");
+        entry.manifest.icon = "icon.png".into();
+        host.entries.push(entry);
+        let mut texture = None;
+        for _ in 0..2 {
+            crate::test_frame(&ctx, Default::default(), |root| {
+                egui::CentralPanel::default().show(root, |ui| {
+                    host.panel_button(ui, "icon-tool", "Icon Tool".into(), true);
+                });
+            });
+            let id = host.entries[0].icon.as_ref().unwrap().id();
+            assert_eq!(*texture.get_or_insert(id), id);
+        }
+    }
+
+    #[test]
+    fn background_addons_are_not_listed_as_panels() {
+        let mut host = Addons::default();
+        let mut background = addon("background");
+        background.manifest.panel = focus_addon_sdk::Panel::None;
+        host.entries = vec![background, addon("visible")];
+        assert_eq!(host.panel_entries().len(), 1);
+        assert_eq!(host.panel_entries()[0].0, "visible");
+        assert_eq!(host.entries.len(), 2);
+    }
+
+    #[test]
     fn right_dock_supports_any_one_both_or_no_addons() {
         let mut host = Addons::default();
         host.entries = vec![addon("first-tool"), addon("second-tool")];
@@ -471,19 +502,17 @@ impl Addons {
                     ui.horizontal_wrapped(|ui| {
                         for id in &available {
                             let addon = self.entries.iter().find(|a| &a.manifest.id == id).unwrap();
-                            if ui
-                                .selectable_label(
-                                    selected.as_ref() == Some(id),
-                                    format!(
-                                        "{} · {}",
-                                        addon.manifest.name,
-                                        if addon.status.is_empty() {
-                                            addon.surface.state()
-                                        } else {
-                                            &addon.status
-                                        }
-                                    ),
-                                )
+                            let label = format!(
+                                "{} · {}",
+                                addon.manifest.name,
+                                if addon.status.is_empty() {
+                                    addon.surface.state()
+                                } else {
+                                    &addon.status
+                                }
+                            );
+                            if self
+                                .panel_button(ui, id, label, selected.as_ref() == Some(id))
                                 .clicked()
                             {
                                 *selected = Some(id.clone());

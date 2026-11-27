@@ -171,7 +171,7 @@ class PackagingTests(unittest.TestCase):
             root = Path(temporary)
             source = root / "payload/fixture"
             source.mkdir(parents=True)
-            (source / "addon.toml").write_text("id='fixture'\nprotocol=1\nexecutable='program'\nicon='icon.png'\n")
+            (source / "addon.toml").write_text("category='Test'\nid='fixture'\nprotocol=1\nexecutable='program'\nicon='icon.png'\n")
             (source / "program").write_bytes(b"old executable")
             (source / "icon.png").write_bytes(b"icon")
             destination = root / "app"
@@ -205,7 +205,7 @@ class PackagingTests(unittest.TestCase):
             for name in ("first", "second"):
                 definition = root / "addons" / name
                 definition.mkdir(parents=True)
-                text = f"id='{name}'\nname='{name}'\nversion='1.0.0'\nprotocol=1\nexecutable='program'\nicon='icon.png'\n"
+                text = f"category='Test'\nid='{name}'\nname='{name}'\nversion='1.0.0'\nprotocol=1\nexecutable='program'\nicon='icon.png'\n"
                 (definition / "addon.toml").write_text(text)
                 stage = build / "addons" / name
                 stage.mkdir(parents=True)

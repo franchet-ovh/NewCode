@@ -1,3 +1,5 @@
+panel = "none"
+category = "Language"
 id = "lsp-python"
 name = "Python"
 description = "Python completion, mypy type checking, linting, formatting, and symbols."

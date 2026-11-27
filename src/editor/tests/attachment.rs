@@ -61,6 +61,29 @@ fn attachment_starts_in_container_and_survives_reconnect_failure_until_explicit_
     args.resolve_attachment().unwrap();
     let ctx = egui::Context::default();
     let mut app = EditorApp::new(&ctx, &args);
+    for _ in 0..2 {
+        let output = crate::test_frame(
+            &ctx,
+            egui::RawInput {
+                screen_rect: Some(egui::Rect::from_min_size(
+                    egui::Pos2::ZERO,
+                    egui::vec2(1440.0, 700.0),
+                )),
+                ..Default::default()
+            },
+            |root| app.toolbar(root),
+        );
+        let labels: Vec<_> = output
+            .shapes
+            .iter()
+            .filter_map(|shape| match &shape.shape {
+                egui::Shape::Text(text) => Some(text.galley.job.text.as_str()),
+                _ => None,
+            })
+            .collect();
+        assert!(labels.contains(&"Addons"));
+        assert!(!labels.contains(&"Dev Container"));
+    }
     let original = app.dev_container.runtime().unwrap().clone();
     assert_eq!(app.workspace(), Some(workspace.canonicalize().unwrap()));
     assert_eq!(

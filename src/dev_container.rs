@@ -265,6 +265,10 @@ impl DevContainer {
         }
     }
 
+    pub(crate) fn is_attached(&self) -> bool {
+        matches!(self.state, State::Attached(_))
+    }
+
     fn start(&mut self, configuration: Configuration, mode: StartMode, ctx: egui::Context) {
         if matches!(self.state, State::Starting(_)) {
             return;

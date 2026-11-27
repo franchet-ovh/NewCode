@@ -10,7 +10,7 @@ fn compatibility_preflight_runs_without_opening_an_editor_or_modifying_packages(
         ("invalid".to_owned(), false),
     ] {
         let text = format!(
-            "id='fixture'\nname='Fixture'\nversion='1.0.0'\nprotocol=1\neditor_version_req='{requirement}'\nexecutable='program'\nicon='icon.png'\n"
+            "category='Test'\nid='fixture'\nname='Fixture'\nversion='1.0.0'\nprotocol=1\neditor_version_req='{requirement}'\nexecutable='program'\nicon='icon.png'\n"
         );
         std::fs::write(&manifest, &text).unwrap();
         let output = Command::new(env!("CARGO_BIN_EXE_focus-editor"))

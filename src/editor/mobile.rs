@@ -339,16 +339,25 @@ impl EditorApp {
                             )
                         }));
                         for (panel, name) in entries {
-                            if ui
-                                .add_sized(
+                            let selected = self.mobile.panel.as_ref() == Some(&panel);
+                            let response = match &panel {
+                                MobilePanel::LeftAddon(id) | MobilePanel::RightAddon(id) => {
+                                    ui.scope(|ui| {
+                                        ui.style_mut().spacing.interact_size =
+                                            egui::vec2(ui.available_width(), 44.0);
+                                        self.addons.panel_button(ui, id, name, selected)
+                                    })
+                                    .inner
+                                }
+                                _ => ui.add_sized(
                                     [ui.available_width(), 44.0],
                                     focus_addon_support::ui_theme::control_button(
                                         egui::RichText::new(name).size(14.0),
                                     )
-                                    .selected(self.mobile.panel.as_ref() == Some(&panel)),
-                                )
-                                .clicked()
-                            {
+                                    .selected(selected),
+                                ),
+                            };
+                            if response.clicked() {
                                 chosen = Some(panel);
                             }
                         }

@@ -241,7 +241,9 @@ impl EditorApp {
         if self.sidebar_mode == SidebarMode::Addon && self.addons.active.is_none() {
             self.sidebar_mode = SidebarMode::Explorer;
         }
-        ui.menu_button("Dev Container", |ui| self.dev_container.menu(ui, ctx));
+        if !self.dev_container.is_attached() {
+            ui.menu_button("Dev Container", |ui| self.dev_container.menu(ui, ctx));
+        }
         if ctx
             .data_mut(|data| data.remove_temp::<bool>(egui::Id::new("show_dev_container_logs")))
             .unwrap_or(false)

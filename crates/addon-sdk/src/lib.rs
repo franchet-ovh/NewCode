@@ -25,6 +25,8 @@ pub struct Manifest {
     pub languages: Vec<language::Language>,
     pub id: String,
     pub name: String,
+    #[serde(deserialize_with = "required_category")]
+    pub category: String,
     pub version: String,
     pub protocol: u32,
     #[serde(default)]
@@ -73,9 +75,20 @@ pub struct Setting {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Panel {
+    None,
     #[default]
     Left,
     Right,
+}
+
+fn required_category<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<String, D::Error> {
+    let value = String::deserialize(deserializer)?;
+    if value.trim().is_empty() {
+        return Err(serde::de::Error::custom("Addon category must not be empty"));
+    }
+    Ok(value)
 }
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -675,8 +688,20 @@ impl<R: BufRead, W: Write> Connection<R, W> {
 mod tests {
     use super::*;
     #[test]
+    fn manifest_category_is_required_and_nonempty() {
+        let mut value = json!({"id":"tool","name":"Tool","version":"1","protocol":1,"executable":"program","icon":"icon.png"});
+        assert!(serde_json::from_value::<Manifest>(value.clone()).is_err());
+        value["category"] = json!("  ");
+        assert!(serde_json::from_value::<Manifest>(value.clone()).is_err());
+        value["category"] = json!("IA Harness");
+        assert_eq!(
+            serde_json::from_value::<Manifest>(value).unwrap().category,
+            "IA Harness"
+        );
+    }
+    #[test]
     fn manifest_text_settings_are_optional_and_round_trip() {
-        let mut legacy = json!({"id":"fixture","name":"Fixture","version":"1","protocol":1,"executable":"program","icon":"icon.png"});
+        let mut legacy = json!({"category":"Test","id":"fixture","name":"Fixture","version":"1","protocol":1,"executable":"program","icon":"icon.png"});
         let manifest: Manifest = serde_json::from_value(legacy.clone()).unwrap();
         assert!(manifest.settings.is_empty());
         legacy["settings"] = json!([{"key":"binary_path","label":"Binary"}]);

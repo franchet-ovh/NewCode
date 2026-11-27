@@ -2,11 +2,57 @@ use super::*;
 use crate::ui_theme as theme;
 use std::fs;
 
+impl Addon {
+    pub(super) fn load_icon(&mut self, ctx: &egui::Context) {
+        if self.icon.is_none() {
+            if let Ok(bytes) = fs::read(self.directory.join(&self.manifest.icon)) {
+                if let Ok(image) =
+                    image::load_from_memory_with_format(&bytes, image::ImageFormat::Png)
+                {
+                    let image = image.to_rgba8();
+                    let image = egui::ColorImage::from_rgba_unmultiplied(
+                        [image.width() as usize, image.height() as usize],
+                        image.as_raw(),
+                    );
+                    self.icon =
+                        Some(ctx.load_texture(&self.manifest.id, image, Default::default()));
+                }
+            }
+        }
+    }
+}
+
 impl Addons {
+    pub fn panel_button(
+        &mut self,
+        ui: &mut egui::Ui,
+        id: &str,
+        label: String,
+        selected: bool,
+    ) -> egui::Response {
+        let icon = self
+            .entries
+            .iter_mut()
+            .find(|addon| addon.manifest.id == id)
+            .and_then(|addon| {
+                addon.load_icon(ui.ctx());
+                addon.icon.clone()
+            });
+        let button = if let Some(icon) = icon {
+            egui::Button::image_and_text(
+                egui::Image::new((icon.id(), egui::vec2(20.0, 20.0))),
+                label,
+            )
+        } else {
+            focus_addon_support::ui_theme::control_button(label)
+        };
+        ui.add(button.selected(selected))
+    }
+
     pub fn panel_entries(&self) -> Vec<(String, String, focus_addon_sdk::Panel)> {
         self.entries
             .iter()
-            .filter(|addon| addon.enabled)
+            .filter(|addon| addon.enabled && addon.manifest.panel != focus_addon_sdk::Panel::None)
             .map(|addon| {
                 (
                     addon.manifest.id.clone(),
@@ -152,24 +198,7 @@ impl Addons {
             .iter_mut()
             .filter(|a| a.enabled && a.manifest.panel == focus_addon_sdk::Panel::Left)
         {
-            if addon.icon.is_none() {
-                if let Ok(bytes) = fs::read(addon.directory.join(&addon.manifest.icon)) {
-                    if let Ok(image) =
-                        image::load_from_memory_with_format(&bytes, image::ImageFormat::Png)
-                    {
-                        let image = image.to_rgba8();
-                        let image = egui::ColorImage::from_rgba_unmultiplied(
-                            [image.width() as usize, image.height() as usize],
-                            image.as_raw(),
-                        );
-                        addon.icon = Some(ui.ctx().load_texture(
-                            &addon.manifest.id,
-                            image,
-                            Default::default(),
-                        ));
-                    }
-                }
-            }
+            addon.load_icon(ui.ctx());
             let active = selected && self.active.as_ref() == Some(&addon.manifest.id);
             let response = if let Some(icon) = &addon.icon {
                 theme::image_nav_button(ui, icon, active, &addon.manifest.name)

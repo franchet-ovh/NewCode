@@ -49,6 +49,8 @@ def manifests(root=Path(".")):
     result = []
     for path in sorted((root / "addons").glob("*/addon.toml")):
         manifest = tomllib.loads(path.read_text())
+        if not isinstance(manifest.get('category'), str) or not manifest['category'].strip():
+            raise ValueError('Addon category is required and must not be empty')
         if not re.fullmatch(r"[A-Za-z0-9_-]+", manifest["id"]) or manifest["id"] != path.parent.name:
             raise ValueError("Addon directory must match its ID")
         assets(manifest)
@@ -108,6 +110,8 @@ def package_addons(binary_directory, destination, tag, target, root=Path("."), s
             continue
         source = binary_directory / "addons" / definition["id"]
         manifest = tomllib.loads((source / "addon.toml").read_text())
+        if manifest.get('category') != definition['category']:
+            raise ValueError('Staged addon category does not match its source manifest')
         if manifest["target"] != target or any(manifest[key] != definition[key] for key in ("id", "version", "protocol", "executable", "icon")):
             raise ValueError("Staged addon identity/platform mismatch")
         if selected is not None:
