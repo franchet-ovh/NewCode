@@ -2,7 +2,7 @@ id = "lsp-python"
 name = "Python"
 description = "Python completion, mypy type checking, linting, formatting, and symbols."
 publisher = "Focus Editor project"
-version = "0.6.0"
+version = "0.7.0"
 editor_version_req = ">=0.6.0, <0.7.0"
 protocol = 1
 executable = "focus-addon-lsp-python"
