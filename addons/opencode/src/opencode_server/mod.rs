@@ -48,7 +48,12 @@ pub(crate) struct Server {
     child: Arc<Mutex<Option<Child>>>,
 }
 impl Server {
-    pub(crate) fn spawn(cwd: &Path, runtime: Option<Runtime>, ctx: egui::Context) -> Self {
+    pub(crate) fn spawn(
+        cwd: &Path,
+        runtime: Option<Runtime>,
+        binary_path: String,
+        ctx: egui::Context,
+    ) -> Self {
         log::info!("spawn requested");
         let (tx, events) = mpsc::channel();
         let (commands, rx) = mpsc::channel();
@@ -61,6 +66,7 @@ impl Server {
             worker::run(
                 cwd,
                 runtime,
+                binary_path,
                 rx,
                 Events { tx, ctx },
                 worker_cancel,

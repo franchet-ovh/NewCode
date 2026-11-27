@@ -45,6 +45,19 @@ pub struct Manifest {
     pub enabled_by_default: bool,
     #[serde(default)]
     pub environment: Vec<String>,
+    #[serde(default)]
+    pub settings: Vec<Setting>,
+}
+
+/// A non-secret workspace text setting, delivered through `Context.state`.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Setting {
+    pub key: String,
+    pub label: String,
+    #[serde(default)]
+    pub description: String,
+    #[serde(default)]
+    pub placeholder: String,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -648,6 +661,20 @@ impl<R: BufRead, W: Write> Connection<R, W> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn manifest_text_settings_are_optional_and_round_trip() {
+        let mut legacy = json!({"id":"fixture","name":"Fixture","version":"1","protocol":1,"executable":"program","icon":"icon.png"});
+        let manifest: Manifest = serde_json::from_value(legacy.clone()).unwrap();
+        assert!(manifest.settings.is_empty());
+        legacy["settings"] = json!([{"key":"binary_path","label":"Binary"}]);
+        let manifest: Manifest = serde_json::from_value(legacy).unwrap();
+        assert_eq!(manifest.settings[0].key, "binary_path");
+        assert!(manifest.settings[0].description.is_empty());
+        let restored: Manifest =
+            serde_json::from_value(serde_json::to_value(manifest).unwrap()).unwrap();
+        assert_eq!(restored.settings[0].label, "Binary");
+    }
+
     #[test]
     fn editor_range_boundaries_and_legacy_protocol_compatibility() {
         for version in ["0.4.8", "0.4.9", "0.4.99"] {

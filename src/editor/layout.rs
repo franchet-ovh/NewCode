@@ -334,9 +334,7 @@ impl EditorApp {
         self.document_tabs(ui, ctx);
         if show_details
             && self.sidebar_mode == SidebarMode::AddonManager
-            && self
-                .addons
-                .manager_central(ui, &mut self.settings.addon_enabled)
+            && self.addon_manager_central(ui)
         {
             return;
         }

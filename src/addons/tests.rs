@@ -91,6 +91,26 @@ fn manifest_rejects_escapes_and_incompatible_protocols() {
     }
 }
 #[test]
+fn manifest_validates_text_setting_keys_and_labels() {
+    let fixture = Fixture::new();
+    fixture.manifest();
+    let path = fixture.0.join("addon.toml");
+    let original = fs::read_to_string(&path).unwrap();
+    for (settings, valid) in [
+        ("[[settings]]\nkey='binary_path'\nlabel='Binary'\n", true),
+        ("[[settings]]\nkey='../escape'\nlabel='Binary'\n", false),
+        ("[[settings]]\nkey='binary_path'\nlabel=' '\n", false),
+        (
+            "[[settings]]\nkey='binary_path'\nlabel='Binary'\n[[settings]]\nkey='binary_path'\nlabel='Other'\n",
+            false,
+        ),
+    ] {
+        fs::write(&path, format!("{original}\n{settings}")).unwrap();
+        assert_eq!(load_manifest(&path).is_ok(), valid);
+    }
+}
+
+#[test]
 fn rejects_stale_addon_views_and_keeps_host_responsive() {
     use std::os::unix::fs::PermissionsExt;
     let fixture = Fixture::new();

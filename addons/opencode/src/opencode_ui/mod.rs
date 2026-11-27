@@ -92,6 +92,7 @@ pub(crate) struct OpenCodeUi {
     last_refresh: Option<Instant>,
     markdown: crate::assistant_ui::content::CommonMarkCache,
     runtime: Option<Runtime>,
+    binary_path: String,
     issue_launch: Option<focus_addon_sdk::AssistantSession>,
 }
 impl Default for OpenCodeUi {
@@ -129,6 +130,7 @@ impl Default for OpenCodeUi {
             last_refresh: None,
             markdown: Default::default(),
             runtime: None,
+            binary_path: String::new(),
             issue_launch: None,
         }
     }
@@ -143,7 +145,12 @@ impl OpenCodeUi {
             .unwrap_or(Path::new("."))
             .canonicalize()
             .unwrap_or_else(|_| cwd.unwrap_or(Path::new(".")).to_path_buf());
-        self.server = Some(Server::spawn(&self.workspace, self.runtime.clone(), ctx));
+        self.server = Some(Server::spawn(
+            &self.workspace,
+            self.runtime.clone(),
+            self.binary_path.clone(),
+            ctx,
+        ));
         self.error = None;
         self.online = false;
         self.stream_online = false;
@@ -159,6 +166,9 @@ impl OpenCodeUi {
         if self.server.is_none() {
             self.workspace = path.to_path_buf();
         }
+    }
+    pub(crate) fn set_binary_path(&mut self, path: &str) {
+        self.binary_path = path.trim().into();
     }
     pub(crate) fn set_runtime(&mut self, runtime: Option<&Runtime>) -> bool {
         if self.runtime.as_ref() != runtime {

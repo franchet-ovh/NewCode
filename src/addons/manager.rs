@@ -31,6 +31,8 @@ pub(super) struct Manager {
     restart: Option<String>,
     queued: Option<Prepared>,
     changing: Option<String>,
+    settings: Option<settings::Draft>,
+    settings_update: Option<settings::SettingsUpdate>,
 }
 impl Default for Manager {
     fn default() -> Self {
@@ -50,10 +52,22 @@ impl Default for Manager {
             restart: None,
             queued: None,
             changing: None,
+            settings: None,
+            settings_update: None,
         }
     }
 }
 impl Addons {
+    pub fn take_settings_update(&mut self) -> Option<settings::SettingsUpdate> {
+        self.manager.settings_update.take()
+    }
+
+    pub fn settings_saved(&mut self, result: Result<(), String>) {
+        if let Some(draft) = &mut self.manager.settings {
+            draft.saved(result);
+        }
+    }
+
     pub fn manager_has_detail(&self) -> bool {
         self.manager.detail_visible && self.manager.selected.is_some()
     }
@@ -128,7 +142,7 @@ mod tests {
         let directory = root.join("addons/fixture");
         std::fs::create_dir_all(&directory).unwrap();
         std::fs::write(directory.join("addon.toml"), "id='fixture'\nname='Fixture'\nversion='1'\nprotocol=1\nexecutable='program'\nicon='icon.png'\npanel='right'\n").unwrap();
-        std::fs::write(directory.join("program"), "#!/bin/sh\nwhile IFS= read -r line; do\ncase \"$line\" in *shutdown*) exit 0;; esac\ndone\n").unwrap();
+        std::fs::write(directory.join("program"), "#!/bin/sh\nwhile IFS= read -r line; do\ncase \"$line\" in *initialize*) printf '%s' \"$line\" > initialize.json;; *shutdown*) exit 0;; esac\ndone\n").unwrap();
         std::fs::set_permissions(
             directory.join("program"),
             std::fs::Permissions::from_mode(0o755),
@@ -180,6 +194,44 @@ mod tests {
         assert!(!host.installation_pending("fixture"));
         assert!(host.entries[0].process.is_some());
         assert_eq!(host.manager.error.as_deref(), Some("simulated failure"));
+    }
+
+    #[test]
+    fn saved_settings_reach_the_addon_only_after_restart() {
+        let root = tempfile::tempdir().unwrap();
+        let mut host = running_fixture(root.path());
+        let started = host.entries[0].process.as_ref().unwrap().started;
+        let state =
+            serde_json::json!({"binary_path":"/container tools/opencode","autostart":false});
+        host.apply_settings(
+            &BTreeMap::new(),
+            &[("fixture".into(), state.clone())].into(),
+        );
+        assert_eq!(host.entries[0].process.as_ref().unwrap().started, started);
+        assert_eq!(host.entries[0].seed, state);
+        host.manager_action(
+            Action::Restart("fixture".into()),
+            &egui::Context::default(),
+            &mut BTreeMap::new(),
+        );
+        assert_ne!(host.entries[0].process.as_ref().unwrap().started, started);
+        let path = host.entries[0].directory.join("initialize.json");
+        let deadline = std::time::Instant::now() + Duration::from_secs(2);
+        let message: serde_json::Value = loop {
+            if let Some(message) = std::fs::read(&path)
+                .ok()
+                .and_then(|b| serde_json::from_slice::<serde_json::Value>(&b).ok())
+                .filter(|message| message["params"]["context"]["state"] == state)
+            {
+                break message;
+            }
+            assert!(
+                std::time::Instant::now() < deadline,
+                "No initialize message captured"
+            );
+            std::thread::sleep(Duration::from_millis(10));
+        };
+        assert_eq!(message["params"]["context"]["state"], state);
     }
 
     #[test]
@@ -828,6 +880,7 @@ impl Addons {
         }
         let mut action = None;
         let mut back = false;
+        let manager_busy = self.manager_busy();
         egui::ScrollArea::vertical()
             .id_salt("addon_manager_details")
             .show(ui, |ui| {
@@ -900,7 +953,7 @@ impl Addons {
                             if let Some(error) = &addon.error {
                                 theme::text(ui, error, focus_addon_sdk::TextRole::Error);
                             }
-                            ui.add_enabled_ui(!self.manager_busy(), |ui| {
+                            ui.add_enabled_ui(!manager_busy, |ui| {
                                 ui.horizontal_wrapped(|ui| {
                                     if theme::role_button(
                                         ui,
@@ -938,6 +991,19 @@ impl Addons {
                             });
                         });
                         ui.add_space(16.0);
+                        if self.context.workspace.is_none() && !addon.manifest.settings.is_empty() {
+                            ui.label("Open a workspace to configure this addon.");
+                        }
+                        if let Some(update) = settings::show(
+                            ui,
+                            &mut self.manager.settings,
+                            addon,
+                            self.context.generation,
+                            self.context.workspace.is_some() && !manager_busy,
+                            self.context.runtime.is_some(),
+                        ) {
+                            self.manager.settings_update = Some(update);
+                        }
                     }
                     if let (Some(catalog), Some(package)) = (&self.manager.catalog, remote) {
                         theme::card(ui, |ui| {

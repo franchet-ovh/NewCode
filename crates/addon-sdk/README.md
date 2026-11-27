@@ -134,6 +134,16 @@ outside the shared executable folder. Updates and uninstall preserve workspace
 data and OS-keyring credentials. Old global state is not imported. Do not write
 runtime state into the installation directory.
 
+Optional `[[settings]]` manifest entries declare non-secret workspace text fields
+with `key`, `label`, and optional `description` and `placeholder` strings. Keys
+must be unique and use the same characters as addon IDs. The Addons manager
+renders these fields for installed addons, including disabled ones. Saving
+merges non-empty text into `[addon_state.<id>]` in the workspace's settings;
+blank fields remove their keys. Other state is preserved. Values are delivered
+through `Context.state` on initialization or the next workspace context change;
+saving does not notify or restart running addons. Tell users to restart the
+addon to apply changes. Manifests without settings remain supported.
+
 The GitHub addon is a complete example. Build it separately with:
 
 ```sh
