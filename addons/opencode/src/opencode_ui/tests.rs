@@ -88,6 +88,9 @@ impl OpenCodeUi {
     pub(crate) fn test_draft(&self) -> &str {
         &self.input
     }
+    pub(crate) fn test_binary_path(&self) -> &str {
+        &self.binary_path
+    }
 }
 
 #[test]

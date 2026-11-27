@@ -45,20 +45,24 @@ pub(super) fn restore_open_files(settings: &Settings) -> (Vec<PathBuf>, Option<P
 
 impl EditorApp {
     pub(crate) fn save_settings(&self) -> bool {
-        if self.settings.workspace.is_none() {
-            return true;
-        }
-        let mut settings = self.settings.clone();
-        settings.session_workspace = settings.workspace.clone();
-        settings.open_files = self.open_files.clone();
-        settings.active_file = self.active_file.clone();
-        match crate::settings::write_workspace(&self.settings_path, &settings) {
+        match self.save_settings_result() {
             Ok(()) => true,
             Err(error) => {
                 log::warn!("Workspace settings write failed: {error}");
                 false
             }
         }
+    }
+
+    pub(super) fn save_settings_result(&self) -> Result<(), String> {
+        if self.settings.workspace.is_none() {
+            return Ok(());
+        }
+        let mut settings = self.settings.clone();
+        settings.session_workspace = settings.workspace.clone();
+        settings.open_files = self.open_files.clone();
+        settings.active_file = self.active_file.clone();
+        crate::settings::write_workspace(&self.settings_path, &settings)
     }
 
     pub(super) fn choose_workspace(&mut self, ctx: &eframe::egui::Context) {

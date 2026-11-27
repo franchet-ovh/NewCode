@@ -62,6 +62,11 @@ impl Panel for App {
         }
         let runtime = self.context.runtime.clone().map(Into::into);
         self.current.set_runtime(runtime.as_ref());
+        self.current.set_binary_path(
+            self.context.state["binary_path"]
+                .as_str()
+                .unwrap_or_default(),
+        );
         if let Some(id) = self
             .context
             .workspace
@@ -137,6 +142,31 @@ fn main() {
 #[cfg(test)]
 mod workspace_tests {
     use super::*;
+    #[test]
+    fn workspace_context_applies_binary_path_to_cached_ui_instances() {
+        let ctx = egui::Context::default();
+        let mut app = App::default();
+        let context = |name: &str, binary: serde_json::Value| Context {
+            workspace: Some(PathBuf::from(name)),
+            state: serde_json::json!({"autostart":false,"binary_path":binary}),
+            ..Default::default()
+        };
+        app.context(context("first", serde_json::json!("/first/opencode")), &ctx);
+        assert_eq!(app.current.test_binary_path(), "/first/opencode");
+        app.context(
+            context("second", serde_json::json!("/container/opencode")),
+            &ctx,
+        );
+        assert_eq!(app.current.test_binary_path(), "/container/opencode");
+        app.context(
+            context("first", serde_json::json!("/updated/opencode")),
+            &ctx,
+        );
+        assert_eq!(app.current.test_binary_path(), "/updated/opencode");
+        app.context(context("second", serde_json::Value::Null), &ctx);
+        assert_eq!(app.current.test_binary_path(), "");
+    }
+
     #[test]
     fn workspace_changes_preserve_drafts_and_hidden_events_update_status() {
         let root = std::env::temp_dir().join(format!(

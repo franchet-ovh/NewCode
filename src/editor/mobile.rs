@@ -225,8 +225,7 @@ impl EditorApp {
                                 {
                                     self.addons.dismiss_manager_detail();
                                 }
-                                self.addons
-                                    .manager_central(ui, &mut self.settings.addon_enabled);
+                                self.addon_manager_central(ui);
                             } else {
                                 self.addons
                                     .manager_sidebar(ui, &mut self.settings.addon_enabled);

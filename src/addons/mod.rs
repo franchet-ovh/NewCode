@@ -11,6 +11,7 @@ mod ui;
 #[cfg(test)]
 use installation::load_manifest;
 mod services;
+mod settings;
 mod surface;
 #[cfg(test)]
 mod tests;

@@ -85,6 +85,68 @@ fn request_ids_are_monotonic_and_shutdown_disconnects_the_queue() {
     assert!(rx.recv_timeout(Duration::from_millis(50)).is_err());
 }
 
+fn startup_error(server: &Server) -> String {
+    let deadline = std::time::Instant::now() + Duration::from_secs(3);
+    loop {
+        for event in server.drain() {
+            if let Event::Closed(error) = event {
+                return error;
+            }
+        }
+        assert!(
+            std::time::Instant::now() < deadline,
+            "No startup error received"
+        );
+        std::thread::sleep(Duration::from_millis(10));
+    }
+}
+
+#[test]
+fn configured_executable_with_spaces_is_launched_without_a_shell() {
+    use std::os::unix::fs::PermissionsExt;
+    let root = std::env::temp_dir().join(format!("focus-opencode-binary-{}", std::process::id()));
+    std::fs::create_dir_all(&root).unwrap();
+    let binary = root.join("custom binary; touch injected");
+    std::fs::write(
+        &binary,
+        "#!/bin/sh\nprintf '%s\\n' \"$@\" > received-args\nexit 13\n",
+    )
+    .unwrap();
+    std::fs::set_permissions(&binary, std::fs::Permissions::from_mode(0o755)).unwrap();
+    let server = Server::spawn(
+        &root,
+        None,
+        binary.to_str().unwrap().into(),
+        egui::Context::default(),
+    );
+    let error = startup_error(&server);
+    assert!(error.contains("exited during startup"), "{error}");
+    assert!(error.contains("custom binary; touch injected"), "{error}");
+    assert_eq!(
+        std::fs::read_to_string(root.join("received-args")).unwrap(),
+        "serve\n--hostname\n127.0.0.1\n--port\n0\n"
+    );
+    assert!(!root.join("injected").exists());
+    drop(server);
+    std::fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn missing_configured_executable_reports_the_setting_to_fix() {
+    let root = std::env::temp_dir();
+    let binary = root.join(format!("missing-opencode-{}", std::process::id()));
+    let server = Server::spawn(
+        &root,
+        None,
+        binary.to_str().unwrap().into(),
+        egui::Context::default(),
+    );
+    let error = startup_error(&server);
+    assert!(error.contains(binary.to_str().unwrap()), "{error}");
+    assert!(error.contains("Workspace settings"), "{error}");
+    assert!(error.contains("restart"), "{error}");
+}
+
 #[test]
 #[ignore = "requires installed OpenCode and permission to start a local server; never sends model prompts"]
 fn installed_server_catalog_smoke() {
@@ -93,7 +155,7 @@ fn installed_server_catalog_smoke() {
         std::process::id()
     ));
     std::fs::create_dir_all(&root).unwrap();
-    let mut server = Server::spawn(&root, None, egui::Context::default());
+    let mut server = Server::spawn(&root, None, String::new(), egui::Context::default());
     let deadline = std::time::Instant::now() + Duration::from_secs(20);
     let mut ready = false;
     while std::time::Instant::now() < deadline && !ready {

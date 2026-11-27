@@ -29,6 +29,15 @@ pub(super) fn load_manifest(path: &Path) -> Result<Manifest, String> {
     {
         return Err("Addon package targets a different platform".into());
     }
+    let mut setting_keys = std::collections::HashSet::new();
+    for setting in &manifest.settings {
+        if !focus_addon_sdk::valid_id(&setting.key)
+            || setting.label.trim().is_empty()
+            || !setting_keys.insert(&setting.key)
+        {
+            return Err("Invalid or duplicate addon setting".into());
+        }
+    }
     let mut extensions = std::collections::HashSet::new();
     for language in &manifest.languages {
         if !focus_addon_sdk::valid_id(&language.id)

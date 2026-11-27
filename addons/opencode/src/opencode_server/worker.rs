@@ -19,13 +19,22 @@ use std::{
 pub(super) fn run(
     cwd: PathBuf,
     runtime: Option<Runtime>,
+    binary_path: String,
     commands: Receiver<Request>,
     events: Events,
     cancel: Arc<AtomicBool>,
     owned: Arc<Mutex<Option<Child>>>,
 ) {
     log::debug!("OpenCode worker starting");
-    let result = serve(&cwd, runtime.as_ref(), commands, &events, &cancel, &owned);
+    let result = serve(
+        &cwd,
+        runtime.as_ref(),
+        &binary_path,
+        commands,
+        &events,
+        &cancel,
+        &owned,
+    );
     if let Some(mut child) = owned.lock().unwrap().take() {
         super::kill(&mut child);
         let _ = child.wait();
@@ -40,6 +49,7 @@ pub(super) fn run(
 fn serve(
     cwd: &std::path::Path,
     runtime: Option<&Runtime>,
+    binary_path: &str,
     commands: Receiver<Request>,
     events: &Events,
     cancel: &Arc<AtomicBool>,
@@ -54,37 +64,15 @@ fn serve(
         if cancel.load(Ordering::Relaxed) {
             return Ok(());
         }
-        let mut command = runtime.map_or_else(
-            || Command::new("opencode"),
-            |runtime| {
-                focus_addon_support::authentication::command(
-                    runtime,
-                    "opencode",
-                    crate::authentication::ENV,
-                )
-            },
-        );
+        let program = executable(cwd, runtime, binary_path);
+        let mut command = server_command(cwd, runtime, &program);
         command.process_group(0);
         let child = command
-            .args([
-                "serve",
-                "--hostname",
-                if runtime.is_some() {
-                    "0.0.0.0"
-                } else {
-                    "127.0.0.1"
-                },
-                "--port",
-                "0",
-            ])
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
-        if runtime.is_none() {
-            child.current_dir(cwd);
-        }
         let mut child = child.spawn().map_err(|e| {
-            format!("Could not start OpenCode: {e}. Install opencode and check PATH.")
+            format!("Could not start OpenCode executable {program:?}: {e}. Check OpenCode binary in Addons → OpenCode → Workspace settings, then restart the addon.")
         })?;
         let stdout = child.stdout.take().ok_or("OpenCode stdout unavailable")?;
         let stderr = child.stderr.take().ok_or("OpenCode stderr unavailable")?;
@@ -117,7 +105,8 @@ fn serve(
             .and_then(|c| c.try_wait().ok().flatten())
         {
             return Err(format!(
-                "OpenCode exited during startup ({status}). Check its CLI configuration."
+                "OpenCode executable {:?} exited during startup ({status}). Check its CLI configuration and OpenCode binary in Addons → OpenCode → Workspace settings.",
+                executable(cwd, runtime, binary_path)
             ));
         }
         if Instant::now() >= deadline {
@@ -196,6 +185,123 @@ fn serve(
         }
     }
     Ok(())
+}
+
+fn executable(cwd: &std::path::Path, runtime: Option<&Runtime>, binary_path: &str) -> String {
+    let binary_path = binary_path.trim();
+    if binary_path.is_empty() {
+        return "opencode".into();
+    }
+    let path = std::path::Path::new(binary_path);
+    if path.is_relative() && binary_path.contains('/') {
+        let directory = runtime.map_or(cwd, |r| r.workspace_folder.as_path());
+        directory.join(path).to_string_lossy().into_owned()
+    } else {
+        binary_path.into()
+    }
+}
+
+fn server_command(cwd: &std::path::Path, runtime: Option<&Runtime>, program: &str) -> Command {
+    let mut command = runtime.map_or_else(
+        || Command::new(program),
+        |runtime| {
+            focus_addon_support::authentication::command(
+                runtime,
+                program,
+                crate::authentication::ENV,
+            )
+        },
+    );
+    command.args([
+        "serve",
+        "--hostname",
+        if runtime.is_some() {
+            "0.0.0.0"
+        } else {
+            "127.0.0.1"
+        },
+        "--port",
+        "0",
+    ]);
+    if runtime.is_none() {
+        command.current_dir(cwd);
+    }
+    command
+}
+
+#[cfg(test)]
+mod command_tests {
+    use super::*;
+    use std::path::Path;
+
+    #[test]
+    fn configured_executable_uses_the_active_runtime_workspace() {
+        let cwd = Path::new("/host/project");
+        let runtime = Runtime {
+            host_workspace: cwd.into(),
+            container_id: "fixture-container".into(),
+            workspace_folder: "/workspace/project".into(),
+            remote_user: Some("developer".into()),
+        };
+        for (value, host, container) in [
+            ("", "opencode", "opencode"),
+            (" \t", "opencode", "opencode"),
+            ("custom-opencode", "custom-opencode", "custom-opencode"),
+            (
+                " /opt/my tools/opencode ",
+                "/opt/my tools/opencode",
+                "/opt/my tools/opencode",
+            ),
+            (
+                "./tools/opencode",
+                "/host/project/./tools/opencode",
+                "/workspace/project/./tools/opencode",
+            ),
+        ] {
+            assert_eq!(executable(cwd, None, value), host);
+            assert_eq!(executable(cwd, Some(&runtime), value), container);
+        }
+        let program = "/container tools/opencode; echo $HOME";
+        let command = server_command(cwd, None, program);
+        assert_eq!(command.get_program(), program);
+        assert_eq!(command.get_current_dir(), Some(cwd));
+        assert_eq!(
+            command.get_args().collect::<Vec<_>>(),
+            ["serve", "--hostname", "127.0.0.1", "--port", "0"]
+        );
+        let command = server_command(cwd, Some(&runtime), program);
+        assert_eq!(command.get_program(), "docker");
+        let args = command
+            .get_args()
+            .map(|s| s.to_string_lossy().into_owned())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            &args[..7],
+            [
+                "exec",
+                "-i",
+                "-w",
+                "/workspace/project",
+                "-u",
+                "developer",
+                "fixture-container"
+            ]
+        );
+        // The user path is a positional argument to exec "$@", never shell code.
+        assert!(args[9].contains("exec \"$@\""));
+        assert_eq!(
+            &args[10..],
+            [
+                "addon-tool",
+                program,
+                "serve",
+                "--hostname",
+                "0.0.0.0",
+                "--port",
+                "0"
+            ]
+        );
+    }
 }
 
 pub(super) fn authorize(
