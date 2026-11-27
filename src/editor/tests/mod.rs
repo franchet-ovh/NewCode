@@ -4,6 +4,7 @@ use std::{
     path::PathBuf,
     sync::{Arc, Mutex},
 };
+mod attachment;
 mod explorer;
 mod geometry;
 mod indentation;

@@ -94,6 +94,76 @@ fn logger_records_current_session_to_both_sinks_and_redacts() {
 
 use super::*;
 #[test]
+fn attachment_requires_two_parameters_and_no_manual_host_settings() {
+    for args in [
+        vec![
+            "--attach-container",
+            "my-container",
+            "--container-workspace",
+            "/workspaces/my project",
+        ],
+        vec![
+            "--headless",
+            "--attach-container=/my-container",
+            "--container-workspace=/workspaces/my project",
+        ],
+        vec![
+            "--browser",
+            "--container-workspace=/workspaces/my project",
+            "--attach-container=my-container",
+        ],
+    ] {
+        let parsed = Arguments::parse(args.into_iter().map(Into::into)).unwrap();
+        assert!(parsed.workspace.is_none());
+        assert!(parsed.attachment.is_none());
+        let request = parsed.attachment_request.unwrap();
+        assert_eq!(
+            request.folder,
+            std::path::Path::new("/workspaces/my project")
+        );
+    }
+    for args in [
+        vec!["--attach-container"],
+        vec!["--attach-container=dev"],
+        vec!["--container-workspace=/workspace"],
+        vec!["--attach-container=", "--container-workspace=/workspace"],
+        vec![
+            "--attach-container=--help",
+            "--container-workspace=/workspace",
+        ],
+        vec!["--attach-container=dev", "--container-workspace=relative"],
+        vec!["--attach-container=dev", "--container-workspace="],
+        vec![
+            "--attach-container=dev",
+            "--container-workspace=/workspace",
+            "host-dir",
+        ],
+        vec![
+            "--attach-container=dev",
+            "--attach-container=other",
+            "--container-workspace=/workspace",
+        ],
+        vec![
+            "--attach-container=dev",
+            "--container-workspace=/workspace",
+            "--container-workspace=/other",
+        ],
+    ] {
+        assert!(Arguments::parse(args.into_iter().map(Into::into)).is_err());
+    }
+    assert_eq!(
+        Arguments::parse(["--", "--attach-container"].map(Into::into))
+            .unwrap()
+            .workspace,
+        Some("--attach-container".into())
+    );
+    assert!(
+        Arguments::parse(["--attach-container=dev", "--help"].map(Into::into))
+            .unwrap()
+            .help
+    );
+}
+#[test]
 fn native_is_default_and_ui_flag_preserves_other_arguments() {
     assert!(Arguments::parse(Vec::<OsString>::new()).unwrap().ui);
     for args in [

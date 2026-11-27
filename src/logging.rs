@@ -12,6 +12,8 @@ pub(crate) struct Arguments {
     pub(crate) headless: bool,
     pub(crate) level: Option<log::LevelFilter>,
     pub(crate) workspace: Option<PathBuf>,
+    pub(crate) attachment_request: Option<crate::dev_container::attachment::Request>,
+    pub(crate) attachment: Option<crate::dev_container::attachment::Attachment>,
     pub(crate) disabled_addons: Vec<String>,
 }
 impl Default for Arguments {
@@ -23,6 +25,8 @@ impl Default for Arguments {
             headless: false,
             level: None,
             workspace: None,
+            attachment_request: None,
+            attachment: None,
             disabled_addons: Vec::new(),
         }
     }
@@ -35,7 +39,9 @@ Usage: focus-editor [OPTIONS] [WORKSPACE]
 Options:
   --ui                     Native desktop window (default)
   --browser                Chromium/Chrome app window (requires installed browser)
-  --headless               Workspace session without a local window; requires WORKSPACE
+  --headless               Workspace session without a local window; requires a workspace
+  --attach-container NAME  Attach to an already running container
+  --container-workspace DIR  Absolute folder inside that container; host bind mount required
   --foreground             Stay attached to the launching terminal
   --no-addon ID            Suppress an addon for this launch; repeatable
   --log-level LEVEL        trace, debug, info, warn, error, or off
@@ -45,11 +51,13 @@ Options:
 
 Window modes are mutually exclusive. Native mode requires a desktop display.
 For remote browser access, run focus-editor-server.
+Attachment requires both container flags and no positional WORKSPACE. No configuration file is needed.
 
 Examples:
   focus-editor ./my-project
   focus-editor --browser ./my-project
-  focus-editor --ui --foreground --log-level debug ./my-project";
+  focus-editor --ui --foreground --log-level debug ./my-project
+  focus-editor --attach-container my-container --container-workspace /workspaces/my-project";
 
 impl Arguments {
     pub(crate) fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Self, String> {
@@ -57,6 +65,8 @@ impl Arguments {
         let mut args = args.into_iter();
         let mut positional = false;
         let mut mode: Option<OsString> = None;
+        let mut container: Option<String> = None;
+        let mut container_folder: Option<PathBuf> = None;
         while let Some(arg) = args.next() {
             if !positional && (arg == "--help" || arg == "-h") {
                 result.help = true;
@@ -91,6 +101,36 @@ impl Arguments {
                 continue;
             }
             let text = arg.to_string_lossy();
+            if !positional {
+                let flag = text.split('=').next().unwrap_or("");
+                if matches!(flag, "--attach-container" | "--container-workspace") {
+                    let value = if let Some((_, value)) = text.split_once('=') {
+                        OsString::from(value)
+                    } else {
+                        args.next()
+                            .ok_or_else(|| format!("{flag} requires a value"))?
+                    };
+                    if value.is_empty() || value.to_string_lossy().starts_with("--") {
+                        return Err(format!("{flag} requires a value"));
+                    }
+                    if flag == "--attach-container" {
+                        if container.is_some() {
+                            return Err("--attach-container must be supplied once".into());
+                        }
+                        container = Some(
+                            value
+                                .into_string()
+                                .map_err(|_| "Container name must be UTF-8")?,
+                        );
+                    } else {
+                        if container_folder.is_some() {
+                            return Err("--container-workspace must be supplied once".into());
+                        }
+                        container_folder = Some(value.into());
+                    }
+                    continue;
+                }
+            }
             if !positional && (text == "--no-addon" || text.starts_with("--no-addon=")) {
                 let id = if text == "--no-addon" {
                     args.next()
@@ -125,10 +165,44 @@ impl Arguments {
                 result.workspace = Some(arg.into());
             }
         }
-        if !result.help && !result.version && result.headless && result.workspace.is_none() {
+        if !result.help && !result.version {
+            match (container, container_folder) {
+                (Some(container), Some(folder)) => {
+                    if result.workspace.is_some() {
+                        return Err("Container attachment cannot be combined with a positional host workspace".into());
+                    }
+                    let request = crate::dev_container::attachment::Request { container, folder };
+                    request.validate()?;
+                    result.attachment_request = Some(request);
+                }
+                (None, None) => {}
+                _ => {
+                    return Err(
+                        "Attachment requires both --attach-container and --container-workspace"
+                            .into(),
+                    );
+                }
+            }
+        }
+        if !result.help
+            && !result.version
+            && result.headless
+            && result.workspace.is_none()
+            && result.attachment_request.is_none()
+        {
             return Err("--headless requires a workspace".into());
         }
         Ok(result)
+    }
+
+    /// Resolve before settings, terminals, or addons can initialize a host session.
+    pub(crate) fn resolve_attachment(&mut self) -> Result<(), String> {
+        if let Some(request) = &self.attachment_request {
+            let attachment = request.resolve()?;
+            self.workspace = Some(attachment.runtime.host_workspace.clone());
+            self.attachment = Some(attachment);
+        }
+        Ok(())
     }
 }
 fn filter(level: Option<log::LevelFilter>, environment: Option<String>) -> String {
