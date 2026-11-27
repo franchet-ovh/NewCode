@@ -1,8 +1,8 @@
 execution = "workspace"
 id = "codex"
 name = "Codex"
-version = "0.7.0"
-editor_version_req = ">=0.6.1, <0.7.0"
+version = "0.7.1"
+editor_version_req = ">=0.6.1, <0.8.0"
 protocol = 1
 executable = "focus-addon-codex"
 icon = "icon.png"
