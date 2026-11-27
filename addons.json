@@ -8,10 +8,63 @@
         {
           "version": "0.7.1",
           "release": "addon_codex_0.7.1",
-          "status": "planned",
+          "status": "published",
           "protocol": 1,
           "editor_version_req": ">=0.6.1, <0.8.0",
-          "packages": []
+          "packages": [
+            {
+              "id": "codex",
+              "name": "Codex",
+              "description": "",
+              "publisher": "",
+              "version": "0.7.1",
+              "protocol": 1,
+              "target": "aarch64-unknown-linux-gnu",
+              "editor_version_req": ">=0.6.1, <0.8.0",
+              "archive": "focus-addon-codex-addon_codex_0.7.1-linux-arm64.tar.gz",
+              "size": 4856290,
+              "sha256": "3995a4ac448a751311ca2b2a2c9adacc5f1ae6f046f7a77cadbde165fae61eb0"
+            },
+            {
+              "id": "codex",
+              "name": "Codex",
+              "description": "",
+              "publisher": "",
+              "version": "0.7.1",
+              "protocol": 1,
+              "target": "aarch64-unknown-linux-musl",
+              "editor_version_req": ">=0.6.1, <0.8.0",
+              "archive": "focus-addon-codex-addon_codex_0.7.1-linux-musl-arm64.tar.gz",
+              "size": 4868504,
+              "sha256": "4a306f482265584e9e31f299ab7101e433a8e0427cb7b45914b3a9869858bd05"
+            },
+            {
+              "id": "codex",
+              "name": "Codex",
+              "description": "",
+              "publisher": "",
+              "version": "0.7.1",
+              "protocol": 1,
+              "target": "x86_64-unknown-linux-gnu",
+              "editor_version_req": ">=0.6.1, <0.8.0",
+              "archive": "focus-addon-codex-addon_codex_0.7.1-linux-amd64.tar.gz",
+              "size": 5082059,
+              "sha256": "2b77209b9da996198fd20a7dc0d1367471fd2cf0e91a4dc76da9d57fbdea1422"
+            },
+            {
+              "id": "codex",
+              "name": "Codex",
+              "description": "",
+              "publisher": "",
+              "version": "0.7.1",
+              "protocol": 1,
+              "target": "x86_64-unknown-linux-musl",
+              "editor_version_req": ">=0.6.1, <0.8.0",
+              "archive": "focus-addon-codex-addon_codex_0.7.1-linux-musl-amd64.tar.gz",
+              "size": 5263395,
+              "sha256": "fcf0c62efd7054034929c16cb167ecb9cb2fd0506a060a0f149cd69db191eed9"
+            }
+          ]
         },
         {
           "version": "0.7.0",
